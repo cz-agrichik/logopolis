@@ -14,7 +14,7 @@ const BALANCE = {
   buildCostGrowth: 1.25,   // каждое следующее здание того же типа дороже
   upCostBase: 1.5,         // цена улучшения 1→2 = цена постройки × 1.5
   upCostGrowth: 1.5,       // каждое следующее улучшение дороже в 1.5 раза
-  upProdStep: 0.2,         // а каждый уровень добавляет лишь +20% базового выпуска
+  upProdGrowth: 1.2,       // а выпуск растёт лишь в 1.2 раза за уровень (сложный процент)
   logosFromLevel: 4,       // λ нужен на 4-м уровне и дальше через один: 4, 6, 8, 10
   logosEvery: 2,
   logosGrowth: 1.5,        // каждый следующий «λ-уровень» дороже в 1.5 раза
@@ -99,23 +99,23 @@ const EPOCHS = [
 // ------------------------------------------------------------
 const BUILDINGS = {
   house: {
-    stages: [['🛖'], ['🏠'], ['🏡'], ['🏡', '🏠'], ['🏡', '🏠', '🏠']],
+    art: 'house',
     name: 'Жилище', terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 12,
     forms: [{ name: 'Круглая хижина', icon: '🛖' }, { name: 'Дом из сырцового кирпича', icon: '🏠', capBonus: 2 }],
-    desc: 'Даёт места для жителей: 4 на 1-м уровне, +1 за каждый следующий.',
+    desc: 'Даёт места для жителей: 4 на 1-м уровне, ×1.2 за каждый следующий.',
     lore: `В энеолите кипрские дома круглые: каменный цоколь, стены из глины и плетня, очаг в центре. Такие дома
       раскопаны в Лембе и Киссонерге. В позднем бронзовом веке строят прямоугольные дома из сырцового кирпича
       на каменном фундаменте, с внутренними двориками.`,
   },
   field: {
-    stages: [['🌱'], ['🌿'], ['🌾'], ['🌾', '🌿'], ['🌾', '🌾', '🌾']],
+    art: 'field',
     name: 'Поле', terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 15,
     forms: [{ name: 'Поле ячменя', icon: '🌾' }, { name: 'Поле с бронзовыми серпами', icon: '🌾' }],
     desc: 'Главный источник зерна.',
     lore: 'Ячмень и пшеница — основа питания древнего Кипра; их выращивали здесь с неолита.',
   },
   goatpen: {
-    stages: [['🐐'], ['🐏'], ['🐐', '🐏'], ['🐏', '🐐', '🐐'], ['🐏', '🐐', '🐐']],
+    art: 'goatpen',
     name: 'Козий загон', terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1,
     prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 15,
     forms: [{ name: 'Козий загон', icon: '🐐' }, { name: 'Козья ферма', icon: '🐐' }],
@@ -125,7 +125,7 @@ const BUILDINGS = {
       Из козьего и овечьего молока на Кипре веками делают сыр — от этой традиции ведёт родословную знаменитый халлуми.`,
   },
   lumber: {
-    stages: [['🪓'], ['🪵'], ['🪵', '🪓'], ['🪵', '🪓', '🪵'], ['🪵', '🪓', '🪵']],
+    art: 'lumber',
     name: 'Лесорубы', terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, lp: 15,
     forms: [{ name: 'Стоянка лесорубов', icon: '🪓' }, { name: 'Лесорубы с бронзовыми топорами', icon: '🪓' }],
     desc: 'Рубят лес. Ставятся только в лесу.',
@@ -133,14 +133,14 @@ const BUILDINGS = {
       и на топливо для медеплавилен — на выплавку меди уходили целые рощи.`,
   },
   quarry: {
-    stages: [['⛏️'], ['🪨'], ['🪨', '⛏️'], ['🪨', '⛏️', '🪨'], ['🪨', '⛏️', '🪨']],
+    art: 'quarry',
     name: 'Каменоломня', terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, lp: 15,
     forms: [{ name: 'Каменоломня', icon: '⛏️' }, { name: 'Каменоломня тёсаного камня', icon: '⛏️' }],
     desc: 'Добывает камень. Ставится на холмах.',
     lore: 'Известняк и гипс — обычный строительный камень Кипра; в бронзовом веке из них тешут блоки для монументальных зданий.',
   },
   workshop: {
-    stages: [['🔨'], ['🏺'], ['🏺', '🔨'], ['🏺', '🔨', '🏺'], ['🏺', '🔨', '🏺']],
+    art: 'workshop',
     name: 'Мастерская', terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2,
     prod: { goods: 0.1 }, lp: 18,
     forms: [{ name: 'Мастерская резчиков', icon: '🔨' }, { name: 'Гончарная мастерская', icon: '🏺' }],
@@ -149,14 +149,14 @@ const BUILDINGS = {
       в руслах рек Курис и Карьотис, и лепят расписную красно-белую посуду.`,
   },
   storehouse: {
-    stages: [['🧺'], ['📦'], ['📦', '🧺'], ['📦', '🧺', '📦'], ['📦', '🧺', '📦']],
-    name: 'Склад', terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 250, lp: 18,
+    art: 'store',
+    name: 'Склад', terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 18,
     forms: [{ name: 'Амбар', icon: STORAGE_ICON }, { name: 'Кладовая пифосов', icon: STORAGE_ICON }],
-    desc: 'Увеличивает вместимость всех складов: +250 за каждый уровень.',
+    desc: 'Увеличивает вместимость всех складов: +400 на 1-м уровне, ×1.2 за каждый следующий.',
     lore: 'Зерно и припасы хранили в ямах, корзинах и огромных глиняных сосудах — пифосах, высотой в человеческий рост.',
   },
   mine: {
-    stages: [['⚒️'], ['🟠'], ['🟠', '⚒️'], ['🟠', '⚒️', '🟠'], ['🟠', '⚒️', '🟠']],
+    art: 'mine',
     name: 'Медный рудник', terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3,
     prod: { copper: 0.15 }, lp: 30,
     forms: [null, { name: 'Медный рудник', icon: '⚒️' }],
@@ -165,7 +165,7 @@ const BUILDINGS = {
       у Скуриотиссы и Тамассоса.`,
   },
   port: {
-    stages: [['⚓'], ['🛶'], ['⛵'], ['⛵', '🛶'], ['⛵', '🛶', '⛵']],
+    art: 'port',
     name: 'Гавань', terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3,
     prod: { copper: -0.12, goods: 0.16, food: 0.32 }, lp: 30,
     forms: [null, { name: 'Гавань', icon: '⚓' }],
@@ -174,7 +174,7 @@ const BUILDINGS = {
       XIV в. до н. э. с десятью тоннами медных слитков — по всей видимости, кипрских.`,
   },
   foundry: {
-    stages: [['🔥'], ['🔔'], ['🔔', '🔥'], ['🔔', '🔥', '🔔'], ['🔔', '🔥', '🔔']],
+    art: 'foundry',
     name: 'Бронзолитейня', terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3,
     prod: { copper: -0.2, bronze: 0.06 }, lp: 30,
     forms: [null, { name: 'Бронзолитейня', icon: '🔥' }],
@@ -182,7 +182,7 @@ const BUILDINGS = {
     lore: 'Бронза — сплав меди и олова. Олова на Кипре нет: его везли издалека, поэтому бронза — дело морской торговли.',
   },
   scribe: {
-    stages: [['📜'], ['✍️'], ['📜', '✍️'], ['📜', '✍️', '📜'], ['📜', '✍️', '📜']],
+    art: 'scribe',
     name: 'Дом писцов', terrain: ['plain'], epoch: 1, tech: 'writing', max: 2, cost: { wood: 250, stone: 250, goods: 150 },
     workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 35,
     forms: [null, { name: 'Дом писцов', icon: '📜' }],
@@ -265,32 +265,32 @@ const BUILDINGS = {
 //  Знания: λ + ресурсы. effect — постоянный бонус.
 // ------------------------------------------------------------
 const TECHS = [
-  { id: 'cheesemaking', epoch: 0, icon: '🧀', name: 'Сыроделие', logos: 30, cost: { food: 150 },
+  { id: 'cheesemaking', art: 'res:cheese', epoch: 0, icon: '🧀', name: 'Сыроделие', logos: 30, cost: { food: 150 },
     desc: 'Козьи загоны начинают давать сыр.' },
-  { id: 'carving', epoch: 0, icon: '🗿', name: 'Резьба по камню', logos: 40, cost: { stone: 150 },
+  { id: 'carving', art: 'workshop0', epoch: 0, icon: '🗿', name: 'Резьба по камню', logos: 40, cost: { stone: 150 },
     desc: 'Фигурки и подвески из голубовато-зелёного речного камня. Открывает мастерскую и ремёсла.' },
-  { id: 'granary', epoch: 0, icon: STORAGE_ICON, name: 'Зернохранилища', logos: 50, cost: { wood: 400 },
+  { id: 'granary', art: 'store1', epoch: 0, icon: STORAGE_ICON, name: 'Зернохранилища', logos: 50, cost: { wood: 400 },
     desc: '+25% зерна, +150 к вместимости складов.', effect: { mult: { food: 0.25 }, storage: 150 } },
-  { id: 'foundations', epoch: 0, icon: '🧱', name: 'Каменные основания', logos: 60, cost: { stone: 500 },
+  { id: 'foundations', art: 'house1', epoch: 0, icon: '🧱', name: 'Каменные основания', logos: 60, cost: { stone: 500 },
     desc: 'Каждое жилище даёт +1 место.', effect: { houseCap: 1 } },
-  { id: 'redwhite', epoch: 0, icon: '🏺', name: 'Красно-белая керамика', logos: 80, cost: { goods: 120, wood: 300 }, req: ['carving'],
+  { id: 'redwhite', art: 'res:goods', epoch: 0, icon: '🏺', name: 'Красно-белая керамика', logos: 80, cost: { goods: 120, wood: 300 }, req: ['carving'],
     desc: 'Узнаваемая расписная посуда энеолита (стиль Эрими). Мастерские +30%.', effect: { bmult: { workshop: 0.3 } } },
-  { id: 'nativecopper', epoch: 0, icon: '🪡', name: 'Первая медь', logos: 100, cost: { stone: 600, goods: 150 }, req: ['carving'],
+  { id: 'nativecopper', art: 'res:copper', epoch: 0, icon: '🪡', name: 'Первая медь', logos: 100, cost: { stone: 600, goods: 150 }, req: ['carving'],
     desc: 'Медные шила и топорики из самородной меди. Дерево и камень +20%.', effect: { mult: { wood: 0.2, stone: 0.2 } } },
 
-  { id: 'smelting', epoch: 1, icon: '🔥', name: 'Выплавка меди', logos: 100, cost: { wood: 900 },
+  { id: 'smelting', art: 'mine2', epoch: 1, icon: '🔥', name: 'Выплавка меди', logos: 100, cost: { wood: 900 },
     desc: 'Открывает медный рудник.' },
-  { id: 'seafaring', epoch: 1, icon: '⛵', name: 'Мореплавание', logos: 130, cost: { wood: 1200 },
+  { id: 'seafaring', art: 'port1', epoch: 1, icon: '⛵', name: 'Мореплавание', logos: 130, cost: { wood: 1200 },
     desc: 'Открывает гавань.' },
-  { id: 'ashlar', epoch: 1, icon: '🧱', name: 'Тёсаная кладка', logos: 120, cost: { stone: 1200 },
+  { id: 'ashlar', art: 'quarry1', epoch: 1, icon: '🧱', name: 'Тёсаная кладка', logos: 120, cost: { stone: 1200 },
     desc: 'Каждое жилище +2 места, склады +20%.', effect: { houseCap: 2, storagePct: 0.2 } },
-  { id: 'bronze', epoch: 1, icon: '🔔', name: 'Бронза', logos: 160, cost: { copper: 450 }, req: ['smelting', 'seafaring'],
+  { id: 'bronze', art: 'foundry1', epoch: 1, icon: '🔔', name: 'Бронза', logos: 160, cost: { copper: 450 }, req: ['smelting', 'seafaring'],
     desc: 'Олово из-за моря + кипрская медь. Открывает бронзолитейню.' },
-  { id: 'oxhide', epoch: 1, icon: '🟧', name: 'Слитки «воловья шкура»', logos: 200, cost: { copper: 600 }, req: ['seafaring'],
+  { id: 'oxhide', art: 'sp_ingot', epoch: 1, icon: '🟧', name: 'Слитки «воловья шкура»', logos: 200, cost: { copper: 600 }, req: ['seafaring'],
     desc: 'Стандартные слитки для морской торговли. Гавани +50%.', effect: { bmult: { port: 0.5 } } },
-  { id: 'bronzetools', epoch: 1, icon: '🪓', name: 'Бронзовые орудия', logos: 200, cost: { bronze: 150 }, req: ['bronze'],
+  { id: 'bronzetools', art: 'res:bronze', epoch: 1, icon: '🪓', name: 'Бронзовые орудия', logos: 200, cost: { bronze: 150 }, req: ['bronze'],
     desc: 'Зерно, дерево и камень +25%.', effect: { mult: { food: 0.25, wood: 0.25, stone: 0.25 } } },
-  { id: 'writing', epoch: 1, icon: '📜', name: 'Кипро-минойское письмо', logos: 160, cost: { goods: 450 },
+  { id: 'writing', art: 'scribe0', epoch: 1, icon: '📜', name: 'Кипро-минойское письмо', logos: 160, cost: { goods: 450 },
     desc: 'Открывает дом писцов (бонус к Логосу).' },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));

@@ -5,6 +5,45 @@
 // ============================================================
 
 const pl = (id, text) => `<a href="#" data-pedia="${id}">${text}</a>`;
+const ri = k => Art.res(k, 'inl');
+const bi = k => Art.svg(k, 'inl');
+
+// Ссылки на фотографии реальных находок и мест (поиск по Wikimedia Commons — свободные лицензии)
+const PHOTOS = {
+  'e:0': [['Pomos idol', 'идол из Помоса'], ['Chalcolithic Cyprus', 'находки энеолита'], ['Erimi Cyprus', 'Эрими']],
+  'e:1': [['Enkomi', 'Энкоми'], ['oxhide ingot', 'слитки «воловья шкура»'], ['Cypro-Minoan', 'кипро-минойское письмо']],
+  'e:2': [['Salamis Cyprus', 'Саламин'], ['Palaepaphos', 'Палепафос']],
+  'b:house': [['Choirokoitia reconstruction', 'реконструкция круглых домов, Хирокития']],
+  'b:goatpen': [['goats Cyprus', 'козы на Кипре'], ['halloumi', 'халлуми']],
+  'b:workshop': [['picrolite figurine Cyprus', 'фигурки из пикролита'], ['Red-on-White ware Cyprus', 'красно-белая керамика']],
+  'b:storehouse': [['pithos Cyprus', 'пифосы']],
+  'b:mine': [['Skouriotissa', 'рудник Скуриотисса'], ['oxhide ingot', 'медные слитки']],
+  'b:port': [['Uluburun shipwreck', 'корабль из Улубуруна']],
+  'b:foundry': [['Late Bronze Age Cyprus bronze', 'кипрская бронза']],
+  'b:scribe': [['Cypro-Minoan', 'кипро-минойские надписи']],
+  'b:sp_lemba': [['Lemba Lady', '«Госпожа из Лембы»'], ['Lemba Lakkous', 'поселение Лемба']],
+  'b:sp_troodos': [['Cyprus mouflon', 'кипрский муфлон'], ['Troodos mountains', 'горы Троодос']],
+  'b:sp_souskiou': [['Souskiou', 'Суския'], ['cruciform figurine Cyprus', 'крестообразные фигурки']],
+  'b:shrine1': [['Pomos idol', 'идол из Помоса'], ['cruciform figurine Cyprus', 'крестообразные фигурки']],
+  'b:sp_halasultan': [['Hala Sultan Tekke', 'Хала-Султан-Текке и Солёное озеро']],
+  'b:sp_ingot': [['Ingot God Enkomi', 'Слитковый бог из Энкоми']],
+  'b:sp_walls': [['Enkomi', 'Энкоми'], ['Kition', 'Китион']],
+  'b:sp_palace': [['Amarna letters', 'письма из Амарны'], ['Kalavasos Ayios Dhimitrios', 'Каловасос']],
+  'b:shrine2': [['Horned God Enkomi', 'Рогатый бог из Энкоми']],
+  't:redwhite': [['Red-on-White ware Cyprus', 'красно-белая керамика']],
+  't:oxhide': [['oxhide ingot', 'слитки «воловья шкура»']],
+  't:writing': [['Cypro-Minoan', 'кипро-минойское письмо']],
+  't:carving': [['picrolite figurine Cyprus', 'фигурки из пикролита']],
+  'a:goats': [['Cyprus mouflon', 'кипрский муфлон'], ['goats Cyprus', 'козы на Кипре'], ['halloumi', 'халлуми']],
+  'a:religion': [['Pomos idol', 'идол из Помоса'], ['Kissonerga', 'находки из Киссонерги'], ['Horned God Enkomi', 'Рогатый бог'],
+    ['Ingot God Enkomi', 'Слитковый бог'], ['Palaepaphos sanctuary', 'святилище в Палепафосе']],
+};
+const photosHtml = id => {
+  const list = PHOTOS[id];
+  if (!list) return '';
+  return `<div class="photos"><b>🖼 Фото на Wikimedia Commons:</b> ${list.map(([q, label]) =>
+    `<a class="ext" href="https://commons.wikimedia.org/w/index.php?search=${encodeURIComponent(q)}&title=Special:MediaSearch&type=image" target="_blank" rel="noopener">${label}</a>`).join(' · ')}</div>`;
+};
 
 const PEDIA_ARTICLES = [
   { id: 'basics', icon: '🏛️', title: 'Как играть', html: () => `
@@ -84,10 +123,10 @@ const PEDIA_ARTICLES = [
 
   { id: 'import', icon: '📥', title: 'Импорт колод', html: () => `
     <h4>Встроенные колоды</h4>
-    <p>Кроме стартового набора «Кипр» (перевод на русский) в игре есть ~420 слов уровня A1 (перевод на английский),
-    разбитых на колоды: существительные мужского и женского рода (в подсказке — артикль), люди и профессии,
-    наречия и числа, глаголы на -ω, на -άω/-ώ и на -μαι. Все включены по умолчанию — отключите лишние галочкой.
-    Варианты ответа берутся из той же колоды, так что язык перевода не подсказывает ответ.</p>
+    <p>Кроме стартового набора «Кипр» в игре есть ~420 слов уровня A1 с русским переводом, разбитых на колоды:
+    существительные мужского и женского рода, люди и профессии, наречия и числа, глаголы на -ω, на -άω/-ώ и на -μαι.
+    В подсказке у существительных — артикль (ο, η, а у слов общего рода — ο/η). Все колоды включены по умолчанию — лишние отключите галочкой.
+    Варианты ответа берутся из той же колоды, поэтому они одной части речи.</p>
     <h4>Своя колода</h4>
     <p>Вкладка «Карточки» → «Импорт колоды». Вставьте текст или выберите файл (.txt, .tsv, .csv, .json).
     Колоду можно выключить галочкой — тогда её карточки не попадут в раунды.</p>
@@ -121,42 +160,46 @@ const PEDIA_ARTICLES = [
       <tr><td>⚒ 18 нужно · 67%</td><td>зданиям нужно 18 работников, а жителей 12: все здания работают на 67%. Стройте и улучшайте жилища.</td></tr>
     </table>` },
 
-  { id: 'storage', icon: STORAGE_ICON, title: 'Склады', html: () => `
+  { id: 'storage', icon: 'art:store0', title: 'Склады', html: () => `
     <p>Каждый ресурс хранится отдельно, но предел у всех общий: ${BALANCE.baseStorage} без построек.
-    ${pl('b:storehouse', 'Склад')} добавляет +250 за каждый уровень; знания и спецстроения увеличивают вместимость ещё.</p>
+    ${pl('b:storehouse', 'Склад')} добавляет 400 на 1-м уровне и в 1.2 раза больше за каждый следующий; знания и спецстроения увеличивают вместимость ещё.</p>
     <p>Когда склад полон, ресурс подсвечивается красным и дальше не копится. <b>Цена, которая больше вместимости,
     недоступна вовсе</b> — поэтому перед большими стройками и переходом эпохи придётся строить и улучшать склады.</p>
-    <p>Текущая вместимость — значок ${STORAGE_ICON} в верхней панели.</p>` },
+    <p>Текущая вместимость — значок ${bi('store0')} в верхней панели.</p>` },
 
   { id: 'upgrade', icon: '⬆️', title: 'Улучшение зданий', html: () => {
     const ex = 'field';
-    let rows = '';
+    let rows = `<tr><td>1</td><td>${Game.icons(ex, 1).map(bi).join('')}</td><td>${num(BUILDINGS[ex].prod.food)}/с <span class="dim">(×1)</span></td><td>${Object.entries(BUILDINGS[ex].cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
     for (let L = 2; L <= 10; L++) {
       const { cost, logos } = Game.upgradeCost(ex, L);
-      rows += `<tr class="${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Game.icons(ex, L).join('')}</td><td>${num(BUILDINGS[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(+${Math.round((Game.levelMult(L) - 1) * 100)}%)</span></td>
-        <td>${logos ? `<b>λ ${logos}</b> <span class="dim">· новый облик</span>` : Object.entries(cost).map(([k, v]) => `${RES[k].icon} ${v}`).join(' ')}</td></tr>`;
+      rows += `<tr class="${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Game.icons(ex, L).map(bi).join('')}</td><td>${num(BUILDINGS[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))})</span></td>
+        <td>${logos ? `<b>λ ${logos}</b> <span class="dim">· новый облик</span>` : Object.entries(cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`;
     }
     return `
     <p>Кликните по зданию, чтобы увидеть, что даст следующий уровень, или <b>Shift+клик</b>, чтобы улучшить сразу.</p>
     <h4>Два вида уровней</h4>
     <ul>
       <li><b>Уровни труда</b> (2, 3, 5, 7, 9) — только за обычные ресурсы. Облик здания не меняется.</li>
-      <li><b>Уровни мудрости</b> (4, 6, 8, 10) — <b>только за λ</b>, без ресурсов. Именно они меняют облик здания на карте:
-      хижина становится домом, росток — колосьями, а на высоких уровнях вырастает целая группа построек в золотой рамке.</li>
+      <li><b>Уровни мудрости</b> (4, 6, 8, 10) — <b>только за λ</b>, без ресурсов. Именно они меняют облик здания на карте,
+      а на 8-м и 10-м уровне вырастает целая группа построек в золотой рамке.</li>
     </ul>
-    <h4>Закон убывающей отдачи</h4>
+    <h4>Формулы</h4>
+    <p class="formula">Выпуск = база × ${BALANCE.upProdGrowth}<sup>уровень−1</sup> × (1 + сумма бонусов) × благословения</p>
     <ul>
-      <li>Каждый уровень добавляет <b>+${Math.round(BALANCE.upProdStep * 100)}% к базовому выпуску</b>: 2-й — 120%, 3-й — 140%, 10-й — 280%.</li>
-      <li>Цена ресурсами растёт <b>в ${BALANCE.upCostGrowth} раза за каждый уровень</b> — и за λ-уровни тоже, хоть их ресурсами и не оплачивают.
-      Поэтому 5-й уровень стоит как 3-й × ${BALANCE.upCostGrowth} × ${BALANCE.upCostGrowth}.</li>
+      <li><b>Выпуск</b> растёт в ${BALANCE.upProdGrowth} раза за <i>каждый</i> уровень: ×1.2, ×1.44, ×1.73… на 10-м уровне — ×${num(Game.levelMult(10), 1)}.</li>
+      <li><b>Цена</b> ресурсами растёт в ${BALANCE.upCostGrowth} раза за каждый уровень, включая λ-уровни, хоть их и не оплачивают ресурсами.
+      Поэтому 5-й уровень стоит как 3-й × ${BALANCE.upCostGrowth} × ${BALANCE.upCostGrowth}. Цена растёт быстрее отдачи — высокие уровни роскошь, а не выгода.</li>
+      <li><b>Бонусы</b> знаний и спецстроений складываются между собой (+20% и +30% = +50%) и умножают уже весь выпуск здания с учётом уровня.
+      Бонус «ко всему производству» и бонус к конкретному зданию тоже просто складываются.</li>
+      <li><b>Благословения</b> обрядов — отдельный честный множитель ×2 поверх всего.</li>
       <li>λ-уровни: 4-й — базовая цена, каждый следующий в ${BALANCE.logosGrowth} раза дороже, 8-й и 10-й — ещё вдвое.</li>
-      <li>С ${BALANCE.copperFromLevel}-го уровня нужна медь, с ${BALANCE.bronzeFromLevel}-го — бронза.</li>
-      <li>Предел уровня зависит от эпохи: в медном веке — ${EPOCHS[0].maxLevel}, в бронзовом — ${EPOCHS[1].maxLevel}.</li>
+      <li>С ${BALANCE.copperFromLevel}-го уровня нужна медь, с ${BALANCE.bronzeFromLevel}-го — бронза. Предел уровня: ${EPOCHS[0].maxLevel} в медном веке, ${EPOCHS[1].maxLevel} в бронзовом.</li>
+      <li>Жилища и склады растут по тому же закону ×${BALANCE.upProdGrowth}: места и вместимость.</li>
     </ul>
     <p>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза. Выбор между «ещё одно поле» и «улучшить старое» — ваш.</p>
     <h4>Пример: поле</h4>
-    <table class="pt levels"><tr><th>Ур.</th><th>Облик</th><th>Зерно</th><th>Цена улучшения</th></tr>${rows}</table>
-    <p class="dim">Без учёта бонусов от знаний и спецстроений.</p>`;
+    <table class="pt levels"><tr><th>Ур.</th><th>Облик</th><th>Зерно</th><th>Цена</th></tr>${rows}</table>
+    <p class="dim">Без учёта бонусов от знаний и спецстроений. Пример бонусов: Зернохранилища (+25%) и Святилище (+20%) дают +45%, и поле 6-го уровня даёт ${num(BUILDINGS[ex].prod.food * Game.levelMult(6))} × 1.45 = ${num(BUILDINGS[ex].prod.food * Game.levelMult(6) * 1.45)}/с.</p>`;
   } },
 
   { id: 'techs', icon: '📜', title: 'Знания', html: () => `
@@ -171,7 +214,7 @@ const PEDIA_ARTICLES = [
     <p>Так же устроены ${pl('a:specials', 'спецстроения')}, только их цена трудом — ×${BALANCE.laborSpecialMult}.</p>
     ${EPOCHS.map((E, e) => {
       const list = TECHS.filter(t => t.epoch === e);
-      return list.length ? `<h4>${E.name}</h4><ul>${list.map(t => `<li>${t.icon} ${pl('t:' + t.id, t.name)} — ${t.desc}</li>`).join('')}</ul>` : '';
+      return list.length ? `<h4>${E.name}</h4><ul>${list.map(t => `<li>${UI.techIcon(t).replace('class="ico', 'class="ico inl')} ${pl('t:' + t.id, t.name)} — ${t.desc}</li>`).join('')}</ul>` : '';
     }).join('')}` },
 
   { id: 'specials', icon: '✨', title: 'Спецстроения', html: () => `
@@ -180,7 +223,7 @@ const PEDIA_ARTICLES = [
     <p>Как и ${pl('a:techs', 'знания')}, их можно строить двумя путями: за λ и ресурсы или трудом — без λ, но ресурсов примерно вдвое-втрое больше.</p>
     ${EPOCHS.map((E, e) => {
       const list = Object.entries(BUILDINGS).filter(([, B]) => B.special && B.epoch === e);
-      return list.length ? `<h4>${E.name}</h4><ul>${list.map(([id, B]) => `<li>${B.icon} ${pl('b:' + id, B.name)} — ${B.desc}</li>`).join('')}</ul>` : '';
+      return list.length ? `<h4>${E.name}</h4><ul>${list.map(([id, B]) => `<li>${bi(id)} ${pl('b:' + id, B.name)} — ${B.desc}</li>`).join('')}</ul>` : '';
     }).join('')}` },
 
   { id: 'epochs', icon: '⏳', title: 'Эпохи и переход', html: () => `
@@ -213,7 +256,7 @@ const PEDIA_ARTICLES = [
     <p>Обряды — вкладка «Обряды». Это главный способ потратить Логос <b>сразу</b>: получить ресурсы и жителей немедленно
     или удвоить производство на несколько минут. Благословения продлеваются повторным обрядом (до ${BALANCE.maxBuffMinutes} минут),
     но не усиливаются. Активные благословения видны в верхней панели с таймером.</p>
-    <table class="pt">${RITUALS.map(R => `<tr><td>${R.icon} ${R.name}</td><td>${R.desc}<br><span class="dim">${[R.logos ? 'λ ' + R.logos : 'без λ', ...Object.entries(R.cost || {}).map(([k, v]) => RES[k].icon + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, BUILDINGS[R.req].name)}` : ''}${R.epoch ? ' · бронзовый век' : ''}</span></td></tr>`).join('')}</table>
+    <table class="pt">${RITUALS.map(R => `<tr><td>${R.icon} ${R.name}</td><td>${R.desc}<br><span class="dim">${[R.logos ? 'λ ' + R.logos : 'без λ', ...Object.entries(R.cost || {}).map(([k, v]) => ri(k) + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, BUILDINGS[R.req].name)}` : ''}${R.epoch ? ' · бронзовый век' : ''}</span></td></tr>`).join('')}</table>
     <p class="dim">Обряды прошлой эпохи в новой стоят в 1.5 раза больше λ.</p>
     <h4>Религия медного века</h4>
     <p>Письменных источников нет — только находки. Главный образ эпохи — фигурки с раскинутыми руками, похожие на крест:
@@ -258,11 +301,11 @@ const Pedia = {
 
   nav() {
     const groups = [
-      { title: 'Основы', items: PEDIA_ARTICLES.map(a => ({ id: 'a:' + a.id, icon: a.icon, title: a.title })) },
-      { title: 'Ресурсы', items: RES_KEYS.map(k => ({ id: 'r:' + k, icon: RES[k].icon, title: RES[k].name })).concat([{ id: 'r:logos', icon: 'λ', title: 'Логос' }]) },
-      { title: 'Здания', items: Object.entries(BUILDINGS).filter(([, B]) => !B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Game.icons(id, 1)[0], title: B.name })) },
-      { title: 'Спецстроения', items: Object.entries(BUILDINGS).filter(([, B]) => B.special).map(([id, B]) => ({ id: 'b:' + id, icon: B.icon, title: B.name })) },
-      { title: 'Знания', items: TECHS.map(t => ({ id: 't:' + t.id, icon: t.icon, title: t.name })) },
+      { title: 'Основы', items: PEDIA_ARTICLES.map(a => ({ id: 'a:' + a.id, icon: a.icon.startsWith('art:') ? Art.svg(a.icon.slice(4)) : a.icon, title: a.title })) },
+      { title: 'Ресурсы', items: RES_KEYS.map(k => ({ id: 'r:' + k, icon: Art.res(k), title: RES[k].name })).concat([{ id: 'r:logos', icon: 'λ', title: 'Логос' }]) },
+      { title: 'Здания', items: Object.entries(BUILDINGS).filter(([, B]) => !B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Art.svg(Game.icons(id, 1)[0]), title: B.name })) },
+      { title: 'Спецстроения', items: Object.entries(BUILDINGS).filter(([, B]) => B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Art.svg(id), title: B.name })) },
+      { title: 'Знания', items: TECHS.map(t => ({ id: 't:' + t.id, icon: UI.techIcon(t), title: t.name })) },
       { title: 'Эпохи', items: EPOCHS.map((E, i) => ({ id: 'e:' + i, icon: ['🪨', '🔔', '🏛️'][i] || '⏳', title: E.name })) },
     ];
     return groups.map(g => `<div class="pn-group"><div class="pn-title">${g.title}</div>${g.items.map(it =>
@@ -280,11 +323,11 @@ const Pedia = {
   article(id) {
     const [kind, key] = id.split(':');
     try {
-      if (kind === 'a') { const a = PEDIA_ARTICLES.find(x => x.id === key) || PEDIA_ARTICLES[0]; return this.head(a.icon, a.title, 'Основы') + a.html(); }
+      if (kind === 'a') { const a = PEDIA_ARTICLES.find(x => x.id === key) || PEDIA_ARTICLES[0]; return this.head(a.icon.startsWith('art:') ? Art.svg(a.icon.slice(4)) : a.icon, a.title, 'Основы') + a.html() + photosHtml(id); }
       if (kind === 'r') return key === 'logos' ? this.article('a:logos') : this.resArticle(key);
-      if (kind === 'b') return this.buildingArticle(key);
-      if (kind === 't') return this.techArticle(key);
-      if (kind === 'e') return this.epochArticle(+key);
+      if (kind === 'b') return this.buildingArticle(key) + photosHtml(id);
+      if (kind === 't') return this.techArticle(key) + photosHtml(id);
+      if (kind === 'e') return this.epochArticle(+key) + photosHtml(id);
     } catch (e) { console.error(e); }
     return this.article('a:basics');
   },
@@ -293,7 +336,7 @@ const Pedia = {
     return `<div class="pa-head"><div class="pa-ic">${icon}</div><div><div class="pa-sub">${esc(sub)}</div><h2>${esc(title)}</h2></div></div>`;
   },
   costText(cost, logos) {
-    const parts = Object.entries(cost || {}).map(([k, v]) => `<span class="chip">${RES[k].icon} ${v}</span>`);
+    const parts = Object.entries(cost || {}).map(([k, v]) => `<span class="chip"><i>${Art.res(k)}</i>${v}</span>`);
     if (logos) parts.push(`<span class="chip logos">λ ${logos}</span>`);
     return parts.join(' ') || '—';
   },
@@ -317,7 +360,7 @@ const Pedia = {
       copper: 'С 7-го уровня улучшения любых зданий требуют медь.',
       bronze: 'Сплав меди с привозным оловом. С 9-го уровня улучшения требуют бронзу.',
     }[k] || '';
-    return this.head(R.icon, R.name, 'Ресурс') + `
+    return this.head(Art.res(k), R.name, 'Ресурс') + `
       <p>Появляется: ${EPOCHS[R.epoch].name}${R.tech ? `, после знания ${pl('t:' + R.tech, '«' + TECH_BY_ID[R.tech].name + '»')}` : ''}.</p>
       ${extra ? `<p>${extra}</p>` : ''}
       <h4>Где добыть</h4><p>${from.join(', ') || '—'}${gather.length ? `; вручную — клик по клетке «${gather.join(', ')}»` : ''}${['food', 'wood', 'stone', 'cheese', 'goods'].includes(k) ? '; ' + pl('a:events', 'беглые козы') : ''}.</p>
@@ -331,27 +374,27 @@ const Pedia = {
     const terrain = B.terrain.map(t => TERRAIN[t].name.toLowerCase()).join(', ') + (B.coast ? ' (только у моря)' : '');
     const req = B.tech ? `<p>Нужно знание: ${pl('t:' + B.tech, '«' + TECH_BY_ID[B.tech].name + '»')}.</p>` : '';
     if (B.special) {
-      return this.head(B.icon, B.name, 'Спецстроение · ' + EPOCHS[B.epoch].name) + `
+      return this.head(Art.svg(type), B.name, 'Спецстроение · ' + EPOCHS[B.epoch].name) + `
         <p class="lead">${esc(B.desc)}</p>
         <table class="pt"><tr><td>Цена</td><td>${this.costText(B.cost, B.logos)}</td></tr>
           <tr><td>Где строить</td><td>${terrain}</td></tr></table>${req}
         <h4>История</h4><p class="lore">${B.lore}</p>`;
     }
-    const icon = Game.icons(type, 1)[0];
+    const icon = Art.svg(Game.icons(type, 1)[0]);
     const forms = B.forms.map((f, i) => f ? `<li>${EPOCHS[i].name}: ${f.name}</li>` : "").join("");
     // таблица уровней
     let main = '';
-    if (B.prod) { const k = Object.keys(B.prod).find(r => B.prod[r] > 0); main = { label: RES[k].icon + ' ' + RES[k].name, f: L => num(B.prod[k] * Game.levelMult(L)) + '/с' }; }
-    else if (B.cap) main = { label: '👥 Места', f: L => B.cap + L - 1 };
-    else if (B.storage) main = { label: STORAGE_ICON + ' Склад', f: L => '+' + B.storage * L };
+    if (B.prod) { const k = Object.keys(B.prod).find(r => B.prod[r] > 0); main = { label: ri(k) + ' ' + RES[k].name, f: L => num(B.prod[k] * Game.levelMult(L)) + '/с' }; }
+    else if (B.cap) main = { label: '👥 Места', f: L => Math.round(B.cap * Game.levelMult(L)) };
+    else if (B.storage) main = { label: bi('store0') + ' Склад', f: L => '+' + Math.round(B.storage * Game.levelMult(L)) };
     else if (B.logosBonus) main = { label: 'λ Бонус', f: L => '+' + Math.round((B.logosBonus + B.logosBonusPerLevel * (L - 1)) * 100) + '%' };
     const maxL = EPOCHS[1].maxLevel;
-    let rows = `<tr><td>1</td><td>${Game.icons(type, 1).join('')}</td><td>${main.f(1)}</td><td>${B.workers || 0}</td><td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
+    let rows = `<tr><td>1</td><td>${Game.icons(type, 1).map(bi).join('')}</td><td>${main.f(1)}</td><td>${B.workers || 0}</td><td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
     for (let L = 2; L <= maxL; L++) {
       const { cost, logos } = Game.upgradeCost(type, L);
-      rows += `<tr class="${L > EPOCHS[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Game.icons(type, L).join('')}</td><td>${main.f(L)}</td><td>${B.workers ? B.workers + Math.floor((L - 1) / 2) : 0}</td><td>${this.costText(cost, logos)}</td></tr>`;
+      rows += `<tr class="${L > EPOCHS[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Game.icons(type, L).map(bi).join('')}</td><td>${main.f(L)}</td><td>${B.workers ? B.workers + Math.floor((L - 1) / 2) : 0}</td><td>${this.costText(cost, logos)}</td></tr>`;
     }
-    const prod = B.prod ? Object.entries(B.prod).map(([k, v]) => `${RES[k].icon} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после ${pl('t:' + B.prodTech[k], '«' + TECH_BY_ID[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
+    const prod = B.prod ? Object.entries(B.prod).map(([k, v]) => `${ri(k)} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после ${pl('t:' + B.prodTech[k], '«' + TECH_BY_ID[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
     return this.head(icon, B.name, 'Здание · с эпохи «' + EPOCHS[B.epoch].name + '»') + `
       <p class="lead">${esc(B.desc)}</p>
       <table class="pt"><tr><td>Где строить</td><td>${terrain}</td></tr>
@@ -370,7 +413,7 @@ const Pedia = {
     const opens = Object.entries(BUILDINGS).filter(([, B]) => B.tech === id).map(([bid, B]) => pl('b:' + bid, B.special ? B.name : B.forms.find(Boolean).name));
     const leadsTo = TECHS.filter(t => (t.req || []).includes(id)).map(t => pl('t:' + t.id, t.name));
     const st = Game.hasTech(id) ? '<span class="chip good">✓ изучено</span>' : '';
-    return this.head(T.icon, T.name, 'Знание · ' + EPOCHS[T.epoch].name) + `
+    return this.head(UI.techIcon(T), T.name, 'Знание · ' + EPOCHS[T.epoch].name) + `
       <p class="lead">${esc(T.desc)} ${st}</p>
       <table class="pt"><tr><td>Цена</td><td>${this.costText(T.cost, T.logos)}</td></tr>
         ${T.req ? `<tr><td>Требует</td><td>${T.req.map(r => pl('t:' + r, TECH_BY_ID[r].name)).join(', ')}</td></tr>` : ''}
@@ -395,7 +438,7 @@ const Pedia = {
         <li>население ${a.pop};</li>
         <li>${a.specials.map(s => pl('b:' + s, BUILDINGS[s].name)).join(' и ')};</li>
         ${a.allTechs ? '<li>все знания эпохи;</li>' : ''}
-        <li>${Object.entries(a.res).map(([k, v]) => `${RES[k].icon} ${v}`).join(', ')}, λ ${a.logos}.</li></ul>`;
+        <li>${Object.entries(a.res).map(([k, v]) => `${ri(k)} ${v}`).join(', ')}, λ ${a.logos}.</li></ul>`;
     }
     return h;
   },

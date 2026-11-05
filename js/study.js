@@ -401,6 +401,12 @@ const Study = {
     // слоги: копим набранные буквы, пока они не совпадут со слогом целиком
     let buf = t.kb + key;
     let cands = free.filter(o => norm(o.x.ch).startsWith(norm(buf)));
+    if (!cands.length && t.kb) {
+      // набранное ранее уже было целым слогом (а длиннее не вышло) — берём его и начинаем новый
+      const prev = free.find(o => o.x.ch.toLowerCase() === t.kb.toLowerCase()) || free.find(o => norm(o.x.ch) === norm(t.kb));
+      t.kb = '';
+      if (prev) { this.buildTap(prev.i); if (this.answered) return; return this.buildKey(key); }
+    }
     if (!cands.length) { buf = key; cands = free.filter(o => norm(o.x.ch).startsWith(norm(buf))); }
     if (!cands.length) { t.kb = ''; return; }
     const exact = cands.find(o => o.x.ch.toLowerCase() === buf.toLowerCase()) || cands.find(o => norm(o.x.ch) === norm(buf));
@@ -504,6 +510,13 @@ const Study = {
     }
     if (t.type === 'build') {
       if (e.key === 'Backspace') { e.preventDefault(); if (t.kb) { t.kb = ''; return; } return this.buildUndo(); }
+      if ((e.key === 'Enter' || e.key === ' ') && t.kb) {
+        e.preventDefault();
+        const o = t.tiles.map((x, i) => ({ x, i })).find(o => !o.x.used && stripAccents(o.x.ch) === stripAccents(t.kb));
+        t.kb = '';
+        if (o) this.buildTap(o.i);
+        return;
+      }
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) return this.buildKey(e.key);
     }
   },

@@ -454,3 +454,32 @@ table.pt tr.lv-logos td:first-child::after { content: ' λ'; font-style: italic;
 /* слоги */
 .slots.syl .slot { width: auto; min-width: 54px; padding: 0 8px; font-size: 24px; }
 .tiles.syl .tile-l { width: auto; min-width: 60px; padding: 0 12px; font-size: 21px; }
+
+/* ---------- v5: рисованные SVG-иконки ---------- */
+.ico { display: block; width: 100%; height: 100%; overflow: visible; }
+.ico.inl { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: -.42em; }
+.lg { font-style: italic; }
+.res .ic { display: inline-flex; align-items: center; }
+.res .ic .ico { width: 20px; height: 20px; }
+.res { padding: 3px 7px; }
+.resources { gap: 4px; }
+.chip i .ico { width: 19px; height: 19px; }
+.item-ic { width: 46px; height: 46px; font-size: 30px; display: flex; align-items: center; justify-content: center; }
+.item-ic .ico { width: 46px; height: 46px; }
+.mb-ic { width: 76px; height: 76px; flex: none; }
+.pa-ic { width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; }
+.pa-ic .ico { width: 72px; height: 72px; }
+.pn-item span { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+.pn-item span .ico { width: 22px; height: 22px; }
+.tile .b .ico { width: 1.75em; height: 1.75em; }
+.tile.special .b .ico { width: 1.85em; height: 1.85em; }
+.tile .deco { opacity: .8; }
+.tile .deco .ico { width: 1.6em; height: 1.6em; }
+.tile.t-hill .deco { opacity: .55; }
+.tile.goat .goat-ic .ico { width: 1.7em; height: 1.7em; }
+table.pt td .ico.inl { width: 28px; height: 28px; vertical-align: middle; }
+table.pt.levels td:nth-child(2) { white-space: nowrap; }
+.newlook .ico.inl { width: 24px; height: 24px; }
+.photos { margin-top: 18px; padding: 10px 12px; background: #fff8; border-radius: 8px; font-size: 13.5px; line-height: 1.8; }
+.photos a.ext { white-space: nowrap; }
+.formula { background: #fffdf7; border: 1px solid var(--parch-3); border-radius: 8px; padding: 8px 12px; font-weight: 600; }

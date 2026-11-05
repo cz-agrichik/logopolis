@@ -77,7 +77,9 @@ const Decks = {
     const list = [this.sampleDeck()];
     if (typeof WORD_DECKS !== 'undefined') {
       for (const d of WORD_DECKS) {
-        list.push(this.makeDeck(d.name, d.cards.map(([front, back, hint]) => ({ front, back, hint })), { id: d.id, builtin: true }));
+        const deck = this.makeDeck(d.name, d.cards.map(([front, back, hint]) => ({ front, back, hint })), { id: d.id, builtin: true });
+        deck.ver = typeof WORD_DECKS_VERSION !== 'undefined' ? WORD_DECKS_VERSION : 1;
+        list.push(deck);
       }
     }
     return list;
@@ -85,9 +87,20 @@ const Decks = {
 
   /** Добавляет в сохранение встроенные колоды, которых там ещё нет. */
   ensureBuiltins(state) {
-    const have = new Set(state.decks.map(d => d.id));
     let added = 0;
-    for (const d of this.builtinDecks()) if (!have.has(d.id)) { state.decks.push(d); added++; }
+    for (const fresh of this.builtinDecks()) {
+      const old = state.decks.find(d => d.id === fresh.id);
+      if (!old) { state.decks.push(fresh); added++; continue; }
+      // обновлённая встроенная колода (например, новый перевод): переносим прогресс по греческому слову
+      if ((old.ver || 1) < (fresh.ver || 1)) {
+        const byFront = new Map(fresh.cards.map(c => [c.front, c]));
+        for (const c of old.cards) {
+          const n = byFront.get(c.front), p = state.progress[c.id];
+          if (n && p && n.id !== c.id) { state.progress[n.id] = p; delete state.progress[c.id]; }
+        }
+        old.cards = fresh.cards; old.ver = fresh.ver; old.name = fresh.name;
+      }
+    }
     return added;
   },
 

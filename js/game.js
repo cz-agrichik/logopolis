@@ -121,12 +121,13 @@ const Game = {
 
   /** Стадия облика: меняется на «λ-уровнях» 4, 6, 8, 10. */
   stage(level) { return level >= 10 ? 4 : level >= 8 ? 3 : level >= 6 ? 2 : level >= 4 ? 1 : 0; },
-  /** Иконки здания на уровне (1–3 штуки: группа построек на высоких стадиях). */
+  /** Ключи рисунков здания на уровне (1–3 штуки: группа построек на высоких стадиях). */
   icons(type, level = 1) {
     const B = BUILDINGS[type];
-    if (B.special) return [B.icon];
-    if (B.stages) return B.stages[Math.min(this.stage(level), B.stages.length - 1)];
-    return [this.form(type).icon];
+    if (B.special) return [type];
+    const p = B.art, st = this.stage(level);
+    if (!p) return [];
+    return [[p + '0'], [p + '1'], [p + '2'], [p + '2', p + '1'], [p + '2', p + '1', p + '1']][st];
   },
 
   /** «🪵 12, λ 5» — чего не хватает для цены. */
@@ -147,18 +148,30 @@ const Game = {
     return m ? `Не хватает: ${m}` : '';
   },
 
-  /** Сводка всех постоянных бонусов от знаний, спецстроений и писцов. */
+  /**
+   * Сводка бонусов.
+   * Постоянные (знания, спецстроения) СКЛАДЫВАЮТСЯ: +20% и +30% = +50% — в bonus[ресурс] и bbonus[здание].
+   * Благословения обрядов — отдельные множители (×2), в buff и bbuff.
+   */
   effects() {
-    const fx = { mult: {}, bmult: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false };
-    for (const k of RES_KEYS) fx.mult[k] = 1;
+    const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false };
+    for (const k of RES_KEYS) { fx.bonus[k] = 0; fx.buff[k] = 1; }
     const apply = e => {
       if (!e) return;
-      if (e.all) for (const k of RES_KEYS) fx.mult[k] += e.all;
-      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.mult[k] += v;
-      if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bmult[k] = (fx.bmult[k] || 1) + v;
+      if (e.all) for (const k of RES_KEYS) fx.bonus[k] += e.all;
+      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.bonus[k] += v;
+      if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbonus[k] = (fx.bbonus[k] || 0) + v;
       for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
       if (e.raidShield) fx.raidShield = true;
+    };
+    const applyBuff = e => {
+      if (!e) return;
+      if (e.all) for (const k of RES_KEYS) fx.buff[k] *= 1 + e.all;
+      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.buff[k] *= 1 + v;
+      if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbuff[k] = (fx.bbuff[k] || 1) * (1 + v);
+      if (e.logos) fx.logos += e.logos;
+      if (e.growth) fx.growth += e.growth;
     };
     for (const id of this.state.techs) apply(TECH_BY_ID[id] && TECH_BY_ID[id].effect);
     for (const b of this.state.buildings) {
@@ -166,13 +179,17 @@ const Game = {
       if (B.special) apply(B.effect);
       if (B.logosBonus) fx.logos += B.logosBonus + (B.logosBonusPerLevel || 0) * (b.level - 1);
     }
-    for (const [id, left] of Object.entries(this.state.buffs || {})) if (left > 0 && RITUAL_BY_ID[id]) apply(RITUAL_BY_ID[id].buff);
+    for (const [id, left] of Object.entries(this.state.buffs || {})) if (left > 0 && RITUAL_BY_ID[id]) applyBuff(RITUAL_BY_ID[id].buff);
     return fx;
+  },
+  /** Итоговый множитель здания по ресурсу: (1 + сумма постоянных бонусов) × благословения. */
+  bonusMult(type, k, fx = this.fx || this.effects()) {
+    return (1 + fx.bonus[k] + (fx.bbonus[type] || 0)) * fx.buff[k] * (fx.bbuff[type] || 1);
   },
   logosMult() { return this.effects().logos; },
 
-  /** Каждый уровень добавляет +20% базового выпуска. */
-  levelMult(L) { return 1 + BALANCE.upProdStep * (L - 1); },
+  /** Выпуск растёт в 1.2 раза за КАЖДЫЙ уровень: 1.2, 1.44, 1.73… */
+  levelMult(L) { return Math.pow(BALANCE.upProdGrowth, L - 1); },
   workersOf(b) {
     const B = BUILDINGS[b.type];
     return B.workers ? B.workers + Math.floor((b.level - 1) / 2) : 0;
@@ -181,19 +198,19 @@ const Game = {
   prodOf(b, fx = this.fx || this.effects(), level = b.level) {
     const B = BUILDINGS[b.type], out = {};
     if (!B.prod) return out;
-    const lm = this.levelMult(level), bm = fx.bmult[b.type] || 1;
+    const lm = this.levelMult(level);
     for (const [k, v] of Object.entries(B.prod)) {
       if (B.prodTech && B.prodTech[k] && !this.hasTech(B.prodTech[k])) continue;
-      out[k] = v > 0 ? v * lm * bm * fx.mult[k] : v * lm;
+      out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
     }
     return out;
   },
   houseCapOf(b, fx = this.fx || this.effects(), level = b.level) {
     const B = BUILDINGS[b.type];
     if (!B.cap) return 0;
-    return B.cap + (level - 1) + (this.form(b.type).capBonus || 0) + fx.houseCap;
+    return Math.round(B.cap * this.levelMult(level)) + (this.form(b.type).capBonus || 0) + fx.houseCap;
   },
-  storageOf(b, level = b.level) { return BUILDINGS[b.type].storage ? BUILDINGS[b.type].storage * level : 0; },
+  storageOf(b, level = b.level) { return BUILDINGS[b.type].storage ? Math.round(BUILDINGS[b.type].storage * this.levelMult(level)) : 0; },
   storageCap(fx = this.fx || this.effects()) {
     let cap = BALANCE.baseStorage + fx.storage;
     for (const b of this.state.buildings) cap += this.storageOf(b);

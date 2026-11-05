@@ -78,10 +78,10 @@ const UI = {
       const r = Game.rates[k] || 0;
       const full = s.res[k] >= Game.storage - 0.5;
       html += `<div class="res ${full ? 'full' : ''}" title="${RES[k].name}: ${Math.floor(s.res[k])} из ${Game.storage}${full ? ' — склад полон!' : ''}">
-        <span class="ic">${RES[k].icon}</span><b>${fmt(s.res[k])}</b>
+        <span class="ic">${Art.res(k)}</span><b>${fmt(s.res[k])}</b>
         <small class="${r < 0 ? 'neg' : ''}">${Math.abs(r) > 0.05 ? fmtRate(r) : ''}</small></div>`;
     }
-    html += `<div class="res store" title="Вместимость складов (для каждого ресурса)"><span class="ic">${STORAGE_ICON}</span><small>${fmt(Game.storage)}</small></div>`;
+    html += `<div class="res store" title="Вместимость складов (для каждого ресурса)"><span class="ic">${Art.svg('store0')}</span><small>${fmt(Game.storage)}</small></div>`;
     for (const [id, left] of Object.entries(s.buffs || {})) {
       const R = RITUAL_BY_ID[id]; if (!R) continue;
       const m = Math.floor(left / 60), sec = Math.floor(left % 60);
@@ -111,17 +111,17 @@ const UI = {
         cls.push('has-b');
         if (B.special) cls.push('special');
         if (b.idle) cls.push('idle');
-        if (B.special) inner = `<span class="b">${F.icon}</span>`;
+        if (B.special) inner = `<span class="b">${Art.svg(b.type)}</span>`;
         else {
           cls.push('stage-' + Game.stage(b.level), 'n' + ic.length);
-          inner = `<span class="bw">${ic[2] ? `<span class="b b3">${ic[2]}</span>` : ''}${ic[1] ? `<span class="b b2">${ic[1]}</span>` : ''}<span class="b b1">${ic[0]}</span></span><span class="lvl">${b.level}</span>`;
+          inner = `<span class="bw">${ic[2] ? `<span class="b b3">${Art.svg(ic[2])}</span>` : ''}${ic[1] ? `<span class="b b2">${Art.svg(ic[1])}</span>` : ''}<span class="b b1">${Art.svg(ic[0])}</span></span><span class="lvl">${b.level}</span>`;
         }
         title = B.special ? F.name : `${F.name} · ур. ${b.level} (Shift+клик — улучшить)`;
-      } else if (t.t === 'forest') inner = '<span class="deco">🌳</span>';
-      else if (t.t === 'hill') inner = '<span class="deco">⛰️</span>';
+      } else if (t.t === 'forest') inner = `<span class="deco">${Art.svg('tree')}</span>`;
+      else if (t.t === 'hill') inner = `<span class="deco">${Art.svg('hill')}</span>`;
       if (Game.goat && Game.goat.x === t.x && Game.goat.y === t.y) {
         cls.push('goat');
-        inner = '<span class="goat-ic">🐐</span>';
+        inner = `<span class="goat-ic">${Art.svg('goat')}</span>`;
         title = 'Беглая коза! Поймайте её';
       }
       if (this.placing && t.t !== 'sea') cls.push(Game.canPlaceOn(this.placing, t) ? 'valid' : 'invalid');
@@ -229,7 +229,7 @@ const UI = {
     let h = '';
     for (const [k, v] of Object.entries(cost || {})) {
       const have = Math.floor(s.res[k] || 0), lack = have < v;
-      h += `<span class="chip cost ${lack ? 'lack' : ''}" title="${RES[k].name}: нужно ${v}, есть ${have}${lack ? ` — не хватает ${Math.ceil(v - have)}` : ''}"><i>${RES[k].icon}</i>${fmt(v)}</span>`;
+      h += `<span class="chip cost ${lack ? 'lack' : ''}" title="${RES[k].name}: нужно ${v}, есть ${have}${lack ? ` — не хватает ${Math.ceil(v - have)}` : ''}"><i>${Art.res(k)}</i>${fmt(v)}</span>`;
     }
     if (logos) {
       const lack = s.logos < logos;
@@ -239,7 +239,7 @@ const UI = {
   },
   prodChips(p) {
     let h = '';
-    for (const [k, v] of Object.entries(p)) h += `<span class="chip ${v < 0 ? 'bad' : 'good'}" title="${RES[k].name}: ${v < 0 ? 'расход' : 'производство'} ${num(Math.abs(v))} в секунду"><i>${RES[k].icon}</i>${v > 0 ? '+' : ''}${num(v)}/с</span>`;
+    for (const [k, v] of Object.entries(p)) h += `<span class="chip ${v < 0 ? 'bad' : 'good'}" title="${RES[k].name}: ${v < 0 ? 'расход' : 'производство'} ${num(Math.abs(v))} в секунду"><i>${Art.res(k)}</i>${v > 0 ? '+' : ''}${num(v)}/с</span>`;
     return h;
   },
   /** Что даёт здание на уровне L (с учётом бонусов). */
@@ -248,10 +248,14 @@ const UI = {
     const fx = Game.fx || Game.effects();
     let h = this.prodChips(Game.prodOf(b, fx, level));
     if (B.cap) h += `<span class="chip good" title="Места для жителей"><i>👥</i>${Game.houseCapOf(b, fx, level)} мест</span>`;
-    if (B.storage) h += `<span class="chip good" title="Прибавка к вместимости складов"><i>${STORAGE_ICON}</i>+${Game.storageOf(b, level)}</span>`;
+    if (B.storage) h += `<span class="chip good" title="Прибавка к вместимости складов"><i>${Art.svg('store0')}</i>+${Game.storageOf(b, level)}</span>`;
     if (B.logosBonus) h += `<span class="chip good" title="Бонус к Логосу за карточки"><i>λ</i>+${Math.round((B.logosBonus + (B.logosBonusPerLevel || 0) * (level - 1)) * 100)}% за карточки</span>`;
     if (B.workers) h += `<span class="chip muted" title="Сколько жителей нужно, чтобы здание работало в полную силу"><i>⚒</i>${Game.workersOf({ type: b.type, level })} работн.</span>`;
     return h;
+  },
+  techIcon(T) {
+    if (!T.art) return T.icon;
+    return T.art.startsWith('res:') ? Art.res(T.art.slice(4)) : Art.svg(T.art);
   },
   reasonHtml(st) { return st && st.reason && !st.ok ? `<div class="item-lock">${esc(st.reason)}</div>` : ''; },
   pediaBtn(id) { return `<button class="q" data-pedia="${id}" title="Кипропедия">?</button>`; },
@@ -275,7 +279,7 @@ const UI = {
       if (st.hidden) continue;
       const F = Game.form(type), icon = Game.icons(type, 1)[0];
       const n = Game.count(type);
-      const head = `<div class="item-ic">${icon}</div><div class="item-body">
+      const head = `<div class="item-ic">${Art.svg(icon)}</div><div class="item-body">
           <div class="item-title">${esc(F.name)}${!B.special && n ? ` <small>×${n}</small>` : ''} ${this.pediaBtn('b:' + type)}</div>`;
       if (B.special) {
         let body;
@@ -327,7 +331,7 @@ const UI = {
               <button class="btn small ${lab.ok ? '' : 'off'}" data-tech="${T.id}" data-mode="labor">Трудом</button></div>`;
         }
         h += `<div class="item ${st.learned ? 'learned' : (st.ok || (!st.locked && Game.techStatus(T, 'labor').ok)) ? '' : 'disabled'}">
-          <div class="item-ic">${T.icon}</div>
+          <div class="item-ic">${this.techIcon(T)}</div>
           <div class="item-body"><div class="item-title">${esc(T.name)} ${this.pediaBtn('t:' + T.id)}</div><div class="item-desc">${esc(T.desc)}</div>${body}</div>
         </div>`;
       }
@@ -536,7 +540,7 @@ const UI = {
     this.modalBuilding = b;
     const B = BUILDINGS[b.type], F = Game.form(b.type);
     const icon = Game.icons(b.type, b.level)[0];
-    let h = `<div class="mb-head"><div class="mb-ic">${icon}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
+    let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
       <div class="dim">${B.special ? 'Спецстроение' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
       h += `<p>${esc(B.desc)}</p><p class="lore">${B.lore}</p>`;
@@ -549,8 +553,8 @@ const UI = {
         if (up.capped) h += `<div class="dim">${esc(up.reason)}</div>`;
         else {
           const nextIc = Game.icons(b.type, up.target);
-          h += `<div><b>Улучшение до ${up.target}-го уровня</b>${up.newLook ? ` <span class="newlook">новый облик ${nextIc.join('')}</span>` : ''}</div>
-            <div class="dim small">${up.logos ? 'Уровень мудрости: оплачивается только Логосом и меняет облик здания.' : `Каждый уровень +${Math.round(BALANCE.upProdStep * 100)}% к базовому выпуску, цена ресурсами растёт ×${BALANCE.upCostGrowth}.`}</div>
+          h += `<div><b>Улучшение до ${up.target}-го уровня</b>${up.newLook ? ` <span class="newlook">новый облик ${nextIc.map(k => Art.svg(k, 'inl')).join('')}</span>` : ''}</div>
+            <div class="dim small">${up.logos ? 'Уровень мудрости: оплачивается только Логосом и меняет облик здания.' : `Выпуск ×${BALANCE.upProdGrowth} за уровень, цена ресурсами ×${BALANCE.upCostGrowth}. Бонусы знаний и спецстроений умножают уже весь выпуск здания.`}</div>
             <div class="chips">${this.outputHtml(b, up.target)}</div>
             <div class="chips">${this.costHtml(up.cost, up.logos)}</div>
             ${up.reason ? `<div class="item-lock">${esc(up.reason)}</div>` : ''}
