@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Λόγος · Кипр сквозь эпохи</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body data-epoch="0">
+  <header id="topbar">
+    <div class="brand">
+      <div class="logo">Λόγος</div>
+      <div>
+        <div class="epoch-name" id="epochName"></div>
+        <div class="epoch-sub" id="epochSub"></div>
+      </div>
+    </div>
+    <div class="resources" id="resources"></div>
+    <button id="pediaBtn" class="pedia-btn" title="Кипропедия — справочник (F1)">📖</button>
+    <button id="studyBtn" class="study-btn">📜 Учиться <span id="dueCount" class="count"></span></button>
+  </header>
+
+  <main>
+    <section id="mapWrap">
+      <div id="map"></div>
+      <div id="placeHint" class="place-hint hidden"></div>
+      <footer id="log"></footer>
+    </section>
+    <aside id="side">
+      <nav class="tabs">
+        <button data-tab="build" class="active">Строить</button>
+        <button data-tab="tech">Знания</button>
+        <button data-tab="rites">Обряды</button>
+        <button data-tab="epoch">Эпоха</button>
+        <button data-tab="decks">Карточки</button>
+      </nav>
+      <div id="panel"></div>
+    </aside>
+  </main>
+
+  <div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
+
+  <div id="pedia" class="pedia hidden">
+    <div class="pedia-box">
+      <div class="pedia-top"><div class="pedia-title">📖 Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
+      <div class="pedia-main"><nav id="pediaNav" class="pedia-nav"></nav><article id="pediaBody" class="pedia-body"></article></div>
+    </div>
+  </div>
+
+  <div id="study" class="study hidden">
+    <div class="st-box">
+      <div class="st-head">
+        <button class="st-close" id="stClose" title="Закрыть (Esc)">✕</button>
+        <div class="st-bar"><i id="stProgress"></i></div>
+        <div class="st-meta"><span id="stCombo"></span><span id="stEarned" class="st-earned">λ +0</span></div>
+      </div>
+      <div class="st-bonus" id="stBonus"></div>
+      <div id="stBody" class="st-body"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js?v=5"></script>
+  <script src="js/words.js?v=5"></script>
+  <script src="js/decks.js?v=5"></script>
+  <script src="js/game.js?v=5"></script>
+  <script src="js/ui.js?v=5"></script>
+  <script src="js/study.js?v=5"></script>
+  <script src="js/pedia.js?v=5"></script>
+  <script src="js/main.js?v=5"></script>
+</body>
+</html>
