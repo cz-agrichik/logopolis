@@ -23,6 +23,7 @@ const BALANCE = {
   copperFromLevel: 7,      // с 7-го уровня улучшения требуют медь
   bronzeFromLevel: 9,      // с 9-го — бронзу
   offlineMaxHours: 8,
+  offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30,      // благословения продлеваются, но не дольше
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
@@ -144,7 +145,7 @@ const BUILDINGS = {
     name: 'Мастерская', terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2,
     prod: { goods: 0.1 }, lp: 18,
     forms: [{ name: 'Мастерская резчиков', icon: '🔨' }, { name: 'Гончарная мастерская', icon: '🏺' }],
-    desc: 'Ремесленные изделия — для знаний, спецстроений, обрядов и перехода эпохи.',
+    desc: 'Ремесленные изделия — для знаний, чудес, обрядов и перехода эпохи.',
     lore: `Мастера режут фигурки и подвески из мягкого голубовато-зелёного камня (пикролита), который собирают
       в руслах рек Курис и Карьотис, и лепят расписную красно-белую посуду.`,
   },
@@ -190,7 +191,7 @@ const BUILDINGS = {
     lore: 'Кипро-минойское письмо (XVI–XI вв. до н. э.) известно по табличкам из Энкоми и Угарита. Оно до сих пор не расшифровано.',
   },
 
-  // ---------------- Спецстроения: уникальные, за ресурсы и λ ----------------
+  // ---------------- Чудеса древнего Кипра: уникальные, у каждого своя цена ----------------
   sp_lemba: {
     special: true, epoch: 0, terrain: ['plain'], icon: '🏘️', name: 'Большой круглый дом Лембы',
     cost: { wood: 1000, stone: 700 }, logos: 100,
@@ -201,7 +202,7 @@ const BUILDINGS = {
   },
   sp_troodos: {
     special: true, epoch: 0, terrain: ['hill'], icon: '🏔️', name: 'Пастушьи тропы Троодоса',
-    cost: { food: 800, wood: 500 }, logos: 80,
+    cost: { food: 1500, wood: 900 }, logos: 0,
     effect: { bmult: { goatpen: 0.6 }, goats: true },
     desc: 'Козьи загоны +60%. Беглые козы появляются чаще и приносят больше.',
     lore: `Горы Троодос — летнее пастбище для коз и дом кипрского муфлона (агрино) — дикого барана,
@@ -225,7 +226,7 @@ const BUILDINGS = {
   },
   sp_halasultan: {
     special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', icon: '🌊', name: 'Гавань Хала-Султан-Текке',
-    cost: { wood: 3000, stone: 1500, copper: 600 }, logos: 200,
+    cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0,
     effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } },
     desc: 'Гавани +60%, зерно +10%. Только на побережье.',
     lore: 'Крупный портовый город позднего бронзового века у Ларнакского солёного озера, торговавший с Египтом, Левантом и Эгеидой.',
@@ -234,12 +235,12 @@ const BUILDINGS = {
     special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', icon: '🟧', name: 'Святилище Слиткового бога',
     cost: { stone: 1800, copper: 900, goods: 600 }, logos: 250,
     effect: { mult: { copper: 0.5 }, bmult: { foundry: 0.3 } },
-    desc: 'Медь +50%, бронзолитейни +30%. Открывает обряд «Подношение слитка».',
+    desc: 'Медь +50%, бронзолитейни +30%. Открывает «Обряд торговли».',
     lore: 'Бронзовая статуэтка XII в. до н. э. из Энкоми: бог в рогатом шлеме стоит на слитке в форме воловьей шкуры — покровитель медного дела.',
   },
   sp_walls: {
     special: true, epoch: 1, terrain: ['plain'], icon: '🧱', name: 'Циклопические стены',
-    cost: { stone: 5000, wood: 1000 }, logos: 200,
+    cost: { stone: 6000, wood: 1500 }, logos: 0,
     effect: { raidShield: true, storagePct: 0.2 },
     desc: 'Защищают от набегов «народов моря». +20% к вместимости складов.',
     lore: `Около 1200 г. до н. э. «народы моря» разоряют побережья Восточного Средиземноморья. Энкоми и Китион
@@ -301,28 +302,28 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 //  Цена в λ у обрядов прошлых эпох растёт в 1.5 раза за эпоху.
 // ------------------------------------------------------------
 const RITUALS = [
-  { id: 'elders', epoch: 0, icon: '🗣️', name: 'Совет старейшин', logos: 5, instant: 'elders', cooldown: 60,
-    desc: 'Сразу: +2 минуты производства всех ресурсов (и не меньше 30 зерна, дерева и камня). Не чаще раза в минуту.' },
-  { id: 'settlers', epoch: 0, icon: '👥', name: 'Зов поселенцев', logos: 10, instant: 'settlers',
-    desc: 'Сразу: +3 жителя, если в домах есть места.' },
-  { id: 'harvest', epoch: 0, icon: '🌾', name: 'Дар Матери-земле', logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 300,
+  { id: 'elders', epoch: 0, icon: '🗣️', name: 'Сбор припасов', logos: 5, instant: 'elders', cooldown: 60,
+    desc: 'Сразу: +2 минуты производства всех ресурсов (не меньше 30 зерна, дерева и камня). Раз в минуту.' },
+  { id: 'settlers', epoch: 0, icon: '👥', name: 'Помощь соседей', logos: 10, buff: { workers: 1 }, dur: 300,
+    desc: 'Рабочих рук вдвое больше на 5 минут: соседи помогают, не занимая домов.' },
+  { id: 'harvest', epoch: 0, icon: '🌾', name: 'Обряд урожая', logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 300,
     desc: 'Зерно ×2 на 5 минут.' },
-  { id: 'hearth', epoch: 0, icon: '🔥', name: 'Огонь очага', logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 300,
+  { id: 'hearth', epoch: 0, icon: '🔥', name: 'Обряд труда', logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 300,
     desc: 'Дерево и камень ×2 на 5 минут.' },
-  { id: 'herds', epoch: 0, icon: '🐐', name: 'Благословение стад', logos: 10, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 300, goat: true,
-    desc: 'Козьи загоны ×2 на 5 минут, и сразу прибегает беглая коза.' },
+  { id: 'herds', epoch: 0, icon: '🐐', name: 'Благословение стад', logos: 10, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 300, goat: true, cooldown: 60,
+    desc: 'Козьи загоны ×2 на 5 минут, и сразу прибегает беглая коза. Раз в минуту.' },
   { id: 'festival', epoch: 0, icon: '💃', name: 'Праздник плодородия', logos: 40, cost: { cheese: 80, goods: 60 }, req: 'shrine1',
     buff: { all: 1, growth: 2 }, dur: 600,
     desc: 'Всё производство ×2 на 10 минут, жители прибывают втрое быстрее.' },
-  { id: 'vigil', epoch: 0, icon: '🌙', name: 'Ночь у святилища', logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1',
+  { id: 'vigil', epoch: 0, icon: '🌙', name: 'Ночь мудрости', logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1',
     buff: { logos: 0.5 }, dur: 900,
     desc: 'Подношения вместо λ: карточки дают +50% Логоса 15 минут.' },
-  { id: 'bullmask', epoch: 1, icon: '🎭', name: 'Обряд бычьей маски', logos: 30, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 300,
+  { id: 'bullmask', epoch: 1, icon: '🎭', name: 'Обряд рудокопов', logos: 30, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 300,
     desc: 'Медь и бронза ×2 на 5 минут.' },
-  { id: 'ingot', epoch: 1, icon: '🟧', name: 'Подношение слитка', logos: 40, cost: { copper: 150 }, req: 'sp_ingot',
+  { id: 'ingot', epoch: 1, icon: '🟧', name: 'Обряд торговли', logos: 40, cost: { copper: 150 }, req: 'sp_ingot',
     buff: { bmult: { port: 1, foundry: 1 } }, dur: 600,
     desc: 'Гавани и бронзолитейни ×2 на 10 минут.' },
-  { id: 'hornedfeast', epoch: 1, icon: '🐂', name: 'Празднество Рогатого бога', logos: 0, cost: { bronze: 60, goods: 200, cheese: 150 }, req: 'shrine2',
+  { id: 'hornedfeast', epoch: 1, icon: '🐂', name: 'Праздник Рогатого бога', logos: 0, cost: { bronze: 60, goods: 200, cheese: 150 }, req: 'shrine2',
     buff: { logos: 1 }, dur: 900,
     desc: 'Карточки дают вдвое больше Логоса 15 минут.' },
 ];

@@ -66,7 +66,7 @@ const UI = {
     document.body.dataset.epoch = s.epoch;
     $('#epochName').textContent = E.name;
     $('#epochSub').textContent = E.sub;
-    const short = Game.need > s.pop;
+    const short = Game.eff < 0.999;
     let html = `<div class="res pop" title="Жители: ${s.pop}. Мест в домах: ${Game.cap}. Чтобы прибавлялись жители, нужны свободные места и зерно.">
         <span class="ic">👥</span><b>${s.pop}</b><small class="lbl">из ${Game.cap} мест</small></div>
       <div class="res work ${short ? 'short' : ''}" title="${short
@@ -136,8 +136,8 @@ const UI = {
     const tile = Game.tile(+el.dataset.x, +el.dataset.y);
     if (Game.goat && Game.goat.x === tile.x && Game.goat.y === tile.y) {
       const g = Game.catchGoat();
-      this.floatText(el, `+${g.amt} ${RES[g.res].icon}`, 'gold');
-      this.toast(`🐐 ${esc(g.line)} <b>+${g.amt} ${RES[g.res].icon}</b>`);
+      this.floatText(el, '🐐!', 'gold');
+      this.toast(`🐐 ${esc(g.line)} <b>${g.gained}</b>`);
       this.renderMap(); this.renderTop();
       return;
     }
@@ -286,15 +286,12 @@ const UI = {
         if (st.locked) body = `<div class="item-lock">🔒 ${esc(st.reason)}</div>`;
         else if (st.done) body = `<div class="item-done">✓ Построено</div>`;
         else {
-          const lab = Game.buildStatus(type, 'labor');
           body = `<div class="item-effect">${esc(B.desc)}</div>
-            <div class="path"><span class="path-l">λ путь</span><div class="chips">${this.costHtml(st.cost, st.logos)}</div>
-              <button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}" data-mode="logos">Строить</button></div>
-            <div class="path"><span class="path-l">Трудом</span><div class="chips">${this.costHtml(lab.cost)}</div>
-              <button class="btn small ${lab.ok ? '' : 'off'}" data-build="${type}" data-mode="labor">Трудом</button></div>
-            ${!st.ok && !lab.ok ? this.reasonHtml(st) : ''}`;
+            <div class="chips">${this.costHtml(st.cost, st.logos)}${st.logos ? '' : '<span class="chip muted">без λ</span>'}</div>
+            ${this.reasonHtml(st)}`;
         }
-        specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div></div>`;
+        specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div>
+          ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">Строить</button>`}</div>`;
       } else {
         normal += `<div class="item ${st.ok ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}
           <div class="item-desc">${esc(B.desc)}</div>
@@ -306,8 +303,7 @@ const UI = {
       }
     }
     return `<div class="hint">Клик по лесу, холмам или равнине — собрать ресурс. Клик по зданию — сведения и улучшение, <b>Shift+клик</b> — улучшить сразу.</div>
-      ${normal}<h3>Спецстроения <small>уникальные · за λ или трудом</small></h3>
-      <div class="hint dim">Каждое спецстроение можно возвести двумя путями: быстрее — за λ и ресурсы, или трудом — без λ, но ресурсов намного больше.</div>${specials}`;
+      ${normal}<h3>Чудеса древнего Кипра <small>по одному каждого</small></h3>${specials}`;
   },
 
   panel_tech() {
@@ -541,7 +537,7 @@ const UI = {
     const B = BUILDINGS[b.type], F = Game.form(b.type);
     const icon = Game.icons(b.type, b.level)[0];
     let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
-      <div class="dim">${B.special ? 'Спецстроение' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
+      <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
       h += `<p>${esc(B.desc)}</p><p class="lore">${B.lore}</p>`;
     } else {
@@ -568,13 +564,24 @@ const UI = {
     this.showModal(h);
   },
 
+  showAway(a) {
+    const mins = Math.round(a.seconds / 60);
+    const dur = mins >= 60 ? `${Math.floor(mins / 60)} ч ${mins % 60} мин` : `${Math.max(1, mins)} мин`;
+    const list = Object.entries(a.gained).map(([k, v]) => `<span class="chip good"><i>${Art.res(k)}</i>+${fmt(v)}</span>`).join(' ');
+    this.showModal(`<div class="epoch-modal"><h2>С возвращением!</h2>
+      <p>Вас не было ${dur}. Поселение продолжало работать${a.halved ? ': первые 5 минут — в полную силу, потом — вполовину' : ''}.</p>
+      ${list ? `<div class="chips away">${list}</div>` : '<p class="dim">Ничего не прибавилось: склады полны или производить пока нечему.</p>'}
+      ${a.pop > 0 ? `<p>👥 Пришло жителей: ${a.pop}</p>` : ''}
+      <div class="em-actions"><button class="btn gold" data-action="close">Продолжить</button></div></div>`);
+  },
+
   showEpoch(first = false) {
     const s = Game.state, E = EPOCHS[s.epoch];
     let h = `<div class="epoch-modal"><div class="meander"></div>
       <div class="dim">${first ? 'Начало пути' : 'Новая эпоха'}</div>
       <h2>${esc(E.name)}</h2><div class="epoch-years">${esc(E.sub)}</div><p>${E.intro}</p>`;
     if (first) h += `<p class="how"><b>Как играть.</b> Кликайте по лесу, холмам и полям, чтобы собирать ресурсы, стройте и улучшайте
-      жилища, поля и козьи загоны — город растёт сам. Но всё важное — знания, спецстроения, высокие уровни зданий и переход
+      жилища, поля и козьи загоны — город растёт сам. Но всё важное — знания, чудесоения, высокие уровни зданий и переход
       в новую эпоху — требует <b>λ Логоса</b>. Его не добыть ни киркой, ни торговлей: только решая карточки в «📜 Учиться».
       Логос можно тратить с первых минут: во вкладке «Обряды» <b>Совет старейшин</b> за 5 λ сразу даёт ресурсы,
       а благословения удваивают производство. Можно и не спешить — поиграть без карточек, пока не упрётесь в λ.

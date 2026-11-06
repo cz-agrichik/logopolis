@@ -150,7 +150,7 @@ const Game = {
 
   /**
    * Сводка бонусов.
-   * Постоянные (знания, спецстроения) СКЛАДЫВАЮТСЯ: +20% и +30% = +50% — в bonus[ресурс] и bbonus[здание].
+   * Постоянные (знания, чудеса) СКЛАДЫВАЮТСЯ: +20% и +30% = +50% — в bonus[ресурс] и bbonus[здание].
    * Благословения обрядов — отдельные множители (×2), в buff и bbuff.
    */
   effects() {
@@ -172,6 +172,7 @@ const Game = {
       if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbuff[k] = (fx.bbuff[k] || 1) * (1 + v);
       if (e.logos) fx.logos += e.logos;
       if (e.growth) fx.growth += e.growth;
+      if (e.workers) fx.workers = (fx.workers || 0) + e.workers;
     };
     for (const id of this.state.techs) apply(TECH_BY_ID[id] && TECH_BY_ID[id].effect);
     for (const b of this.state.buildings) {
@@ -258,10 +259,9 @@ const Game = {
     for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] / 10) * 10;
     return out;
   },
-  /** Цена постройки: mode 'logos' (обычный путь) или 'labor' (для спецстроений — без λ). */
+  /** Цена постройки: mode 'logos' (обычный путь) или 'labor' (больше не используется). */
   priceOf(type, mode = 'logos') {
     const B = BUILDINGS[type];
-    if (mode === 'labor' && B.special) return { cost: this.laborCost(B.cost, B.logos || 0, B.epoch, BALANCE.laborSpecialMult), logos: 0 };
     return { cost: this.buildCost(type), logos: B.logos || 0 };
   },
 
@@ -296,7 +296,7 @@ const Game = {
     const s = this.state;
     s.buildings.push({ id: s.nextId++, type, level: 1, x, y });
     const B = BUILDINGS[type];
-    this.log(B.special ? `✨ Возведено спецстроение: ${B.name}!${mode === 'labor' ? ' (трудом)' : ''}` : `Построено: ${this.form(type).name}`);
+    this.log(B.special ? `✨ Возведено чудо Кипра: ${B.name}!` : `Построено: ${this.form(type).name}`);
     this.save();
     return true;
   },
@@ -430,7 +430,8 @@ const Game = {
     const fx = this.fx = this.effects();
     const cap = this.popCap(fx);
     const need = this.workersNeeded();
-    const eff = need > 0 ? Math.min(1, s.pop / need) : 1;
+    const hands = s.pop * (1 + (fx.workers || 0));   // «Помощь соседей» удваивает рабочие руки
+    const eff = need > 0 ? Math.min(1, hands / need) : 1;
     const storage = this.storageCap(fx);
     const rates = {};
     for (const k of RES_KEYS) rates[k] = 0;
@@ -474,7 +475,6 @@ const Game = {
     const cost = R.cost || {}, logos = this.ritualLogos(R);
     const cd = (s.cooldowns || {})[R.id];
     if (cd > 0) return { cost, logos, cd, reason: `Можно снова через ${Math.ceil(cd)} с` };
-    if (R.instant === 'settlers' && s.pop >= this.popCap()) return { cost, logos, reason: 'Нет свободных мест в домах' };
     if (R.goat && this.goat) return { cost, logos, ok: this.canAfford(cost, logos) };
     const reason = this.lackReason(cost, logos);
     return { cost, logos, ok: !reason, reason };
@@ -534,23 +534,31 @@ const Game = {
     return changed;
   },
 
+  /** Коза приносит одно из двух: 4 минуты производства случайного ресурса или 1 минуту всех сразу. */
   catchGoat() {
     if (!this.goat) return null;
-    const fx = this.fx || this.effects();
-    const options = ['food', 'wood', 'stone'];
-    if (this.hasTech('cheesemaking')) options.push('cheese', 'cheese');
-    if (this.hasTech('carving')) options.push('goods');
-    const r = options[Math.floor(Math.random() * options.length)];
-    const rate = Math.max(0, this.rates[r] || 0);
-    let amt = Math.max(20, Math.round(rate * 45));
-    if (fx.goats) amt = Math.round(amt * 1.6);
-    this.state.res[r] = Math.min(this.storageCap(fx), this.state.res[r] + amt);
-    this.state.stats.goats++;
+    const s = this.state, fx = this.fx || this.effects(), cap = this.storageCap(fx);
+    const avail = RES_KEYS.filter(k => (this.rates[k] || 0) > 0 || ['food', 'wood', 'stone'].includes(k));
+    const mult = fx.goats ? 1.6 : 1, minBase = 20 * (1 + s.epoch);
+    const give = (k, sec, min) => {
+      const g = Math.floor(Math.min(cap - s.res[k], Math.max(min, Math.max(0, this.rates[k] || 0) * sec) * mult));
+      if (g > 0) s.res[k] += g;
+      return g > 0 ? `${RES[k].icon} +${g}` : '';
+    };
+    let parts;
+    if (Math.random() < 0.5) {
+      const k = avail[Math.floor(Math.random() * avail.length)];
+      parts = [give(k, 240, minBase * 3)];
+    } else {
+      parts = avail.map(k => give(k, 60, ['food', 'wood', 'stone'].includes(k) ? minBase : 0));
+    }
+    const gained = parts.filter(Boolean).join(' ') || 'склады полны';
+    s.stats.goats++;
     const pos = this.goat;
     this.goat = null;
     const line = GOAT_LINES[Math.floor(Math.random() * GOAT_LINES.length)];
-    this.log(`🐐 ${line} +${amt} ${RES[r].icon}`);
-    return { x: pos.x, y: pos.y, res: r, amt, line };
+    this.log(`🐐 ${line} ${gained}`);
+    return { x: pos.x, y: pos.y, gained, line };
   },
 
   raid() {
@@ -571,15 +579,22 @@ const Game = {
     if (typeof UI !== 'undefined') UI.toast(`⚔️ Набег «народов моря»! Разграблено 15% запасов. Защитят только Циклопические стены.`);
   },
 
-  /** Прогресс, пока игра была закрыта (до 8 часов). */
+  /**
+   * Прогресс за время отсутствия: первые 5 минут — в полную силу,
+   * дальше — вполовину (до 8 часов). Всё упирается в склады.
+   */
   catchUp() {
-    const elapsed = Math.min(BALANCE.offlineMaxHours * 3600, (Date.now() - (this.state.lastSave || Date.now())) / 1000);
-    if (elapsed < 30) return null;
-    const before = { ...this.state.res };
-    const step = 5;
-    for (let t = 0; t < elapsed; t += step) this.tick(Math.min(step, elapsed - t));
+    const away = (Date.now() - (this.state.lastSave || Date.now())) / 1000;
+    if (away < 20) return null;
+    const capped = Math.min(BALANCE.offlineMaxHours * 3600, away);
+    const full = Math.min(BALANCE.offlineFullSec, capped);
+    const half = Math.max(0, capped - full) * 0.5;
+    const before = { ...this.state.res }, popBefore = this.state.pop;
+    const sim = full + half, step = 5;
+    for (let t = 0; t < sim; t += step) this.tick(Math.min(step, sim - t));
     const gained = {};
     for (const k of RES_KEYS) { const d = Math.floor(this.state.res[k] - before[k]); if (d > 0) gained[k] = d; }
-    return { minutes: Math.round(elapsed / 60), gained };
+    this.state.lastSave = Date.now();
+    return { seconds: away, gained, pop: this.state.pop - popBefore, halved: away > BALANCE.offlineFullSec };
   },
 };

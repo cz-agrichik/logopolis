@@ -19,13 +19,11 @@
     Game.log('Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.');
     Game.log('λ Логос даётся только за карточки — кнопка «📜 Учиться».');
     UI.showEpoch(true);
-  } else if (away && Object.keys(away.gained).length) {
-    const list = Object.entries(away.gained).map(([k, v]) => `${RES[k].icon} +${v}`).join(' ');
-    UI.toast(`Пока вас не было (${away.minutes} мин): ${list}`);
-  }
+  } else if (away) UI.showAway(away);
 
   let last = performance.now(), sinceRender = 0, sinceSave = 0;
   setInterval(() => {
+    if (Game.paused) { last = performance.now(); return; }
     const now = performance.now();
     const dt = Math.min(1, (now - last) / 1000);
     last = now;
@@ -44,5 +42,11 @@
   }, 250);
 
   window.addEventListener('beforeunload', () => Game.save());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) Game.save(); });
+  // во фоне игра «спит», а при возвращении досчитывает офлайн-прогресс по общим правилам
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { Game.save(); Game.paused = true; return; }
+    const a = Game.catchUp();
+    Game.paused = false; last = performance.now();
+    if (a) { UI.renderMap(); UI.renderAll(); UI.showAway(a); }
+  });
 })();

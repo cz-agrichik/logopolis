@@ -55,7 +55,7 @@ const PEDIA_ARTICLES = [
       Поставьте ${pl('b:field', 'поля')}, ${pl('b:goatpen', 'козьи загоны')}, ${pl('b:lumber', 'лесорубов')} и ${pl('b:quarry', 'каменоломни')} — дальше ресурсы пойдут сами.</li>
       <li><b>Растите население.</b> ${pl('b:house', 'Жилища')} дают места, жители приходят, если есть зерно, и работают в зданиях. См. ${pl('a:pop', 'Жители и работники')}.</li>
       <li><b>Учитесь.</b> Кнопка «📜 Учиться» запускает раунд карточек. Каждый верный ответ приносит ${pl('a:logos', 'λ Логос')}.</li>
-      <li><b>Тратьте Логос на главное:</b> ${pl('a:techs', 'знания')}, ${pl('a:specials', 'спецстроения')},
+      <li><b>Тратьте Логос на главное:</b> ${pl('a:techs', 'знания')}, ${pl('a:specials', 'чудеса Кипра')},
       ${pl('a:upgrade', 'улучшение зданий')} на 4, 6, 8 и 10-й уровень и ${pl('a:epochs', 'переход в новую эпоху')}.</li>
       <li><b>Или ускоряйтесь с первых минут:</b> ${pl('a:religion', 'обряды')} превращают λ в ресурсы, жителей и временные благословения.
       Учиться сразу не обязательно — можно сначала погонять город и упереться в λ позже.</li>
@@ -63,7 +63,7 @@ const PEDIA_ARTICLES = [
     </ol>
     <h4>Сколько это займёт</h4>
     <p>Переход из медного века в бронзовый рассчитан на несколько дней игры. Сам переход стоит ${EPOCHS[0].advance.logos} λ,
-    а знания и спецстроения можно взять либо за λ (быстро), либо трудом — горой обычных ресурсов. Чем больше учитесь, тем быстрее идёте. Город работает и когда игра закрыта — до ${BALANCE.offlineMaxHours} часов, пока не заполнятся склады.</p>
+    а знания можно взять либо за λ (быстро), либо трудом — горой обычных ресурсов. Чем больше учитесь, тем быстрее идёте. Город работает и когда игра закрыта — до ${BALANCE.offlineMaxHours} часов, пока не заполнятся склады.</p>
     <p class="tip">Совет: учите понемногу, но каждый день. Карточки, которые пора повторить, дают в 2.5 раза больше Логоса, чем досрочные.</p>` },
 
   { id: 'logos', icon: 'λ', title: 'Логос (λ)', html: () => `
@@ -80,7 +80,7 @@ const PEDIA_ARTICLES = [
     <h4>На что тратится</h4>
     <ul>
       <li>${pl('a:techs', 'Знания')} — от 30 до 200 λ (или трудом, без λ);</li>
-      <li>${pl('a:specials', 'Спецстроения')} — от 80 до 400 λ (или трудом, без λ);</li>
+      <li>${pl('a:specials', 'Чудеса Кипра')} — у каждого своя цена: одни требуют λ, другие только ресурсы;</li>
       <li>${pl('a:upgrade', 'Улучшение зданий')} на 4, 6, 8 и 10-й уровень — только за λ, и именно они меняют облик здания;</li>
       <li>${pl('a:religion', 'Обряды')} — от 5 λ: мгновенные ресурсы и жители, удвоение производства на время;</li>
       <li>${pl('a:epochs', 'Переход эпохи')} — ${EPOCHS[0].advance.logos} λ в бронзовый век, ${EPOCHS[1].advance.logos} λ дальше.</li>
@@ -189,7 +189,7 @@ const PEDIA_ARTICLES = [
       <li><b>Выпуск</b> растёт в ${BALANCE.upProdGrowth} раза за <i>каждый</i> уровень: ×1.2, ×1.44, ×1.73… на 10-м уровне — ×${num(Game.levelMult(10), 1)}.</li>
       <li><b>Цена</b> ресурсами растёт в ${BALANCE.upCostGrowth} раза за каждый уровень, включая λ-уровни, хоть их и не оплачивают ресурсами.
       Поэтому 5-й уровень стоит как 3-й × ${BALANCE.upCostGrowth} × ${BALANCE.upCostGrowth}. Цена растёт быстрее отдачи — высокие уровни роскошь, а не выгода.</li>
-      <li><b>Бонусы</b> знаний и спецстроений складываются между собой (+20% и +30% = +50%) и умножают уже весь выпуск здания с учётом уровня.
+      <li><b>Бонусы</b> знаний и чудес складываются между собой (+20% и +30% = +50%) и умножают уже весь выпуск здания с учётом уровня.
       Бонус «ко всему производству» и бонус к конкретному зданию тоже просто складываются.</li>
       <li><b>Благословения</b> обрядов — отдельный честный множитель ×2 поверх всего.</li>
       <li>λ-уровни: 4-й — базовая цена, каждый следующий в ${BALANCE.logosGrowth} раза дороже, 8-й и 10-й — ещё вдвое.</li>
@@ -199,7 +199,7 @@ const PEDIA_ARTICLES = [
     <p>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза. Выбор между «ещё одно поле» и «улучшить старое» — ваш.</p>
     <h4>Пример: поле</h4>
     <table class="pt levels"><tr><th>Ур.</th><th>Облик</th><th>Зерно</th><th>Цена</th></tr>${rows}</table>
-    <p class="dim">Без учёта бонусов от знаний и спецстроений. Пример бонусов: Зернохранилища (+25%) и Святилище (+20%) дают +45%, и поле 6-го уровня даёт ${num(BUILDINGS[ex].prod.food * Game.levelMult(6))} × 1.45 = ${num(BUILDINGS[ex].prod.food * Game.levelMult(6) * 1.45)}/с.</p>`;
+    <p class="dim">Без учёта бонусов от знаний и чудес. Пример бонусов: Зернохранилища (+25%) и Святилище (+20%) дают +45%, и поле 6-го уровня даёт ${num(BUILDINGS[ex].prod.food * Game.levelMult(6))} × 1.45 = ${num(BUILDINGS[ex].prod.food * Game.levelMult(6) * 1.45)}/с.</p>`;
   } },
 
   { id: 'techs', icon: '📜', title: 'Знания', html: () => `
@@ -211,16 +211,15 @@ const PEDIA_ARTICLES = [
       <li><b>Трудом</b> — без λ, но ресурсная часть цены ×${BALANCE.laborTechMult}, а каждый λ заменяется ${BALANCE.laborPerLogos} единицами
       дерева и камня (в бронзовом веке — камня, меди и дерева). Долго, нужны большие склады, зато можно и без карточек.</li>
     </ul>
-    <p>Так же устроены ${pl('a:specials', 'спецстроения')}, только их цена трудом — ×${BALANCE.laborSpecialMult}.</p>
     ${EPOCHS.map((E, e) => {
       const list = TECHS.filter(t => t.epoch === e);
       return list.length ? `<h4>${E.name}</h4><ul>${list.map(t => `<li>${UI.techIcon(t).replace('class="ico', 'class="ico inl')} ${pl('t:' + t.id, t.name)} — ${t.desc}</li>`).join('')}</ul>` : '';
     }).join('')}` },
 
-  { id: 'specials', icon: '✨', title: 'Спецстроения', html: () => `
+  { id: 'specials', icon: '✨', title: 'Чудеса древнего Кипра', html: () => `
     <p>Уникальные постройки по мотивам реальных памятников Кипра. Каждое можно возвести один раз; они дороги, но заметно меняют экономику.
     Некоторые нужны для перехода в новую эпоху. Улучшать их не нужно.</p>
-    <p>Как и ${pl('a:techs', 'знания')}, их можно строить двумя путями: за λ и ресурсы или трудом — без λ, но ресурсов примерно вдвое-втрое больше.</p>
+    <p>У каждого чуда своя цена: в одних не обойтись без λ, другие строятся только ресурсами — их не бывает дёшево.</p>
     ${EPOCHS.map((E, e) => {
       const list = Object.entries(BUILDINGS).filter(([, B]) => B.special && B.epoch === e);
       return list.length ? `<h4>${E.name}</h4><ul>${list.map(([id, B]) => `<li>${bi(id)} ${pl('b:' + id, B.name)} — ${B.desc}</li>`).join('')}</ul>` : '';
@@ -230,7 +229,7 @@ const PEDIA_ARTICLES = [
     <p>Переход в новую эпоху — главная цель. Условия смотрите во вкладке «Эпоха»: население, обязательные спецстроения,
     все знания эпохи, ресурсы и λ. Ресурсы и λ при переходе списываются.</p>
     <p>С новой эпохой все здания меняют облик (хижины становятся домами из сырцового кирпича), поднимается предел улучшения,
-    появляются новые ресурсы, знания и спецстроения.</p>
+    появляются новые ресурсы, знания и чудеса.</p>
     <ul>${EPOCHS.map((E, i) => `<li>${pl('e:' + i, E.name)} <span class="dim">${E.sub}</span>${E.locked ? ' — в следующей версии' : ''}</li>`).join('')}</ul>` },
 
   { id: 'events', icon: '🐐', title: 'События: козы и набеги', html: () => `
@@ -304,7 +303,7 @@ const Pedia = {
       { title: 'Основы', items: PEDIA_ARTICLES.map(a => ({ id: 'a:' + a.id, icon: a.icon.startsWith('art:') ? Art.svg(a.icon.slice(4)) : a.icon, title: a.title })) },
       { title: 'Ресурсы', items: RES_KEYS.map(k => ({ id: 'r:' + k, icon: Art.res(k), title: RES[k].name })).concat([{ id: 'r:logos', icon: 'λ', title: 'Логос' }]) },
       { title: 'Здания', items: Object.entries(BUILDINGS).filter(([, B]) => !B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Art.svg(Game.icons(id, 1)[0]), title: B.name })) },
-      { title: 'Спецстроения', items: Object.entries(BUILDINGS).filter(([, B]) => B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Art.svg(id), title: B.name })) },
+      { title: 'Чудеса древнего Кипра', items: Object.entries(BUILDINGS).filter(([, B]) => B.special).map(([id, B]) => ({ id: 'b:' + id, icon: Art.svg(id), title: B.name })) },
       { title: 'Знания', items: TECHS.map(t => ({ id: 't:' + t.id, icon: UI.techIcon(t), title: t.name })) },
       { title: 'Эпохи', items: EPOCHS.map((E, i) => ({ id: 'e:' + i, icon: ['🪨', '🔔', '🏛️'][i] || '⏳', title: E.name })) },
     ];
@@ -374,7 +373,7 @@ const Pedia = {
     const terrain = B.terrain.map(t => TERRAIN[t].name.toLowerCase()).join(', ') + (B.coast ? ' (только у моря)' : '');
     const req = B.tech ? `<p>Нужно знание: ${pl('t:' + B.tech, '«' + TECH_BY_ID[B.tech].name + '»')}.</p>` : '';
     if (B.special) {
-      return this.head(Art.svg(type), B.name, 'Спецстроение · ' + EPOCHS[B.epoch].name) + `
+      return this.head(Art.svg(type), B.name, 'Чудо древнего Кипра · ' + EPOCHS[B.epoch].name) + `
         <p class="lead">${esc(B.desc)}</p>
         <table class="pt"><tr><td>Цена</td><td>${this.costText(B.cost, B.logos)}</td></tr>
           <tr><td>Где строить</td><td>${terrain}</td></tr></table>${req}
@@ -431,7 +430,7 @@ const Pedia = {
     const sps = Object.entries(BUILDINGS).filter(([, B]) => B.special && B.epoch === i).map(([id, B]) => pl('b:' + id, B.name));
     const blds = Object.entries(BUILDINGS).filter(([, B]) => !B.special && B.epoch === i).map(([id, B]) => pl('b:' + id, B.name));
     h += `<tr><td>Новые здания</td><td>${blds.join(', ')}</td></tr><tr><td>Знания</td><td>${techs.join(', ')}</td></tr>
-      <tr><td>Спецстроения</td><td>${sps.join(', ')}</td></tr></table>`;
+      <tr><td>Чудеса</td><td>${sps.join(', ')}</td></tr></table>`;
     const a = E.advance;
     if (a) {
       h += `<h4>Чтобы перейти дальше</h4><ul>
