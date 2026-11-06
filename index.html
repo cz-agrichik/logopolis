@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body data-epoch="0">
   <header id="topbar">
@@ -21,8 +21,9 @@
     <div class="logos-medal" id="logosMedal" title="Логос — главный ресурс: его дают только карточки"></div>
     <div class="resbar" id="resources"></div>
     <div class="popbox" id="popbox"></div>
-    <button id="pediaBtn" class="pedia-btn" title="Кипропедия — справочник (F1)">📖</button>
-    <button id="studyBtn" class="study-btn">📜 Учиться <span id="dueCount" class="count"></span></button>
+    <button id="pediaBtn" class="pedia-btn" title="Кипропедия — справочник по игре и учёбе (F1)">📖</button>
+    <button id="schoolBtn" class="pedia-btn" title="Обучение: прогресс по словам, колоды, темп, экспорт">📚</button>
+    <button id="studyBtn" class="study-btn"><span class="sb-main">📜 Учиться</span><span class="sb-sub" id="studySub"></span></button>
   </header>
 
   <main>
@@ -38,7 +39,6 @@
         <button data-tab="tech">Знания</button>
         <button data-tab="rites">Обряды</button>
         <button data-tab="epoch">Эпоха</button>
-        <button data-tab="decks">Карточки</button>
       </nav>
       <div id="panel"></div>
     </aside>
@@ -50,6 +50,13 @@
     <div class="pedia-box">
       <div class="pedia-top"><div class="pedia-title">📖 Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
       <div class="pedia-main"><nav id="pediaNav" class="pedia-nav"></nav><article id="pediaBody" class="pedia-body"></article></div>
+    </div>
+  </div>
+
+  <div id="school" class="pedia school hidden">
+    <div class="pedia-box">
+      <div class="pedia-top"><div class="pedia-title">📚 Обучение <small>Παιδεία</small></div><button class="st-close" data-school-close title="Закрыть (Esc)">✕</button></div>
+      <div class="pedia-main"><nav id="schoolNav" class="pedia-nav"></nav><article id="schoolBody" class="pedia-body"></article></div>
     </div>
   </div>
 
@@ -65,14 +72,15 @@
     </div>
   </div>
 
-  <script src="js/data.js?v=12"></script>
-  <script src="js/art.js?v=12"></script>
-  <script src="js/words.js?v=12"></script>
-  <script src="js/decks.js?v=12"></script>
-  <script src="js/game.js?v=12"></script>
-  <script src="js/ui.js?v=12"></script>
-  <script src="js/study.js?v=12"></script>
-  <script src="js/pedia.js?v=12"></script>
-  <script src="js/main.js?v=12"></script>
+  <script src="js/data.js?v=13"></script>
+  <script src="js/art.js?v=13"></script>
+  <script src="js/words.js?v=13"></script>
+  <script src="js/decks.js?v=13"></script>
+  <script src="js/game.js?v=13"></script>
+  <script src="js/ui.js?v=13"></script>
+  <script src="js/study.js?v=13"></script>
+  <script src="js/pedia.js?v=13"></script>
+  <script src="js/school.js?v=13"></script>
+  <script src="js/main.js?v=13"></script>
 </body>
 </html>

@@ -26,11 +26,11 @@ const UI = {
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
     $('#studyBtn').addEventListener('click', () => Study.start());
     $('#pediaBtn').addEventListener('click', () => Pedia.open());
+    $('#schoolBtn').addEventListener('click', () => School.open());
     $('#logosMedal').addEventListener('click', () => Pedia.open('a:logos'));
     $('#resources').addEventListener('click', () => Pedia.open('a:top'));
     $('#popbox').addEventListener('click', () => Pedia.open('a:pop'));
     $('#panel').addEventListener('click', e => this.onPanelClick(e));
-    $('#panel').addEventListener('change', e => this.onPanelChange(e));
     this.folds = {};
     $('#panel').addEventListener('toggle', e => {
       const d = e.target.closest && e.target.closest('details[data-fold]');
@@ -45,8 +45,9 @@ const UI = {
     document.addEventListener('keydown', e => {
       if (!$('#study').classList.contains('hidden')) return;
       if (e.key === 'Escape') {
-        if (!$('#pedia').classList.contains('hidden')) Pedia.close();
-        else if (!$('#modal').classList.contains('hidden')) this.closeModal();
+        if (!$('#modal').classList.contains('hidden')) this.closeModal();
+        else if (!$('#pedia').classList.contains('hidden')) Pedia.close();
+        else if (School.isOpen()) School.close();
         else this.cancelPlacing();
       }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -119,10 +120,15 @@ const UI = {
       return `<span class="bf" title="${esc(R.desc)}">${this.riteIcon(R).replace('class="ico', 'class="ico inl')}<b>${esc(R.name)}</b><small>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</small></span>`;
     }).join('');
 
-    const p = Decks.pending(s);
-    const n = p.due + Math.min(p.fresh, Decks.settings(s).newPerRound);
-    $('#dueCount').textContent = n ? n : '';
-    $('#dueCount').classList.toggle('hidden', !n);
+    // кнопка «Учиться»: понятными словами, что ждёт в раунде
+    const p = Decks.pending(s), newNow = Math.min(p.fresh, Decks.settings(s).newPerRound);
+    const sub = [p.due ? `повторить ${p.due}` : '', newNow ? `новых ${newNow}` : ''].filter(Boolean).join(' · ') || 'всё повторено';
+    if (sub !== this.lastStudySub) {
+      this.lastStudySub = sub;
+      $('#studySub').textContent = sub;
+      $('#studyBtn').title = `Раунд карточек — единственный источник λ.\n${p.due ? `Пора повторить: ${p.due} ${plural(p.due, 'слово', 'слова', 'слов')}.` : 'Сейчас повторять нечего — можно повторить досрочно (λ меньше).'}\n${newNow ? `Новых слов в раунде: до ${newNow}.` : 'Новых слов нет: все уже в работе или колоды выключены.'}`;
+      $('#studyBtn').classList.toggle('quiet', !p.due && !newNow);
+    }
   },
 
   // ---------------- карта ----------------
@@ -294,7 +300,6 @@ const UI = {
   // ---------------- боковая панель ----------------
   renderPanel() {
     const p = $('#panel');
-    if (this.tab === 'decks' && p.contains(document.activeElement) && /TEXTAREA|INPUT/.test(document.activeElement.tagName)) return;
     const html = this['panel_' + this.tab]();
     if (html === this.lastPanel) return;   // без лишних перерисовок — клики не теряются
     this.lastPanel = html;
@@ -433,47 +438,11 @@ const UI = {
     });
     h += `<li class="future"><b>Классика, эллинизм, Рим, Византия…</b><small>дальше по истории Кипра</small></li></ol>`;
     const st = s.stats;
-    h += `<h3>Летопись</h3><div class="statline">Раундов: <b>${st.rounds}</b> · верно: <b>${st.right}</b> · ошибок: <b>${st.wrong}</b> · лучшая серия: <b>${st.bestStreak}</b> · всего λ: <b>${Math.floor(s.logosEarned)}</b> · поймано коз: <b>${st.goats || 0}</b></div>`;
+    h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(s)}</b>
+      <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
+      <h3>Игра</h3><button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
+      <div class="hint dim">Город начнётся заново, а колоды и выученные слова сохранятся.</div>`;
     if (this.dev) h += `<div class="dev"><b>dev:</b> <button class="btn small" data-dev="logos">+500 λ</button> <button class="btn small" data-dev="res">+1000 ресурсов</button> <button class="btn small" data-dev="goat">коза</button> <button class="btn small" data-dev="raid">набег</button></div>`;
-    return h;
-  },
-
-  panel_decks() {
-    const s = Game.state;
-    let h = `<div class="hint">Колоды участвуют в раундах, если включены. Полный Логос — за новые карточки и те, что пора повторить; досрочное повторение даёт меньше. ${this.pediaBtn('a:import')}</div>`;
-    for (const d of s.decks) {
-      const st = Decks.stats(s, d);
-      h += `<div class="deck ${d.active ? '' : 'off'}">
-        <label class="deck-head"><input type="checkbox" data-deck-toggle="${d.id}" ${d.active ? 'checked' : ''}> <b>${esc(d.name)}</b></label>
-        <div class="deck-bar" title="выучены / учатся / новые">
-          <i class="learned" style="flex:${st.learned}"></i><i class="learning" style="flex:${st.learning}"></i><i class="fresh" style="flex:${st.fresh}"></i>
-        </div>
-        <div class="deck-stats">${st.total} карт · новых ${st.fresh} · учатся ${st.learning} · выучено ${st.learned} · к повторению ${st.due}</div>
-        <div class="deck-actions"><button class="link" data-deck-view="${d.id}">Посмотреть</button>
-          <button class="link danger" data-deck-del="${d.id}">Удалить</button></div>
-      </div>`;
-    }
-    const set = Decks.settings(s);
-    const opt = (name, cur, vals) => `<select data-setting="${name}">${vals.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
-    h += `<h3>Скорость обучения ${this.pediaBtn('a:cards')}</h3>
-      <div class="settings">
-        <label><span>Верных ответов, чтобы слово считалось выученным</span>${opt('learnSteps', set.learnSteps, [[2, '2 — быстро'], [3, '3 — обычно'], [4, '4'], [5, '5 — основательно']])}</label>
-        <label><span>Повторять выученное</span>${opt('appetite', set.appetite, Object.entries(APPETITES).map(([k, a]) => [k, `${a.name} — ${a.desc}`]))}</label>
-        <label><span>Новых слов за раунд</span>${opt('newPerRound', set.newPerRound, [[3, '3'], [5, '5'], [8, '8'], [12, '12']])}</label>
-        <label><span>Карточек в раунде</span>${opt('roundSize', set.roundSize, [[6, '6'], [8, '8'], [12, '12'], [16, '16']])}</label>
-        <div class="dim small">Сейчас выученное повторяется через: ${(APPETITES[set.appetite] || APPETITES.normal).intervals.map(fmtDur).join(' → ')}, дальше — с последним интервалом.</div>
-      </div>`;
-    h += `<h3>Импорт колоды</h3>
-      <div class="import">
-        <input type="text" id="deckName" placeholder="Название колоды">
-        <textarea id="deckText" rows="7" placeholder="По одной карточке в строке:\nσπίτι\tдом\tspíti\nνερό; вода\nψωμί — хлеб\n\nили JSON: [{&quot;front&quot;:&quot;σπίτι&quot;,&quot;back&quot;:&quot;дом&quot;}]"></textarea>
-        <div class="import-row">
-          <label class="btn small ghost">📂 Файл…<input type="file" id="deckFile" accept=".txt,.tsv,.csv,.json" hidden></label>
-          <button class="btn small" data-import>Импортировать</button>
-        </div>
-        <div class="hint dim">TSV (экспорт Anki «Notes in Plain Text»), CSV, «слово ; перевод ; подсказка», «слово — перевод», JSON. Греческая сторона определяется сама.</div>
-      </div>
-      <h3>Игра</h3><button class="btn small ghost danger" data-reset>Начать заново (сбросить всё)</button>`;
     return h;
   },
 
@@ -506,65 +475,12 @@ const UI = {
       if (Game.advanceEpoch()) { this.renderMap(); this.renderAll(); this.showEpoch(); }
       return;
     }
-    if (t.hasAttribute('data-import')) return this.doImport();
-    if (t.dataset.deckDel) {
-      const d = Game.state.decks.find(x => x.id === t.dataset.deckDel);
-      if (d) this.confirmModal(`Удалить колоду «${esc(d.name)}» и её прогресс?`, 'Удалить', () => {
-        for (const c of d.cards) delete Game.state.progress[c.id];
-        Game.state.decks = Game.state.decks.filter(x => x !== d);
-        Game.save(); this.lastPanel = null; this.renderAll();
-      });
-      return;
-    }
-    if (t.dataset.deckView) return this.showDeck(t.dataset.deckView);
-    if (t.hasAttribute('data-reset')) {
-      this.confirmModal('Начать игру заново? Город, знания, Логос и прогресс карточек будут удалены. Импортированные колоды тоже.', 'Начать заново', () => Game.reset());
-      return;
-    }
+    if (t.dataset.school) return School.open(t.dataset.school);
     if (t.dataset.dev === 'logos') Game.addLogos(500);
     if (t.dataset.dev === 'res') for (const k of RES_KEYS) Game.state.res[k] += 1000;
     if (t.dataset.dev === 'goat') Game.state.timers.goat = 0;
     if (t.dataset.dev === 'raid') Game.raid();
     if (t.dataset.dev) this.renderAll();
-  },
-
-  onPanelChange(e) {
-    const t = e.target;
-    if (t.dataset.setting) {
-      const v = t.value;
-      Game.state.settings[t.dataset.setting] = /^\d+$/.test(v) ? +v : v;
-      Game.save(); this.lastPanel = null; this.renderAll();
-      return;
-    }
-    if (t.dataset.deckToggle) {
-      const d = Game.state.decks.find(x => x.id === t.dataset.deckToggle);
-      if (d) { d.active = t.checked; Game.save(); this.renderAll(); }
-    }
-    if (t.id === 'deckFile' && t.files[0]) {
-      const f = t.files[0];
-      const r = new FileReader();
-      r.onload = () => {
-        $('#deckText').value = r.result;
-        if (!$('#deckName').value) $('#deckName').value = f.name.replace(/\.[^.]+$/, '');
-      };
-      r.readAsText(f, 'utf-8');
-    }
-  },
-
-  doImport() {
-    let parsed;
-    try { parsed = Decks.parse($('#deckText').value); }
-    catch (err) { return this.toast('Не удалось разобрать: ' + esc(err.message)); }
-    if (!parsed.cards.length) return this.toast('Карточек не найдено');
-    const name = $('#deckName').value.trim() || parsed.name || `Колода ${Game.state.decks.length + 1}`;
-    const deck = Decks.makeDeck(name, parsed.cards);
-    Game.state.decks.push(deck);
-    Game.save();
-    this.toast(`Импортировано: ${deck.cards.length} карт${parsed.skipped ? ` (пропущено строк: ${parsed.skipped})` : ''}`);
-    Game.log(`Новая колода: «${name}» (${deck.cards.length})`);
-    $('#deckText').value = ''; $('#deckName').value = '';
-    this.lastPanel = null;
-    this.renderAll();
   },
 
   renderLog() {
@@ -653,16 +569,6 @@ const UI = {
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
       <button class="btn gold" data-action="close">${first ? 'Начать' : 'Дальше'}</button></div></div>`;
     this.showModal(h);
-  },
-
-  showDeck(id) {
-    const d = Game.state.decks.find(x => x.id === id);
-    if (!d) return;
-    const rows = d.cards.map(c => {
-      return `<tr><td class="greek">${esc(c.front)}</td><td>${esc(c.back)}</td><td class="dim">${esc(c.hint)}</td><td class="box">${Decks.progressText(Game.state, c.id)}</td></tr>`;
-    }).join('');
-    this.showModal(`<h2>${esc(d.name)}</h2><div class="deck-table"><table>${rows}</table></div>
-      <div class="mb-actions"><span></span><button class="btn ghost small" data-action="close">Закрыть</button></div>`);
   },
 
   /** Подтверждение внутри игры (без window.confirm — он может быть заблокирован). */

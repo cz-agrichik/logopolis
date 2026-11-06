@@ -16,9 +16,11 @@
   UI.init();
 
   const firstScreen = () => {
-    if (!saved) {
+    if (!saved || Game.state.introPending) {
+      delete Game.state.introPending;
       Game.log('Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.');
       Game.log('λ Логос даётся только за карточки — кнопка «📜 Учиться».');
+      if (saved) Game.log('📚 Новая игра: выученные слова и колоды остались с вами.');
       UI.showEpoch(true);
     } else if (away) UI.showAway(away);
   };
@@ -47,7 +49,7 @@
     sinceRender += dt; sinceSave += dt;
     if (sinceRender >= 1 || Game.state.pop !== popBefore) {
       sinceRender = 0;
-      if (UI.tab !== 'decks') UI.renderPanel();
+      UI.renderPanel();
     }
     if (sinceSave >= 5) { sinceSave = 0; Game.save(); }
   }, 250);

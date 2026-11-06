@@ -132,11 +132,12 @@ const Study = {
   start() {
     const s = Game.state;
     const picks = Decks.selectRound(s);
-    if (!picks.length) return UI.toast('Нет активных карточек — включите или импортируйте колоду во вкладке «Карточки»');
+    if (!picks.length) return UI.toast('Нет активных карточек — включите или импортируйте колоду в «📚 Обучении»');
     UI.cancelPlacing();
+    if (typeof School !== 'undefined') School.close(true);
     this.pool = Decks.activeCards(s);
     this.tasks = this.buildTasks(picks);
-    this.i = 0; this.streak = 0; this.earned = 0; this.right = 0; this.wrong = 0; this.best = 0; this.learnedNow = 0;
+    this.i = 0; this.earned = 0; this.right = 0; this.wrong = 0; this.learnedNow = 0; this.ended = false;
     this.open = true;
     $('#study').classList.remove('hidden');
     if (!this.bound) this.bind();
@@ -212,27 +213,29 @@ const Study = {
   },
 
   // ---------- награды ----------
-  reward(p) {
-    const base = p.kind === 'early' ? 2 : 5;
-    const combo = 1 + Math.min(this.streak, 10) * 0.1;
-    return Math.max(1, Math.round(base * combo * Game.logosMult()));
+  /** λ за верный ответ: цена типа задания × бонусы святилищ и писцов. Серии не поощряются. */
+  reward(type, p) {
+    return Math.max(1, Math.round(Decks.rewardBase(type, p.kind) * Game.logosMult()));
+  },
+  /** Значок «сколько λ даёт задание» рядом с вопросом. */
+  valueBadge(type, p, perPair = false) {
+    return `<span class="badge val" title="Столько λ даст верный ответ${perPair ? ' — за каждую пару без ошибки' : ''}${p && p.kind === 'early' ? ' (досрочно — меньше)' : ''}">λ ${this.reward(type, p || {})}${perPair ? ' за пару' : ''}</span>`;
   },
 
-  grade(p, correct, typed = false) {
+  grade(p, correct, typed = false, type = 'gr2ru') {
     const s = Game.state;
     const ev = Decks.grade(s, p.card, correct, p.kind, typed);
     if (ev === 'needtype') this.needType = true;
     if (ev === 'learned') { this.learnedNow++; this.justLearned = (this.justLearned || 0) + 1; s.stats.learned = (s.stats.learned || 0) + 1; }
     let gain = 0;
     if (correct) {
-      this.streak++; this.right++; s.stats.right++;
-      gain = this.reward(p);
+      this.right++; s.stats.right++;
+      gain = this.reward(type, p);
       Game.addLogos(gain); this.earned += gain;
-      this.best = Math.max(this.best, this.streak);
-      s.stats.bestStreak = Math.max(s.stats.bestStreak, this.streak);
     } else {
-      this.streak = 0; this.wrong++; s.stats.wrong++;
+      this.wrong++; s.stats.wrong++;
     }
+    Decks.logDay(s, { a: 1, r: correct ? 1 : 0, x: gain, l: ev === 'learned' ? 1 : 0, n: p.kind === 'new' ? 1 : 0 });
     this.renderHead();
     if (gain) {
       const el = $('#stEarned');
@@ -247,8 +250,7 @@ const Study = {
     const total = this.tasks.length;
     $('#stProgress').style.width = (100 * this.i / total) + '%';
     $('#stEarned').textContent = `λ +${this.earned}`;
-    const combo = 1 + Math.min(this.streak, 10) * 0.1;
-    $('#stCombo').textContent = this.streak >= 2 ? `🔥 ${this.streak} · ×${combo.toFixed(1)}` : '';
+    $('#stCombo').textContent = total ? `${Math.min(this.i + 1, total)} / ${total}` : '';
     const bonus = Math.round((Game.logosMult() - 1) * 100);
     $('#stBonus').textContent = bonus ? `бонус святилищ и писцов: +${bonus}% λ` : '';
   },
@@ -271,7 +273,7 @@ const Study = {
     return `<div class="q-word ${g ? 'greek' : ''} ${big ? '' : 'small'}">${esc(text)}${g ? `<button class="say" data-say="${esc(text)}" title="Произнести">🔊</button>` : ''}</div>`;
   },
   badge(p) {
-    return p.kind === 'new' ? '<span class="badge new">новое</span>' : p.kind === 'early' ? '<span class="badge">досрочно · λ меньше</span>' : '';
+    return p.kind === 'new' ? '<span class="badge new">новое</span>' : p.kind === 'early' ? '<span class="badge" title="Карточку ещё не пора повторять — λ меньше">досрочно</span>' : '';
   },
 
   r_intro(t) {
@@ -289,7 +291,7 @@ const Study = {
   choiceHtml(t, from, to, label) {
     const c = t.p.card;
     t.opts = this.options(c, to);
-    return `<div class="q-label">${label} ${this.badge(t.p)}</div>
+    return `<div class="q-label">${label} ${this.badge(t.p)} ${this.valueBadge(t.type, t.p)}</div>
       ${this.wordHtml(c[from])}
       <div class="q-hint reveal">${esc(c.hint)}</div>
       <div class="options">${t.opts.map((o, i) => `<button class="opt ${Decks.hasGreek(o) ? 'greek' : ''}" data-opt="${i}"><kbd>${i + 1}</kbd><span>${esc(o)}</span></button>`).join('')}</div>
@@ -326,7 +328,7 @@ const Study = {
     t.picked = [];
     t.kb = '';
     const last = Decks.needsBuild(Game.state, c);
-    return `<div class="q-label">Соберите слово по-гречески${t.syl ? ' из слогов' : ''} ${last ? '<span class="badge new">последний шаг к «выучено»</span>' : this.badge(t.p)}</div>
+    return `<div class="q-label">Соберите слово по-гречески${t.syl ? ' из слогов' : ''} ${last ? '<span class="badge new">последний шаг к «выучено»</span>' : this.badge(t.p)} ${this.valueBadge('build', t.p)}</div>
       ${this.wordHtml(c.back)}
       <div class="slots ${t.syl ? 'syl' : ''}" id="slots"></div>
       <div class="tiles ${t.syl ? 'syl' : ''}" id="tiles"></div>
@@ -338,7 +340,7 @@ const Study = {
     t.left = shuffle(t.items);
     t.right = shuffle(t.items);
     t.sel = null; t.done = new Set(); t.miss = new Set();
-    return `<div class="q-label">Соедините пары</div>
+    return `<div class="q-label">Соедините пары ${this.valueBadge('match', t.items[0], true)}</div>
       <div class="match">
         <div class="col">${t.left.map((p, i) => `<button class="mt greek" data-mt="L${i}">${esc(p.card.front)}</button>`).join('')}</div>
         <div class="col">${t.right.map((p, i) => `<button class="mt" data-mt="R${i}">${esc(p.card.back)}</button>`).join('')}</div>
@@ -347,7 +349,7 @@ const Study = {
 
   r_flip(t) {
     const c = t.p.card;
-    return `<div class="q-label">Вспомните перевод ${this.badge(t.p)}</div>
+    return `<div class="q-label">Вспомните перевод ${this.badge(t.p)} ${this.valueBadge('flip', t.p)}</div>
       ${this.wordHtml(c.front)}
       <div class="flash-back hidden" id="flipBack">${esc(c.back)}${c.hint ? `<div class="q-hint">${esc(c.hint)}</div>` : ''}</div>
       <div class="flip-actions" id="flipActions"><button class="btn" data-flip>Показать ответ <kbd>Пробел</kbd></button></div>
@@ -366,15 +368,16 @@ const Study = {
     $('#stProgress').style.width = '100%';
     const total = this.right + this.wrong;
     const p = Decks.pending(Game.state);
-    Game.state.stats.rounds++;
+    if (!this.ended) { this.ended = true; Game.state.stats.rounds++; Decks.logDay(Game.state, { rounds: 1 }); }
     Game.save();
     $('#stBody').className = 'st-body type-end';
     $('#stBody').innerHTML = `<div class="end">
       <div class="end-l">λ +${this.earned}</div>
       <div class="end-t">Раунд окончен</div>
-      <div class="dim">Верно ${this.right} из ${total} · лучшая серия ${this.best}${this.learnedNow ? ` · <b class="learned-mark">выучено слов: ${this.learnedNow}</b>` : ''}</div>
-      <div class="dim">${p.due ? `Ещё к повторению: ${p.due}` : 'Всё, что пора было повторить, — повторено.'} ${p.fresh ? `Новых карточек: ${p.fresh}.` : ''}</div>
+      <div class="dim">Верно ${this.right} из ${total}${this.learnedNow ? ` · <b class="learned-mark">выучено слов: ${this.learnedNow}</b>` : ''}</div>
+      <div class="dim">${p.due ? `Пора повторить ещё: ${p.due}.` : 'Всё, что пора было повторить, — повторено.'} ${p.fresh ? `Новых слов в колодах: ${p.fresh}.` : ''}</div>
       <div class="end-actions"><button class="btn gold" data-again>Ещё раунд</button><button class="btn ghost" data-close>В город</button></div>
+      <button class="link" data-school>📚 Обучение: прогресс, колоды, темп</button>
     </div>`;
   },
 
@@ -408,7 +411,7 @@ const Study = {
       else if (k === i) b.classList.add('wrong');
     });
     $('#stBody .reveal').classList.add('shown');
-    const gain = this.grade(t.p, ok);
+    const gain = this.grade(t.p, ok, false, t.type);
     if (Decks.hasGreek(t.p.card.front)) Speech.say(t.p.card.front, true);
     const c = t.p.card;
     this.feedback(ok, ok ? `Верно! <b>+${gain} λ</b>` : `<span class="greek">${esc(c.front)}</span> — ${esc(c.back)}`);
@@ -468,7 +471,7 @@ const Study = {
     const almost = !ok && stripAccents(word) === stripAccents(target);
     document.querySelectorAll('#tiles button').forEach(b => b.disabled = true);
     $('#slots').classList.add(ok ? 'right' : 'wrong');
-    const gain = this.grade(t.p, ok, true);
+    const gain = this.grade(t.p, ok, true, 'build');
     if (Decks.hasGreek(target)) Speech.say(target, true);
     this.feedback(ok, ok ? `Верно! <b>+${gain} λ</b>` :
       `${almost ? 'Почти — ударение/диакритика. ' : ''}Правильно: <span class="greek">${esc(target)}</span>`);
@@ -496,7 +499,7 @@ const Study = {
       if (Decks.hasGreek(p.card.front)) Speech.say(p.card.front, true);
       if (t.done.size === t.items.length) {
         let gain = 0;
-        for (const it of t.items) gain += this.grade(it, !t.miss.has(it));
+        for (const it of t.items) gain += this.grade(it, !t.miss.has(it), false, 'match');
         const errs = t.miss.size;
         this.feedback(errs === 0, errs === 0 ? `Все пары! <b>+${gain} λ</b>` : `Собрано. Ошибок: ${errs}${gain ? ` · +${gain} λ` : ''}`);
       }
@@ -518,7 +521,7 @@ const Study = {
     const t = this.tasks[this.i];
     if (this.answered) return;
     $('#flipActions').innerHTML = '';
-    const gain = this.grade(t.p, ok);
+    const gain = this.grade(t.p, ok, false, 'flip');
     this.feedback(ok, ok ? `<b>+${gain} λ</b>` : 'Ничего, вернёмся к ней скоро.');
   },
 
@@ -531,6 +534,7 @@ const Study = {
     if (d.say) return Speech.say(d.say);
     if ('close' in d || b.id === 'stClose') return this.close();
     if ('again' in d) return this.start();
+    if ('school' in d) { this.close(); return School.open(); }
     if ('next' in d) return this.next();
     if (d.opt != null) return this.pickOption(+d.opt);
     if (d.tile != null) return this.buildTap(+d.tile);

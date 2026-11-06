@@ -545,3 +545,53 @@ details.fold[open] > summary::before { content: '▾ '; }
 @media (max-width: 1250px) { .rs-v small { display: none; } .rs { padding-bottom: 7px; } .brand .epoch-sub { display: none; } }
 .pedia-body .story { font-style: italic; color: #5a4632; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 4px 0 12px; }
 .pedia-body code { background: #fffdf7; border: 1px solid var(--parch-3); border-radius: 4px; padding: 0 4px; }
+
+/* ---------- v9: модуль «Обучение», кнопка «Учиться», награды ---------- */
+.modal { z-index: 900; }                 /* подтверждения — поверх «Обучения» и Кипропедии */
+.school { z-index: 650; }                /* Кипропедия (700) открывается поверх «Обучения» */
+.study-btn { display: flex; flex-direction: column; align-items: center; line-height: 1.1; padding: 6px 16px; }
+.study-btn .sb-main { font-size: 16px; }
+.study-btn .sb-sub { font-size: 11px; font-weight: 600; color: #6b4a00; letter-spacing: .01em; }
+.study-btn.quiet { animation: none; background: linear-gradient(180deg, #fff0c4, #e9c56e); }
+.badge.val { background: var(--gold-l); color: #4a3200; font-weight: 700; }
+.st-meta #stCombo { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.end .link { margin-top: 6px; }
+
+.pn-foot { padding: 10px 10px 0; border-top: 1px solid var(--parch-3); margin-top: 6px; }
+.school h2 { margin: 0 0 8px; font-size: 22px; }
+.kpis { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.kpi { flex: 1 1 110px; background: #fff8; border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; cursor: default; }
+.kpi b { font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.kpi small { font-size: 12px; color: var(--ink-2); }
+.kpis.small .kpi b { font-size: 18px; }
+.deck-bar { gap: 2px; height: 8px; border-radius: 4px; }
+.deck-bar i { border-radius: 4px; }
+.bar-legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin: 2px 0 8px; }
+.bar-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.bar-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.bar-legend i.learned { background: var(--good); }
+.bar-legend i.learning { background: var(--gold); }
+.bar-legend i.fresh { background: var(--parch-3); box-shadow: inset 0 0 0 1px #c9b48e; }
+.deck-bar i.fresh { background: #e3d3b0; }
+.ov-go { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 4px 0 8px; }
+table.days td, table.days th { text-align: right; font-variant-numeric: tabular-nums; }
+table.days td:first-child, table.days th:first-child { text-align: left; }
+table.days tr.dim td { color: var(--ink-2); opacity: .7; }
+.sw-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.sw-filters select, .sw-filters input, .io-list select { font-family: inherit; font-size: 13px; padding: 5px 7px; border: 1px solid var(--parch-3); border-radius: 6px; background: #fffdf7; }
+.sw-filters input { flex: 1 1 180px; }
+.school .deck-table { max-height: none; }
+.school .deck-table th { text-align: left; font-size: 12px; color: var(--ink-2); font-weight: 600; padding: 4px 6px; position: sticky; top: 0; background: var(--parch); }
+.school .deck-table td.num { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.bad-n { color: var(--bad); font-weight: 700; }
+.io-list { display: flex; flex-direction: column; gap: 10px; }
+.io-list > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.reset-card { background: #fff8; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+.reset-card p { margin: 4px 0 8px; font-size: 13.5px; }
+.school .deck { background: #fff8; }
+
+/* Кипропедия: две части — игра и учёба */
+.pn-parts { display: flex; gap: 4px; padding: 4px 4px 8px; position: sticky; top: -8px; background: var(--parch-2); z-index: 1; }
+.pn-part { flex: 1; border: 0; border-radius: 8px; padding: 7px 6px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  background: rgba(255,255,255,.35); color: var(--ink-2); }
+.pn-part.active { background: var(--head-bg); color: #fbf3e2; }

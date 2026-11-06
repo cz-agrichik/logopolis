@@ -42,6 +42,27 @@ const APPETITES = {
 };
 const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', newPerRound: 5, roundSize: 8 };
 
+// ------------------------------------------------------------
+//  Награды: λ за верный ответ зависит от типа задания (серии не поощряются).
+//  Чем сложнее задание, тем больше λ; набор слова — самое дорогое.
+//  Обычный раунд из 8 карточек приносит около 60 λ до бонусов святилищ и писцов.
+// ------------------------------------------------------------
+const TASK_REWARDS = {
+  flip:  { lambda: 4,  name: 'Вспомнить перевод', desc: 'сами оцениваете, вспомнили ли' },
+  gr2ru: { lambda: 6,  name: 'Что это значит?', desc: 'выбрать перевод греческого слова' },
+  match: { lambda: 5,  name: 'Соедините пары', desc: 'за каждую пару без ошибки' },
+  ru2gr: { lambda: 7,  name: 'Как это по-гречески?', desc: 'выбрать греческое слово' },
+  build: { lambda: 12, name: 'Соберите слово', desc: 'набрать слово по буквам или слогам' },
+};
+const EARLY_FACTOR = 0.4;          // досрочное повторение (не пора) — меньше
+const LEARN_LOG_DAYS = 90;         // сколько дней хранить журнал занятий
+
+/** Ключ дня по местному времени: 2026-11-06 */
+function dayKey(t = Date.now()) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const GREEK_RE = /[Ͱ-Ͽἀ-῿]/;
 
 const Decks = {
@@ -284,6 +305,101 @@ const Decks = {
     p.last = now;
     state.progress[card.id] = p;
     return event;
+  },
+
+  /** Сколько λ даёт верный ответ в задании этого типа (без бонусов святилищ и писцов). */
+  rewardBase(type, kind) {
+    const base = (TASK_REWARDS[type] || TASK_REWARDS.gr2ru).lambda;
+    return kind === 'early' ? Math.max(1, Math.round(base * EARLY_FACTOR)) : base;
+  },
+
+  /** Состояние карточки одним словом: new / learning / learned (+ due — пора повторить). */
+  status(state, card, now = Date.now()) {
+    const p = this.prog(state, card.id);
+    if (!p) return { st: 'new', due: false, p };
+    return { st: this.isLearned(p) ? 'learned' : 'learning', due: p.due <= now, p };
+  },
+
+  /** Сколько слов сейчас в статусе «выучено» (во всех колодах). */
+  learnedCount(state) {
+    let n = 0;
+    for (const id of Object.keys(state.progress)) { const p = this.prog(state, id); if (this.isLearned(p)) n++; }
+    return n;
+  },
+
+  // ---------- журнал занятий по дням ----------
+  logDay(state, add) {
+    const log = state.learnLog || (state.learnLog = {});
+    const k = dayKey();
+    const d = log[k] || (log[k] = { a: 0, r: 0, l: 0, x: 0, n: 0, rounds: 0 });
+    for (const [f, v] of Object.entries(add)) d[f] = (d[f] || 0) + v;
+    const keys = Object.keys(log).sort();
+    while (keys.length > LEARN_LOG_DAYS) delete log[keys.shift()];
+  },
+
+  /** Сколько карточек станет «пора повторить» в ближайшие ms. */
+  dueWithin(state, ms) {
+    const now = Date.now();
+    let n = 0;
+    for (const c of this.activeCards(state)) {
+      const p = this.prog(state, c.id);
+      if (p && p.due > now && p.due <= now + ms) n++;
+    }
+    return n;
+  },
+  nextDue(state) {
+    let t = Infinity;
+    for (const c of this.activeCards(state)) { const p = this.prog(state, c.id); if (p && p.due < t) t = p.due; }
+    return t;
+  },
+
+  // ---------- сбросы ----------
+  /** Сбросить прогресс всех слов, журнал и статистику обучения. Колоды и настройки остаются. */
+  resetLearning(state) {
+    state.progress = {};
+    state.learnLog = {};
+    Object.assign(state.stats, { right: 0, wrong: 0, rounds: 0, learned: 0, bestStreak: 0 });
+  },
+  resetDeck(state, deck) {
+    for (const c of deck.cards) delete state.progress[c.id];
+  },
+
+  // ---------- экспорт ----------
+  deckTsv(deck) {
+    const f = v => String(v || '').replace(/[\t\r\n]+/g, ' ');
+    return `# ${f(deck.name)}\n` + deck.cards.map(c => [c.front, c.back, c.hint].map(f).join('\t')).join('\n') + '\n';
+  },
+  /** Таблица слов с прогрессом (для Excel/Google Таблиц). */
+  progressTsv(state, cards) {
+    const f = v => String(v ?? '').replace(/[\t\r\n]+/g, ' ');
+    const rows = [['Греческий', 'Перевод', 'Подсказка', 'Колода', 'Статус', 'Верно', 'Ошибок', 'Следующий повтор']];
+    for (const c of cards) {
+      const { st, p } = this.status(state, c), d = this.deckOfCard(state, c.id);
+      rows.push([c.front, c.back, c.hint, d ? d.name : '', { new: 'новое', learning: 'учится', learned: 'выучено' }[st],
+        p ? p.right : 0, p ? p.wrong : 0, p ? new Date(p.due).toLocaleString('ru-RU') : '']);
+    }
+    return rows.map(r => r.map(f).join('\t')).join('\n') + '\n';
+  },
+  /** Полная копия обучения: колоды, прогресс, настройки, журнал. */
+  backup(state) {
+    return {
+      type: 'logos-learning', v: 1, exported: new Date().toISOString(),
+      decks: state.decks, progress: state.progress, settings: state.settings,
+      learnLog: state.learnLog || {},
+      stats: { right: state.stats.right, wrong: state.stats.wrong, rounds: state.stats.rounds, learned: state.stats.learned || 0 },
+    };
+  },
+  /** Восстановить обучение из копии (заменяет текущее). Возвращает число колод. */
+  restore(state, data) {
+    if (!data || data.type !== 'logos-learning' || !Array.isArray(data.decks) || typeof data.progress !== 'object')
+      throw new Error('это не копия обучения «Λόγος»');
+    state.decks = data.decks;
+    state.progress = data.progress || {};
+    state.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
+    state.learnLog = data.learnLog || {};
+    Object.assign(state.stats, { right: 0, wrong: 0, rounds: 0, learned: 0 }, data.stats || {});
+    this.ensureBuiltins(state);
+    return state.decks.length;
   },
 
   /** Короткое описание прогресса карточки для таблиц. */

@@ -21,7 +21,7 @@ const Game = {
       pop: 2, popAcc: 0, starveAcc: 0,
       techs: [], buildings: [], nextId: 1,
       decks: Decks.builtinDecks(), progress: {}, buffs: {}, cooldowns: {}, settings: { ...DEFAULT_SETTINGS },
-      stats: { right: 0, wrong: 0, bestStreak: 0, rounds: 0, goats: 0 },
+      stats: { right: 0, wrong: 0, bestStreak: 0, rounds: 0, goats: 0, learned: 0 }, learnLog: {},
       timers: { goat: 40, raid: null },
       log: [], lastSave: Date.now(), finished: false,
     };
@@ -72,6 +72,8 @@ const Game = {
       s.buffs = s.buffs || {};
       s.cooldowns = s.cooldowns || {};
       s.settings = Object.assign({}, DEFAULT_SETTINGS, s.settings || {});
+      s.learnLog = s.learnLog || {};
+      s.stats.learned = s.stats.learned || 0;
       s.techs = s.techs.map(t => t === 'picrolite' ? 'carving' : t);   // переименование v2 → v3
       const added = Decks.ensureBuiltins(s);
       if (added) s.log.unshift({ t: Date.now(), msg: `📚 Добавлены встроенные колоды: ${added}` });
@@ -85,6 +87,18 @@ const Game = {
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
     } catch (e) { /* хранилище недоступно — играем без сохранения */ }
   },
+  /** Новая игра: город, знания и Логос — с нуля; колоды, прогресс слов, настройки и журнал обучения — сохраняются. */
+  newGame() {
+    const old = this.state, s = this.newState();
+    s.decks = old.decks; s.progress = old.progress; s.settings = old.settings; s.learnLog = old.learnLog || {};
+    for (const k of ['right', 'wrong', 'rounds', 'learned']) s.stats[k] = old.stats[k] || 0;
+    s.introPending = true;
+    this.state = s;
+    this.save();
+    this.resetting = true;
+    location.replace(location.pathname + '?fresh=' + Date.now());
+  },
+  /** Полный сброс: игра, обучение и импортированные колоды. */
   reset() {
     this.resetting = true;   // больше ничего не сохраняем из старой игры
     try {
