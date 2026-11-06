@@ -121,13 +121,21 @@ const Game = {
 
   /** Стадия облика: меняется на «λ-уровнях» 4, 6, 8, 10. */
   stage(level) { return level >= 10 ? 4 : level >= 8 ? 3 : level >= 6 ? 2 : level >= 4 ? 1 : 0; },
-  /** Ключи рисунков здания на уровне (1–3 штуки: группа построек на высоких стадиях). */
-  icons(type, level = 1) {
+  /**
+   * Ключи рисунков здания. Облик резко меняется с ЭПОХОЙ (хижина → дом из сырцового кирпича),
+   * а внутри эпохи уровни делают его лишь чуть наряднее; на 8-м и 10-м уровне рядом вырастают ещё постройки.
+   */
+  icons(type, level = 1, epoch = this.state.epoch) {
     const B = BUILDINGS[type];
     if (B.special) return [type];
-    const p = B.art, st = this.stage(level);
+    const p = B.art;
     if (!p) return [];
-    return [[p + '0'], [p + '1'], [p + '2'], [p + '2', p + '1'], [p + '2', p + '1', p + '1']][st];
+    let main, minor;
+    if (B.epoch === 0 && epoch >= 1) { main = p + (level >= 4 ? '3' : '2'); minor = p + '2'; }   // бронзовый век
+    else if (B.epoch === 0) { main = p + (level >= 4 ? '1' : '0'); minor = p + '0'; } // медный век
+    else { main = p + (level >= 10 ? '2' : level >= 6 ? '1' : '0'); minor = p + '0'; } // здания бронзового века
+    const n = level >= 10 ? 3 : level >= 8 ? 2 : 1;
+    return [main, minor, minor].slice(0, n);
   },
 
   /** «🪵 12, λ 5» — чего не хватает для цены. */
@@ -254,7 +262,8 @@ const Game = {
     const out = {};
     for (const [k, v] of Object.entries(cost || {})) out[k] = v * mult;
     const extra = logos * BALANCE.laborPerLogos;
-    const split = epoch >= 1 ? { stone: 0.5, copper: 0.25, wood: 0.25 } : { wood: 0.5, stone: 0.5 };
+    // без меди: путь трудом должен быть доступен и до первого рудника
+    const split = epoch >= 1 ? { stone: 0.4, wood: 0.4, goods: 0.2 } : { wood: 0.5, stone: 0.5 };
     for (const [k, f] of Object.entries(split)) out[k] = (out[k] || 0) + extra * f;
     for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] / 10) * 10;
     return out;
@@ -335,7 +344,7 @@ const Game = {
     }
     const { cost, logos } = this.upgradeCost(b.type, target);
     const reason = this.lackReason(cost, logos);
-    return { target, cost, logos, ok: !reason, reason, newLook: this.stage(target) > this.stage(target - 1) };
+    return { target, cost, logos, ok: !reason, reason, newLook: this.icons(b.type, target).join() !== this.icons(b.type, b.level).join() };
   },
 
   upgrade(b) {
@@ -377,7 +386,9 @@ const Game = {
     if (!st || !st.ok) return false;
     this.pay(st.cost, st.logos);
     this.state.techs.push(id);
-    this.log(`📜 Новое знание: ${T.name}${mode === 'labor' ? ' (трудом)' : ''}`);
+    this.state.techPath = this.state.techPath || {};
+    this.state.techPath[id] = mode;
+    this.log(`📜 Новое знание: ${T.name}${T.paths ? ' — ' + T.paths[mode][0] : ''}`);
     this.save();
     return true;
   },
@@ -430,7 +441,7 @@ const Game = {
     const fx = this.fx = this.effects();
     const cap = this.popCap(fx);
     const need = this.workersNeeded();
-    const hands = s.pop * (1 + (fx.workers || 0));   // «Помощь соседей» удваивает рабочие руки
+    const hands = s.pop * (1 + (fx.workers || 0));   // «Всей семьёй» удваивает рабочие руки
     const eff = need > 0 ? Math.min(1, hands / need) : 1;
     const storage = this.storageCap(fx);
     const rates = {};

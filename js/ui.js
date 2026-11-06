@@ -8,6 +8,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const fmt = n => n >= 10000 ? (n / 1000).toFixed(1) + 'k' : Math.floor(n).toString();
 const fmtRate = n => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(1);
 const num = (n, d = 2) => (+n.toFixed(d)).toString();
+const plural = (n, one, few, many) => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? many : b === 1 ? one : b >= 2 && b <= 4 ? few : many; };
 
 const UI = {
   tab: 'build',
@@ -25,8 +26,16 @@ const UI = {
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
     $('#studyBtn').addEventListener('click', () => Study.start());
     $('#pediaBtn').addEventListener('click', () => Pedia.open());
+    $('#logosMedal').addEventListener('click', () => Pedia.open('a:logos'));
+    $('#resources').addEventListener('click', () => Pedia.open('a:top'));
+    $('#popbox').addEventListener('click', () => Pedia.open('a:pop'));
     $('#panel').addEventListener('click', e => this.onPanelClick(e));
     $('#panel').addEventListener('change', e => this.onPanelChange(e));
+    this.folds = {};
+    $('#panel').addEventListener('toggle', e => {
+      const d = e.target.closest && e.target.closest('details[data-fold]');
+      if (d) { this.folds[d.dataset.fold] = d.open; this.lastPanel = null; }
+    }, true);
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal') return this.closeModal();
       const a = e.target.closest('[data-action], [data-pedia]');
@@ -61,34 +70,55 @@ const UI = {
     return !R.tech || Game.hasTech(R.tech);
   },
 
+  /** Какие ресурсы сейчас усилены благословениями (для подсветки в шапке). */
+  buffedRes() {
+    const out = new Set();
+    for (const id of Object.keys(Game.state.buffs || {})) {
+      const b = (RITUAL_BY_ID[id] || {}).buff || {};
+      if (b.all) RES_KEYS.forEach(k => out.add(k));
+      Object.keys(b.mult || {}).forEach(k => out.add(k));
+      for (const t of Object.keys(b.bmult || {})) Object.entries(BUILDINGS[t].prod || {}).forEach(([k, v]) => v > 0 && out.add(k));
+    }
+    return out;
+  },
+
   renderTop() {
     const s = Game.state, E = EPOCHS[s.epoch];
     document.body.dataset.epoch = s.epoch;
     $('#epochName').textContent = E.name;
     $('#epochSub').textContent = E.sub;
-    const short = Game.eff < 0.999;
-    let html = `<div class="res pop" title="Жители: ${s.pop}. Мест в домах: ${Game.cap}. Чтобы прибавлялись жители, нужны свободные места и зерно.">
-        <span class="ic">👥</span><b>${s.pop}</b><small class="lbl">из ${Game.cap} мест</small></div>
-      <div class="res work ${short ? 'short' : ''}" title="${short
-        ? `Зданиям нужно ${Game.need} работников, а жителей ${s.pop}. Все здания работают на ${Math.round(Game.eff * 100)}% — постройте или улучшите жилища.`
-        : `Зданиям нужно ${Game.need} работников — жителей хватает.`}">
-        <span class="ic">⚒</span><b>${Game.need}</b><small class="lbl">${short ? `нужно · ${Math.round(Game.eff * 100)}%` : 'работают'}</small></div>`;
+
+    // λ — на почётном месте, сразу после названия эпохи
+    const lm = Math.round((Game.logosMult() - 1) * 100);
+    $('#logosMedal').innerHTML = `<span class="lm-sign">λ</span><span class="lm-v"><b>${fmt(s.logos)}</b><small>${lm ? `Логос · +${lm}%` : 'Логос'}</small></span>`;
+
+    // ресурсы: светлая плашка, фиксированные ячейки, полоска заполнения склада
+    const buffed = this.buffedRes();
+    let html = '';
     for (const k of RES_KEYS) {
       if (!this.resVisible(k)) continue;
-      const r = Game.rates[k] || 0;
-      const full = s.res[k] >= Game.storage - 0.5;
-      html += `<div class="res ${full ? 'full' : ''}" title="${RES[k].name}: ${Math.floor(s.res[k])} из ${Game.storage}${full ? ' — склад полон!' : ''}">
-        <span class="ic">${Art.res(k)}</span><b>${fmt(s.res[k])}</b>
-        <small class="${r < 0 ? 'neg' : ''}">${Math.abs(r) > 0.05 ? fmtRate(r) : ''}</small></div>`;
+      const r = Game.rates[k] || 0, v = s.res[k], fill = Math.min(100, 100 * v / Game.storage);
+      const full = v >= Game.storage - 0.5;
+      html += `<div class="rs ${full ? 'full' : ''} ${buffed.has(k) ? 'buffed' : ''}" title="${RES[k].name}: ${Math.floor(v)} из ${Game.storage}${Math.abs(r) > 0.05 ? `, ${fmtRate(r)} в секунду` : ''}${full ? ' — склад полон!' : ''}${buffed.has(k) ? ' · под благословением' : ''}">
+        <span class="rs-ic">${Art.res(k)}</span><span class="rs-v"><b>${fmt(v)}</b><small class="${r < 0 ? 'neg' : ''}">${Math.abs(r) > 0.05 ? fmtRate(r) : '&nbsp;'}</small></span>
+        <i class="rs-bar"><i style="width:${fill.toFixed(0)}%"></i></i></div>`;
     }
-    html += `<div class="res store" title="Вместимость складов (для каждого ресурса)"><span class="ic">${Art.svg('store0')}</span><small>${fmt(Game.storage)}</small></div>`;
-    for (const [id, left] of Object.entries(s.buffs || {})) {
-      const R = RITUAL_BY_ID[id]; if (!R) continue;
-      const m = Math.floor(left / 60), sec = Math.floor(left % 60);
-      html += `<div class="res buff" title="${esc(R.name)}: ${esc(R.desc)}"><span class="ic">${R.icon}</span><small>${m}:${String(sec).padStart(2, '0')}</small></div>`;
-    }
-    html += `<div class="res logos" title="Логос — добывается только знаниями (карточками)"><span class="ic">λ</span><b>${fmt(s.logos)}</b></div>`;
+    html += `<div class="rs cap" title="Вместимость складов: столько помещается каждого ресурса"><span class="rs-ic">${Art.svg('store0')}</span><span class="rs-v"><b>${fmt(Game.storage)}</b><small>склад</small></span></div>`;
     $('#resources').innerHTML = html;
+
+    // жители и работники — отдельным блоком
+    const short = Game.eff < 0.999;
+    $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap} мест</small></div>
+      <div class="${short ? 'short' : ''}" title="${short ? `Зданиям нужно ${Game.need} работников, а рук не хватает: всё работает на ${Math.round(Game.eff * 100)}%.` : `Зданиям нужно ${Game.need} работников — рук хватает.`}"><span>⚒</span><b>${Game.need}</b><small>${short ? `нужно · ${Math.round(Game.eff * 100)}%` : plural(Game.need, 'работник', 'работника', 'работников')}</small></div>`;
+
+    // благословения — отдельной полосой над картой
+    const buffs = Object.entries(s.buffs || {}).filter(([id]) => RITUAL_BY_ID[id]);
+    $('#buffbar').classList.toggle('hidden', !buffs.length);
+    $('#buffbar').innerHTML = buffs.map(([id, left]) => {
+      const R = RITUAL_BY_ID[id];
+      return `<span class="bf" title="${esc(R.desc)}">${this.riteIcon(R).replace('class="ico', 'class="ico inl')}<b>${esc(R.name)}</b><small>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</small></span>`;
+    }).join('');
+
     const p = Decks.pending(s);
     const n = p.due + Math.min(p.fresh, Decks.settings(s).newPerRound);
     $('#dueCount').textContent = n ? n : '';
@@ -250,9 +280,10 @@ const UI = {
     if (B.cap) h += `<span class="chip good" title="Места для жителей"><i>👥</i>${Game.houseCapOf(b, fx, level)} мест</span>`;
     if (B.storage) h += `<span class="chip good" title="Прибавка к вместимости складов"><i>${Art.svg('store0')}</i>+${Game.storageOf(b, level)}</span>`;
     if (B.logosBonus) h += `<span class="chip good" title="Бонус к Логосу за карточки"><i>λ</i>+${Math.round((B.logosBonus + (B.logosBonusPerLevel || 0) * (level - 1)) * 100)}% за карточки</span>`;
-    if (B.workers) h += `<span class="chip muted" title="Сколько жителей нужно, чтобы здание работало в полную силу"><i>⚒</i>${Game.workersOf({ type: b.type, level })} работн.</span>`;
+    if (B.workers) { const w = Game.workersOf({ type: b.type, level }); h += `<span class="chip muted" title="Сколько жителей нужно, чтобы здание работало в полную силу"><i>⚒</i>${w} ${plural(w, 'работник', 'работника', 'работников')}</span>`; }
     return h;
   },
+  riteIcon(R) { return R.art && Art.has(R.art) ? Art.svg(R.art) : R.icon; },
   techIcon(T) {
     if (!T.art) return T.icon;
     return T.art.startsWith('res:') ? Art.res(T.art.slice(4)) : Art.svg(T.art);
@@ -286,6 +317,7 @@ const UI = {
         if (st.locked) body = `<div class="item-lock">🔒 ${esc(st.reason)}</div>`;
         else if (st.done) body = `<div class="item-done">✓ Построено</div>`;
         else {
+          // эффект чуда иконками не передать — здесь текст нужен
           body = `<div class="item-effect">${esc(B.desc)}</div>
             <div class="chips">${this.costHtml(st.cost, st.logos)}${st.logos ? '' : '<span class="chip muted">без λ</span>'}</div>
             ${this.reasonHtml(st)}`;
@@ -294,7 +326,7 @@ const UI = {
           ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">Строить</button>`}</div>`;
       } else {
         normal += `<div class="item ${st.ok ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}
-          <div class="item-desc">${esc(B.desc)}</div>
+          ${B.note ? `<div class="item-note">${esc(B.note)}</div>` : ''}
           ${st.locked ? `<div class="item-lock">🔒 ${esc(st.reason)}</div>` :
             `<div class="chips">${this.costHtml(st.cost)}</div><div class="chips">${this.outputHtml({ type, level: 1 })}</div>${this.reasonHtml(st)}`}
           </div>
@@ -302,67 +334,83 @@ const UI = {
         </div>`;
       }
     }
-    return `<div class="hint">Клик по лесу, холмам или равнине — собрать ресурс. Клик по зданию — сведения и улучшение, <b>Shift+клик</b> — улучшить сразу.</div>
-      ${normal}<h3>Чудеса древнего Кипра <small>по одному каждого</small></h3>${specials}`;
+    return `${normal}<h3>Чудеса древнего Кипра <small>по одному каждого</small></h3>${specials}`;
+  },
+
+  /** Раскрывающийся блок, который помнит, открыт ли он. */
+  fold(id, title, inner, defOpen = false) {
+    const open = id in this.folds ? this.folds[id] : defOpen;
+    return `<details class="fold" data-fold="${id}" ${open ? 'open' : ''}><summary>${title}</summary>${inner}</details>`;
+  },
+
+  techCard(T) {
+    const s = Game.state, st = Game.techStatus(T);
+    let body;
+    if (st.learned) {
+      const how = (s.techPath || {})[T.id];
+      body = `<div class="item-done">✓ ${how && T.paths ? esc(T.paths[how][0]) : 'Изучено'}</div>`;
+    } else if (st.locked) body = `<div class="item-lock">🔒 ${esc(st.reason)}</div>`;
+    else {
+      const lab = Game.techStatus(T, 'labor');
+      const P = T.paths || { logos: ['За λ', ''], labor: ['Трудом', ''] };
+      const opt = (mode, tag, cls, stt, btn) => `<div class="fork-opt ${cls} ${stt.ok ? '' : 'poor'}">
+          <div class="fork-h"><span class="fork-tag">${tag}</span><b>${esc(P[mode][0])}</b></div>
+          ${P[mode][1] ? `<div class="fork-d">${esc(P[mode][1])}</div>` : ''}
+          <div class="fork-row"><div class="chips">${this.costHtml(stt.cost, stt.logos)}</div>
+            <button class="btn small ${mode === 'logos' ? 'gold' : ''} ${stt.ok ? '' : 'off'}" data-tech="${T.id}" data-mode="${mode}">${btn}</button></div>
+        </div>`;
+      body = `<div class="fork">${opt('logos', '🧠 С умом', 'wise', st, 'Изучить')}<div class="fork-or">или</div>${opt('labor', '💪 Через силу', 'force', lab, 'Осилить')}</div>`;
+    }
+    return `<div class="item tech ${st.learned ? 'learned' : ''}">
+      <div class="item-ic">${this.techIcon(T)}</div>
+      <div class="item-body"><div class="item-title">${esc(T.name)} ${this.pediaBtn('t:' + T.id)}</div>${st.learned ? '' : `<div class="item-desc">${esc(T.desc)}</div>`}${body}</div>
+    </div>`;
   },
 
   panel_tech() {
     const s = Game.state;
-    let h = `<div class="hint">Знание можно получить двумя путями: <b>за λ</b> (быстро, немного ресурсов) или <b>трудом</b> — без λ, но ресурсов втрое больше. ${this.pediaBtn('a:techs')}</div>`;
-    for (let e = 0; e <= s.epoch && e < EPOCHS.length; e++) {
+    // сверху — текущая эпоха: что можно изучить, потом закрытое; изученное и прошлые эпохи — внизу, под катом
+    const cur = TECHS.filter(t => t.epoch === s.epoch);
+    const rank = T => { const st = Game.techStatus(T); return st.learned ? 2 : st.locked ? 1 : 0; };
+    const open = cur.filter(T => rank(T) < 2).sort((a, b) => rank(a) - rank(b));
+    const done = cur.filter(T => rank(T) === 2);
+    let h = `<h3>${esc(EPOCHS[s.epoch].name)} <small>${done.length}/${cur.length}</small> ${this.pediaBtn('a:techs')}</h3>`;
+    h += open.map(T => this.techCard(T)).join('') || '<div class="item-done">✓ Все знания эпохи изучены</div>';
+    if (done.length) h += this.fold('done' + s.epoch, `Изучено в эту эпоху · ${done.length}`, done.map(T => this.techCard(T)).join(''));
+    for (let e = s.epoch - 1; e >= 0; e--) {
       const list = TECHS.filter(t => t.epoch === e);
-      if (!list.length) continue;
-      const have = list.filter(t => Game.hasTech(t.id)).length;
-      h += `<h3>${esc(EPOCHS[e].name)} <small>${have}/${list.length}</small></h3>`;
-      for (const T of list) {
-        const st = Game.techStatus(T);
-        let body;
-        if (st.learned) body = '<div class="item-done">✓ Изучено</div>';
-        else if (st.locked) body = `<div class="item-lock">🔒 ${esc(st.reason)}</div>`;
-        else {
-          const lab = Game.techStatus(T, 'labor');
-          body = `<div class="path"><span class="path-l">λ путь</span><div class="chips">${this.costHtml(st.cost, st.logos)}</div>
-              <button class="btn small gold ${st.ok ? '' : 'off'}" data-tech="${T.id}" data-mode="logos">Изучить</button></div>
-            <div class="path"><span class="path-l">Трудом</span><div class="chips">${this.costHtml(lab.cost)}</div>
-              <button class="btn small ${lab.ok ? '' : 'off'}" data-tech="${T.id}" data-mode="labor">Трудом</button></div>`;
-        }
-        h += `<div class="item ${st.learned ? 'learned' : (st.ok || (!st.locked && Game.techStatus(T, 'labor').ok)) ? '' : 'disabled'}">
-          <div class="item-ic">${this.techIcon(T)}</div>
-          <div class="item-body"><div class="item-title">${esc(T.name)} ${this.pediaBtn('t:' + T.id)}</div><div class="item-desc">${esc(T.desc)}</div>${body}</div>
-        </div>`;
-      }
+      if (list.length) h += this.fold('past' + e, `${esc(EPOCHS[e].name)} · ${list.filter(t => Game.hasTech(t.id)).length}/${list.length}`, list.map(T => this.techCard(T)).join(''));
     }
-    const next = EPOCHS[s.epoch + 1];
-    if (next && !next.locked) h += `<div class="hint dim">Новые знания появятся в эпоху «${esc(next.name)}».</div>`;
     return h;
+  },
+
+  riteCard(R) {
+    const s = Game.state, st = Game.ritualStatus(R), left = s.buffs[R.id];
+    const btn = st.cd ? `<button class="btn small off" data-rite="${R.id}">⏳ ${Math.ceil(st.cd)} с</button>`
+      : R.buff && left ? `<button class="btn small extend ${st.ok ? '' : 'off'}" data-rite="${R.id}">＋${Math.round(R.dur / 60)} мин</button>`
+      : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-rite="${R.id}">${R.instant ? 'Собрать' : 'Начать'}</button>`;
+    const mm = left ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` : '';
+    return `<div class="item rite ${left ? 'active' : ''} ${st.ok || left ? '' : 'disabled'}">
+      <div class="item-ic">${this.riteIcon(R)}</div>
+      <div class="item-body"><div class="item-title">${esc(R.name)}${left ? ` <span class="rite-live">идёт · ${mm}</span>` : ''}</div>
+        <div class="item-desc">${esc(R.desc)}</div>
+        ${st.locked ? `<div class="item-lock">🔒 ${esc(st.reason)}</div>` : `<div class="chips">${this.costHtml(st.cost, st.logos)}${!st.logos ? '<span class="chip muted">без λ</span>' : ''}</div>
+        ${st.cd ? '' : this.reasonHtml(st)}`}</div>
+      ${st.locked ? '' : btn}
+    </div>`;
   },
 
   panel_rites() {
     const s = Game.state;
-    let h = `<div class="hint">${s.epoch === 0
-      ? 'Религия медного века — культ плодородия: фигурки с раскинутыми руками, подношения земле и стадам.'
-      : 'Бронзовый век: святилища Рогатого и Слиткового богов, бычьи маски, жертвы меди.'}
-      Обряды тратят <b>λ</b> (иногда подношения) и дают мгновенную помощь или благословение на время. ${this.pediaBtn('a:religion')}</div>`;
-    const active = Object.entries(s.buffs || {});
-    if (active.length) h += `<div class="buffs-list">${active.map(([id, left]) => `<span class="chip good">${RITUAL_BY_ID[id].icon} ${esc(RITUAL_BY_ID[id].name)} · ${Math.ceil(left / 60)} мин</span>`).join(' ')}</div>`;
+    // «Сбор припасов» — не благословение, а мгновенная выдача: отдельно и сверху
+    let h = `<div class="supply">${this.riteCard(RITUAL_BY_ID.elders)}</div>`;
+    h += `<h3>Обряды <small>благословения на время</small> ${this.pediaBtn('a:religion')}</h3>`;
     for (let e = s.epoch; e >= 0; e--) {
-      const list = RITUALS.filter(r => r.epoch === e);
+      const list = RITUALS.filter(r => r.epoch === e && !r.instant);
       if (!list.length) continue;
-      h += `<h3>${esc(EPOCHS[e].name)}</h3>`;
-      for (const R of list) {
-        const st = Game.ritualStatus(R);
-        const left = s.buffs[R.id];
-        h += `<div class="item ${st.ok ? '' : 'disabled'}">
-          <div class="item-ic">${R.icon}</div>
-          <div class="item-body"><div class="item-title">${esc(R.name)}${left ? ` <small>· ещё ${Math.ceil(left / 60)} мин</small>` : ''}</div>
-            <div class="item-desc">${esc(R.desc)}</div>
-            ${st.locked ? `<div class="item-lock">🔒 ${esc(st.reason)}</div>` : `<div class="chips">${this.costHtml(st.cost, st.logos)}${!st.logos ? '<span class="chip muted">без λ</span>' : ''}</div>
-            ${st.cd ? `<div class="item-lock">⏳ ${esc(st.reason)}</div>` : this.reasonHtml(st)}`}</div>
-          ${st.locked ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-rite="${R.id}">${st.cd ? `${Math.ceil(st.cd)} с` : R.buff && left ? 'Продлить' : 'Провести'}</button>`}
-        </div>`;
-      }
+      if (s.epoch > 0) h += `<div class="sub-h">${esc(EPOCHS[e].name)}</div>`;
+      h += list.map(R => this.riteCard(R)).join('');
     }
-    h += `<div class="hint dim">Благословения складываются по времени (до ${BALANCE.maxBuffMinutes} минут), но не по силе.</div>`;
     return h;
   },
 
@@ -530,7 +578,11 @@ const UI = {
     $('#modalBox').innerHTML = html;
     $('#modal').classList.remove('hidden');
   },
-  closeModal() { $('#modal').classList.add('hidden'); this.modalBuilding = null; },
+  closeModal() {
+    $('#modal').classList.add('hidden'); this.modalBuilding = null;
+    const next = this.afterModal; this.afterModal = null;
+    if (next) next();
+  },
 
   showBuilding(b) {
     this.modalBuilding = b;
@@ -549,19 +601,28 @@ const UI = {
         if (up.capped) h += `<div class="dim">${esc(up.reason)}</div>`;
         else {
           const nextIc = Game.icons(b.type, up.target);
-          h += `<div><b>Улучшение до ${up.target}-го уровня</b>${up.newLook ? ` <span class="newlook">новый облик ${nextIc.map(k => Art.svg(k, 'inl')).join('')}</span>` : ''}</div>
-            <div class="dim small">${up.logos ? 'Уровень мудрости: оплачивается только Логосом и меняет облик здания.' : `Выпуск ×${BALANCE.upProdGrowth} за уровень, цена ресурсами ×${BALANCE.upCostGrowth}. Бонусы знаний и спецстроений умножают уже весь выпуск здания.`}</div>
+          h += `<div><b>Улучшение до ${up.target}-го уровня</b>${up.newLook ? ` <span class="newlook">наряднее ${nextIc.map(k => Art.svg(k, 'inl')).join('')}</span>` : ''}</div>
+            <div class="dim small">${up.logos ? 'Уровень мудрости: оплачивается только Логосом.' : `Выпуск ×${BALANCE.upProdGrowth} за уровень, цена ресурсами ×${BALANCE.upCostGrowth}. Бонусы знаний и спецстроений умножают уже весь выпуск здания.`}</div>
             <div class="chips">${this.outputHtml(b, up.target)}</div>
             <div class="chips">${this.costHtml(up.cost, up.logos)}</div>
             ${up.reason ? `<div class="item-lock">${esc(up.reason)}</div>` : ''}
             <button class="btn ${up.logos ? 'gold' : ''}" data-action="upgrade" ${up.ok ? '' : 'disabled'}>Улучшить <kbd>U</kbd></button>`;
         }
-        h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ и с новым обликом; остальные — за ресурсы.</div>`;
+        h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ, остальные — за ресурсы. Облик здания меняется с эпохой, а уровни делают его чуть наряднее.</div>`;
       }
     }
     h += `<div class="mb-actions">${B.special ? '<span></span>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
       <button class="btn ghost small" data-action="close">Закрыть</button></div>`;
     this.showModal(h);
+  },
+
+  showMobileWarning(next) {
+    this.afterModal = next;
+    this.showModal(`<div class="epoch-modal"><h2>📱 Похоже, вы с телефона</h2>
+      <p>Простите: пока «Λόγος» сделан под компьютер — большой экран, мышь и клавиатура. На телефоне карта и панели
+      будут тесными, а набирать слова неудобно.</p>
+      <p>Играть можно, но на свой страх и риск — мы пока не советуем. Удобная мобильная версия — в планах.</p>
+      <div class="em-actions"><button class="btn gold" data-action="close">Всё равно играть</button></div></div>`);
   },
 
   showAway(a) {
@@ -583,7 +644,7 @@ const UI = {
     if (first) h += `<p class="how"><b>Как играть.</b> Кликайте по лесу, холмам и полям, чтобы собирать ресурсы, стройте и улучшайте
       жилища, поля и козьи загоны — город растёт сам. Но всё важное — знания, чудесоения, высокие уровни зданий и переход
       в новую эпоху — требует <b>λ Логоса</b>. Его не добыть ни киркой, ни торговлей: только решая карточки в «📜 Учиться».
-      Логос можно тратить с первых минут: во вкладке «Обряды» <b>Совет старейшин</b> за 5 λ сразу даёт ресурсы,
+      Логос можно тратить с первых минут: во вкладке «Обряды» <b>Сбор припасов</b> за 5 λ сразу даёт ресурсы,
       а благословения удваивают производство. Можно и не спешить — поиграть без карточек, пока не упрётесь в λ.
       Подробности — в <b>📖 Кипропедии</b>.</p>`;
     else if (!E.locked) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.

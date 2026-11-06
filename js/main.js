@@ -15,11 +15,22 @@
   Speech.init();
   UI.init();
 
-  if (!saved) {
-    Game.log('Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.');
-    Game.log('λ Логос даётся только за карточки — кнопка «📜 Учиться».');
-    UI.showEpoch(true);
-  } else if (away) UI.showAway(away);
+  const firstScreen = () => {
+    if (!saved) {
+      Game.log('Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.');
+      Game.log('λ Логос даётся только за карточки — кнопка «📜 Учиться».');
+      UI.showEpoch(true);
+    } else if (away) UI.showAway(away);
+  };
+  // Телефоны и планшеты: честно предупреждаем, что игра сделана под компьютер (раз за сеанс)
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900);
+  let warned = false;
+  try { warned = sessionStorage.getItem('greekgame.mobileWarned') === '1'; } catch (e) {}
+  if (isMobile && !warned) {
+    try { sessionStorage.setItem('greekgame.mobileWarned', '1'); } catch (e) {}
+    UI.showMobileWarning(firstScreen);
+  } else firstScreen();
 
   let last = performance.now(), sinceRender = 0, sinceSave = 0;
   setInterval(() => {

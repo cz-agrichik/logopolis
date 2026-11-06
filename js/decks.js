@@ -195,6 +195,13 @@ const Decks = {
     return p;
   },
   isLearned(p) { return !!p && p.rev >= 0; },
+  /** Слово можно набрать (одно слово, без пробелов и знаков). */
+  canType(card) { const n = [...card.front].length; return n >= 2 && n <= 18 && !/[\s.,!?;:()'"«»-]/.test(card.front); },
+  /** Слово готово стать выученным, но ещё ни разу не было набрано — нужен набор. */
+  needsBuild(state, card) {
+    const p = this.prog(state, card.id);
+    return !!p && p.rev < 0 && !p.built && p.step >= this.settings(state).learnSteps - 1 && this.canType(card);
+  },
   /** Сложность задания: 0 — новая, 1–2 — заучивается, 3+ — выучена. */
   level(p) { return !p ? 0 : p.rev >= 0 ? 3 + p.rev : Math.min(2, p.step); },
 
@@ -250,15 +257,19 @@ const Decks = {
   },
 
   /** Возвращает 'learned', если карточка только что стала выученной. */
-  grade(state, card, correct, kind) {
+  grade(state, card, correct, kind, typed = false) {
     const now = Date.now(), set = this.settings(state), iv = this.intervals(state);
     const p = this.prog(state, card.id) || { step: 0, rev: -1, due: 0, right: 0, wrong: 0 };
     let event = null;
     if (correct) {
       p.right++;
+      if (typed) p.built = true;
       if (p.rev < 0) {
         p.step++;
-        if (p.step >= set.learnSteps) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + iv[p.rev]; event = 'learned'; }
+        if (p.step >= set.learnSteps && !p.built && this.canType(card)) {
+          // без единого набора слово не выучено: ждём задания «Соберите слово»
+          p.step = set.learnSteps - 1; p.due = now + LEARN_DELAY; event = 'needtype';
+        } else if (p.step >= set.learnSteps) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + iv[p.rev]; event = 'learned'; }
         else p.due = now + LEARN_DELAY;
       } else if (kind !== 'early') {
         p.rev = Math.min(p.rev + 1, iv.length - 1);
@@ -284,7 +295,7 @@ const Decks = {
       return `<span class="learned-mark">✓ выучено</span> <span class="dim">${left > 0 ? 'повтор через ' + fmtDur(left) : 'пора повторить'}</span>`;
     }
     const L = this.settings(state).learnSteps;
-    return `<span class="steps">${'●'.repeat(p.step)}${'○'.repeat(Math.max(0, L - p.step))}</span>`;
+    return `<span class="steps">${'●'.repeat(p.step)}${'○'.repeat(Math.max(0, L - p.step))}</span>${p.built ? ' <span class="dim" title="Слово уже набирали">✍</span>' : ''}`;
   },
 };
 

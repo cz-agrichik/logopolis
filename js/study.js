@@ -94,6 +94,38 @@ const Syl = {
   },
 };
 
+// ------------------------------------------------------------
+//  Обманки: похожие на слух написания (η/ι/υ/ει/οι, ο/ω, ε/αι, σ/ς)
+// ------------------------------------------------------------
+const CONFUSE = [
+  ['ει', ['ι', 'οι', 'η']], ['εί', ['ί', 'οί', 'ή']], ['οι', ['ι', 'ει', 'η']], ['οί', ['ί', 'εί', 'ή']],
+  ['αι', ['ε']], ['αί', ['έ']], ['η', ['ι', 'ει', 'υ']], ['ή', ['ί', 'εί', 'ύ']], ['ι', ['η', 'ει', 'οι']], ['ί', ['ή', 'εί', 'οί']],
+  ['υ', ['ι', 'η']], ['ύ', ['ί', 'ή']], ['ο', ['ω']], ['ό', ['ώ']], ['ω', ['ο']], ['ώ', ['ό']], ['ε', ['αι']], ['έ', ['αί']],
+  ['σ', ['ς']], ['ς', ['σ']],
+];
+/** Все «похожие, но неверные» варианты строки (одна замена в каждом). */
+function confusions(str) {
+  const out = new Set();
+  for (const [from, tos] of CONFUSE) {
+    let i = str.indexOf(from);
+    while (i >= 0) {
+      // не подменяем часть дифтонга одиночной буквой (ει → «ηι» звучит иначе, это не обманка)
+      const prev = str[i - 1] || '', next = str[i + from.length] || '';
+      const inDiph = from.length === 1 && (
+        (/[ιίυύ]/.test(from) && /[αεοηάέόή]/.test(prev)) ||      // вторая буква дифтонга
+        (/[αεοάέό]/.test(from) && /[ιίυύ]/.test(next)));          // первая буква дифтонга
+      if (!inDiph) for (const to of tos) {
+        let v = str.slice(0, i) + to + str.slice(i + from.length);
+        if (to === 'σ' && !next) continue;            // σ в конце слова — явная ошибка, слишком просто
+        if (to === 'ς' && next) v = v;                  // ς в середине — классическая обманка
+        if (v !== str) out.add(v);
+      }
+      i = str.indexOf(from, i + 1);
+    }
+  }
+  return [...out];
+}
+
 const Study = {
   open: false,
 
@@ -129,7 +161,7 @@ const Study = {
   buildTasks(picks) {
     const tasks = [], later = [];
     let rest = picks;
-    const seasoned = picks.filter(p => p.kind !== 'new' && p.lvl >= 1);
+    const seasoned = picks.filter(p => p.kind !== 'new' && p.lvl >= 1 && !Decks.needsBuild(Game.state, p.card));
     if (seasoned.length >= 4 && this.distinct('back') >= 4) {
       const m = shuffle(seasoned).slice(0, 4);
       tasks.push({ type: 'match', items: m });
@@ -152,6 +184,7 @@ const Study = {
   },
 
   typeFor(p) {
+    if (Decks.needsBuild(Game.state, p.card)) return 'build';   // перед «выучено» слово нужно набрать
     const canChoose = this.distinct('back') >= 2 && this.distinct('front') >= 2;
     const b = p.lvl;
     if (b >= 3) {
@@ -185,9 +218,10 @@ const Study = {
     return Math.max(1, Math.round(base * combo * Game.logosMult()));
   },
 
-  grade(p, correct) {
+  grade(p, correct, typed = false) {
     const s = Game.state;
-    const ev = Decks.grade(s, p.card, correct, p.kind);
+    const ev = Decks.grade(s, p.card, correct, p.kind, typed);
+    if (ev === 'needtype') this.needType = true;
     if (ev === 'learned') { this.learnedNow++; this.justLearned = (this.justLearned || 0) + 1; s.stats.learned = (s.stats.learned || 0) + 1; }
     let gain = 0;
     if (correct) {
@@ -267,22 +301,32 @@ const Study = {
     t.target = Syl.pieces(c.front);
     t.syl = t.target.length < [...c.front].length;
     const decoys = [];
+    const used = new Set(t.target);
+    const addDecoy = d => { if (d && !used.has(d) && decoys.length < 3) { decoys.push(d); used.add(d); } };
     if (!t.syl) {
+      // буквы: подменяем похожими по звучанию (η→ι, ο→ω, ς→σ…)
+      const singles = shuffle(t.target.flatMap(ch => confusions(ch)).filter(v => [...v].length === 1));
+      singles.slice(0, 2).forEach(addDecoy);
       const pool = Decks.hasGreek(c.front) ? GREEK_LETTERS : 'abcdefghijklmnopqrstuvwxyz';
-      while (decoys.length < 2) decoys.push(pool[Math.floor(Math.random() * pool.length)]);
+      while (decoys.length < 2) addDecoy(pool[Math.floor(Math.random() * pool.length)]);
     } else {
-      // лишние слоги — из других слов той же колоды
-      const others = shuffle(this.pool.filter(x => x.front !== c.front && this.buildable(x))).slice(0, 10);
-      for (const o of others) {
-        const sy = Syl.split(o.front).filter(x => x.length >= 2 && !t.target.includes(x));
-        if (sy.length) decoys.push(sy[Math.floor(Math.random() * sy.length)]);
-        if (decoys.length >= 2) break;
+      // слоги: тот же слог, но с «неправильной» гласной или сигмой
+      const tricky = shuffle(t.target.flatMap(sy => confusions(sy)));
+      tricky.slice(0, 3).forEach(addDecoy);
+      if (decoys.length < 2) {
+        const others = shuffle(this.pool.filter(x => x.front !== c.front && Decks.canType(x))).slice(0, 10);
+        for (const o of others) {
+          const sy = Syl.split(o.front).filter(x => x.length >= 2);
+          if (sy.length) addDecoy(sy[Math.floor(Math.random() * sy.length)]);
+          if (decoys.length >= 2) break;
+        }
       }
     }
     t.tiles = shuffle(t.target.concat(decoys)).map(ch => ({ ch, used: false }));
     t.picked = [];
     t.kb = '';
-    return `<div class="q-label">Соберите слово по-гречески${t.syl ? ' из слогов' : ''} ${this.badge(t.p)}</div>
+    const last = Decks.needsBuild(Game.state, c);
+    return `<div class="q-label">Соберите слово по-гречески${t.syl ? ' из слогов' : ''} ${last ? '<span class="badge new">последний шаг к «выучено»</span>' : this.badge(t.p)}</div>
       ${this.wordHtml(c.back)}
       <div class="slots ${t.syl ? 'syl' : ''}" id="slots"></div>
       <div class="tiles ${t.syl ? 'syl' : ''}" id="tiles"></div>
@@ -338,7 +382,8 @@ const Study = {
     const f = $('#stBody .feedback');
     f.className = 'feedback ' + (ok ? 'ok' : 'bad');
     f.innerHTML = extra + (this.justLearned ? ` <span class="learned-mark">✓ ${this.justLearned > 1 ? this.justLearned + ' слова выучены' : 'выучено'}</span>` : '');
-    this.justLearned = 0;
+    if (this.needType && ok) f.innerHTML += ` <span class="dim">· осталось один раз набрать слово ✍</span>`;
+    this.justLearned = 0; this.needType = false;
     this.answered = true;
     if (ok) this.timer = setTimeout(() => this.next(), 900);
     else f.innerHTML += `<button class="btn next" data-next>Дальше <kbd>Enter</kbd></button>`;
@@ -423,7 +468,7 @@ const Study = {
     const almost = !ok && stripAccents(word) === stripAccents(target);
     document.querySelectorAll('#tiles button').forEach(b => b.disabled = true);
     $('#slots').classList.add(ok ? 'right' : 'wrong');
-    const gain = this.grade(t.p, ok);
+    const gain = this.grade(t.p, ok, true);
     if (Decks.hasGreek(target)) Speech.say(target, true);
     this.feedback(ok, ok ? `Верно! <b>+${gain} λ</b>` :
       `${almost ? 'Почти — ударение/диакритика. ' : ''}Правильно: <span class="greek">${esc(target)}</span>`);

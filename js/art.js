@@ -11,7 +11,7 @@ const Art = (() => {
     stone: '#bdb6a8', stoneD: '#8f877a', wood: '#9c6b3c', woodD: '#6f4824', terra: '#b5532c',
     green: '#7fa23e', greenD: '#55732a', wheat: '#e6bd4e', wheatD: '#b88a22', water: '#3f86b0', waterD: '#2c6a91',
     copper: '#cf7a3e', copperD: '#9c4f22', bronze: '#c39433', bronzeD: '#8a6619', pic: '#6fb3a6', picD: '#3f7d72',
-    fire: '#f08a24', fireL: '#ffd35a', dark: '#3b2a1c', white: '#f7f2e6', red: '#a8402a', sky: '#bfe0ee',
+    furrow: '#a87a4a', furrowD: '#9c6c3c', fire: '#f08a24', fireL: '#ffd35a', dark: '#3b2a1c', white: '#f7f2e6', red: '#a8402a', sky: '#bfe0ee',
   };
   const st = (w = 1.8) => `stroke="${O}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"`;
   const shadow = (rx = 22, cx = 32) => `<ellipse cx="${cx}" cy="56" rx="${rx}" ry="3.6" fill="#000" opacity=".16"/>`;
@@ -72,6 +72,16 @@ const Art = (() => {
     <path d="M${x} ${y} L${x} ${y - h}" stroke="${ripe ? C.wheatD : C.greenD}" stroke-width="1.6"/>
     <ellipse cx="${x}" cy="${y - h - 3}" rx="2.4" ry="5" fill="${ripe ? C.wheat : C.green}" ${st(1.1)}/>
     <path d="M${x} ${y - h / 2} q-4 -3 -6 -2 M${x} ${y - h / 2 + 3} q4 -3 6 -2" fill="none" stroke="${ripe ? C.wheatD : C.greenD}" stroke-width="1.3"/>`;
+  // ряды на поле: 4 борозды, на каждой — посадки
+  const rows = (furrow, plant) => [14, 27, 40, 53].map((y, r) =>
+    `<path d="M3 ${y + 2} Q32 ${y - 1} 61 ${y + 2}" stroke="${furrow}" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>` +
+    [8, 19, 30, 41, 52].map(x => plant(x + (r % 2) * 5, y)).join('')).join('');
+  const tuft = (x, y, c, cd) => `<path d="M${x} ${y} q-3 -6 -5 -8 M${x} ${y} q0 -7 0 -10 M${x} ${y} q3 -6 5 -8" stroke="${cd}" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M${x} ${y} q-1.5 -6 -3 -7 M${x} ${y} q1.5 -6 3 -7" stroke="${c}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+  const ear = (x, y) => `<path d="M${x} ${y} L${x} ${y - 9}" stroke="${C.wheatD}" stroke-width="1.6"/>
+    <ellipse cx="${x}" cy="${y - 11}" rx="2" ry="4" fill="${C.wheat}" stroke="${C.wheatD}" stroke-width="1"/>`;
+  const sheaf = (x, y) => `<g transform="translate(${x} ${y})"><path d="M-5 0 L0 -16 L5 0Z" fill="${C.wheat}" ${st(1.3)}/>
+    <path d="M-5 -7 L5 -7" stroke="${C.terra}" stroke-width="2.2"/><path d="M0 -16 l-3 -3 M0 -16 l3 -3 M0 -16 l0 -4" stroke="${C.wheatD}" stroke-width="1.4"/></g>`;
   const fence = (y = 44) => `
     <path d="M6 ${y} L58 ${y} M6 ${y + 6} L58 ${y + 6}" stroke="${C.wood}" stroke-width="2.6" stroke-linecap="round"/>
     ${[8, 20, 32, 44, 56].map(x => `<rect x="${x - 1.6}" y="${y - 5}" width="3.2" height="15" rx="1" fill="${C.wood}" ${st(1.2)}/>`).join('')}`;
@@ -101,13 +111,10 @@ const Art = (() => {
       <rect x="44" y="40" width="5" height="5" fill="${C.dark}" ${st(1.2)}/>
       <path d="M10 49 L40 49" stroke="${C.stoneD}" stroke-width="2"/>`,
 
-    field0: shadow(26) + furrows() + sprout(20, 42) + sprout(32, 40) + sprout(44, 42) + sprout(27, 47) + sprout(40, 47),
-    field1: shadow(26) + furrows(true) + [16, 23, 30, 37, 44, 51].map((x, i) => stalk(x, 46 - (i % 2) * 3, 12)).join(''),
-    field2: shadow(26) + furrows(true) + [14, 20, 26, 38, 44, 50].map((x, i) => stalk(x, 46 - (i % 2) * 3, 16, true)).join('') + `
-      <g><path d="M27 52 L32 26 L37 52Z" fill="${C.wheat}" ${st(1.4)}/>
-      <path d="M26 40 L38 40" stroke="${C.terra}" stroke-width="2.4"/>
-      <path d="M32 26 l-4 -4 M32 26 l4 -4 M32 26 l0 -5" stroke="${C.wheatD}" stroke-width="1.6"/></g>`,
-
+    // поле — «нарисовано» прямо на земле клетки: без подставки и тени
+    field0: rows(C.furrow, (x, y) => sprout(x, y, .85)),
+    field1: rows(C.furrow, (x, y) => tuft(x, y, C.green, C.greenD)),
+    field2: rows(C.furrowD, (x, y) => ear(x, y)) + sheaf(52, 54),
     goatpen0: shadow(26) + fence(40) + goat(30, 42, 1.25, C.white),
     goatpen1: shadow(26) + fence(40) + goat(22, 42, 1.05, C.mudD) + goat(42, 44, 1.15, C.white, true),
     goatpen2: shadow(28) + `
@@ -148,23 +155,32 @@ const Art = (() => {
       <path d="M48 12 L48 30" stroke="${O}" stroke-width="1.2"/>` +
       block(43, 30, 10, 7) + block(8, 46, 14, 8) + block(23, 46, 14, 8) + block(15, 38, 14, 8),
 
+    // мастерская резчиков: верстак, глыба зелёного камня, резец и киянка, нитка бус
     workshop0: shadow(22) + `
-      <rect x="10" y="38" width="44" height="6" rx="1" fill="${C.wood}" ${st()}/>
-      <path d="M14 44 L14 54 M50 44 L50 54" stroke="${C.woodD}" stroke-width="3"/>` +
-      idol(26, 32, .82) + `
-      <path d="M40 36 L52 26" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>
-      <path d="M50 24 L55 21 L56 25 L53 28Z" fill="${C.stone}" ${st(1.2)}/>
-      <ellipse cx="44" cy="37" rx="4" ry="1.6" fill="${C.picD}"/>`,
+      <rect x="8" y="38" width="48" height="6" rx="1" fill="${C.wood}" ${st()}/>
+      <path d="M12 44 L12 54 M52 44 L52 54" stroke="${C.woodD}" stroke-width="3"/>
+      <path d="M14 38 L16 28 L26 24 L34 30 L32 38Z" fill="${C.pic}" ${st(1.6)}/>
+      <path d="M18 30 L24 33 L28 28" fill="none" stroke="${C.picD}" stroke-width="1.4"/>
+      <path d="M38 36 L48 22" stroke="${C.stoneD}" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="44" y="12" width="12" height="7" rx="2" transform="rotate(30 50 15)" fill="${C.wood}" ${st(1.4)}/>
+      <path d="M36 50 Q44 56 52 50" fill="none" stroke="${C.woodD}" stroke-width="1.2"/>
+      ${[38, 41.5, 45, 48.5].map((x, i) => `<circle cx="${x}" cy="${52 + (i % 2)}" r="2" fill="${C.pic}" stroke="${O}" stroke-width="1"/>`).join('')}`,
+    // мастерская побогаче: гончарный круг и расписной горшок
     workshop1: shadow(24) + `
-      <path d="M22 16 L34 16 L35 21 Q46 28 44 40 Q42 50 36 53 L20 53 Q14 50 12 40 Q10 28 21 21Z" fill="${C.white}" ${st()}/>
-      <path d="M14 30 Q28 36 42 30 M13 40 Q28 46 43 40" fill="none" stroke="${C.red}" stroke-width="2.2"/>
-      <path d="M18 34 l3 3 l3 -3 l3 3 l3 -3 l3 3 l3 -3" fill="none" stroke="${C.red}" stroke-width="1.6"/>
-      <path d="M22 16 Q28 12 34 16" fill="none" ${st(1.6)}/>` + idol(50, 40, .62),
+      <ellipse cx="22" cy="48" rx="15" ry="4" fill="${C.woodD}" ${st(1.6)}/>
+      <rect x="20" y="48" width="4" height="7" fill="${C.woodD}"/>
+      <path d="M14 46 Q12 34 18 30 L26 30 Q32 34 30 46Z" fill="${C.white}" ${st(1.6)}/>
+      <path d="M13 38 Q22 41 31 38" fill="none" stroke="${C.red}" stroke-width="2"/>
+      <path d="M17 34 l2 2 l2 -2 l2 2 l2 -2 l2 2" fill="none" stroke="${C.red}" stroke-width="1.3"/>
+      <path d="M38 52 Q34 38 42 32 L52 32 Q60 38 56 52Z" fill="${C.white}" ${st(1.8)}/>
+      <path d="M36 42 Q47 46 58 42" fill="none" stroke="${C.red}" stroke-width="2.2"/>
+      <path d="M40 36 Q47 39 54 36" fill="none" stroke="${C.red}" stroke-width="1.4"/>`,
+    // гончарная мастерская бронзового века: печь для обжига и кувшины
     workshop2: shadow(28) + `
       <path d="M30 52 Q30 26 46 24 Q62 26 62 52Z" fill="${C.mudD}" ${st()}/>
       <path d="M40 52 Q40 40 46 40 Q52 40 52 52Z" fill="${C.dark}" ${st(1.4)}/>` + flame(46, 47, .9) + smoke(46, 20) +
-      pithos(16, 40, .78, C.white) + `<path d="M8 40 Q16 43 24 40" fill="none" stroke="${C.red}" stroke-width="1.6"/>` + idol(28, 44, .45),
-
+      pithos(14, 40, .72, C.white) + `<path d="M7 40 Q14 43 21 40" fill="none" stroke="${C.red}" stroke-width="1.6"/>` +
+      `<path d="M24 54 Q21 46 25 42 L31 42 Q35 46 32 54Z" fill="${C.terra}" ${st(1.4)}/>`,
     store0: shadow(20) + `
       <path d="M12 30 L52 30 L47 53 L17 53Z" fill="${C.thatch}" ${st()}/>
       <path d="M14 37 L50 37 M15 44 L49 44 M22 30 L24 53 M32 30 L32 53 M42 30 L40 53" stroke="${C.thatchD}" stroke-width="1.4"/>
@@ -249,6 +265,15 @@ const Art = (() => {
       tablet(52, 42, .8),
   };
 
+  // ---------- бронзовый век, 4+ уровень: тот же облик, но богаче ----------
+  B.house3 = B.house2 + pithos(56, 49, .45) + `<path d="M14 21 L14 13 L22 16 L14 19" fill="${C.red}" ${st(1.1)}/>`;
+  B.field3 = B.field2 + sheaf(12, 56);
+  B.goatpen3 = B.goatpen2 + goat(30, 52, .7, C.mudD, true);
+  B.lumber3 = B.lumber2 + logEnds(18, 54, .7);
+  B.quarry3 = B.quarry2 + block(26, 38, 9, 7);
+  B.workshop3 = B.workshop2 + `<path d="M24 32 Q21 25 25 22 L30 22 Q33 25 31 32Z" fill="${C.white}" ${st(1.2)}/><path d="M22 27 Q27 29 32 27" stroke="${C.red}" stroke-width="1.3" fill="none"/>`;
+  B.store3 = B.store2 + pithos(30, 52, .45, C.white);
+
   // ---------- спецстроения ----------
   const S = {
     sp_lemba: shadow(28) + smoke(44, 6) + roundHut(32, 34, 1.3, { base: true, wall: C.plaster, knob: true }),
@@ -260,7 +285,13 @@ const Art = (() => {
         <path d="M-6 1 L-6 7 M-2 1 L-2 7 M3 1 L3 7 M6 1 L6 7" ${st(1.5)}/>
         <path d="M6 -6 L10 -10 Q13 -10 13 -7 L11 -4Z" fill="${C.mudD}" ${st(1.3)}/>
         <path d="M10 -10 Q3 -16 2 -9 Q3 -5 7 -7" fill="none" stroke="${C.wheat}" stroke-width="2.4" stroke-linecap="round"/></g>`,
-    sp_souskiou: shadow(18) + `<rect x="18" y="44" width="28" height="10" fill="${C.stone}" ${st()}/>` + idol(32, 30, 1.2),
+    sp_souskiou: shadow(26) + `
+      <path d="M6 52 Q8 24 30 20 Q52 24 56 52Z" fill="${C.stoneD}" ${st()}/>
+      <path d="M22 52 Q22 36 30 36 Q38 36 38 52Z" fill="${C.dark}" ${st(1.5)}/>
+      <path d="M18 30 L22 34 M40 28 L44 33" stroke="${O}" stroke-width="1.2" opacity=".5"/>
+      ${[[44, 50, 5], [52, 52, 4], [48, 45, 4], [56, 46, 3.5], [40, 53, 3]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * .75}" fill="${C.pic}" stroke="${O}" stroke-width="1.2"/>`).join('')}
+      <path d="M8 46 Q14 40 18 46" fill="none" stroke="${C.pic}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="13" cy="47" r="2.4" fill="${C.pic}" stroke="${O}" stroke-width="1"/>`,
     shrine1: shadow(26) + `
       <rect x="12" y="42" width="40" height="12" fill="${C.stone}" ${st()}/>
       <path d="M12 47 L52 47" stroke="${C.stoneD}" stroke-width="1.2"/>` + idol(32, 26, 1.2) + `
@@ -312,11 +343,22 @@ const Art = (() => {
     wood: logEnds(30, 42, 1.25) + logEnds(34, 26, 1.1),
     stone: `<path d="M6 52 L10 34 L24 28 L34 36 L32 52Z" fill="${C.stone}" ${st(2)}/>
       <path d="M28 52 L32 30 L46 20 L58 30 L58 52Z" fill="${C.stoneD}" ${st(2)}/>`,
-    cheese: `<path d="M8 30 L40 14 L58 26 L58 44 L24 58 L8 46Z" fill="${C.white}" ${st(2)}/>
-      <path d="M8 30 L24 40 L58 26 M24 40 L24 58" fill="none" ${st(2)}/>
-      <path d="M30 34 l14 -7 M34 40 l12 -6" stroke="#c9b48c" stroke-width="2.4"/>`,
-    goods: `<path d="M24 8 L40 8 L41 14 Q54 22 52 38 Q50 52 40 58 L24 58 Q14 52 12 38 Q10 22 23 14Z" fill="${C.white}" ${st(2)}/>
-      <path d="M14 28 Q32 36 50 28 M13 42 Q32 50 51 42" fill="none" stroke="${C.red}" stroke-width="3"/>`,
+    // халлуми: плотный белый брусок с полосками от гриля и листиком мяты
+    cheese: `<path d="M6 34 L34 22 L58 32 L30 46Z" fill="#fbf6e6" ${st(2)}/>
+      <path d="M6 34 L6 44 L30 56 L30 46Z" fill="#ece1c2" ${st(2)}/>
+      <path d="M30 46 L30 56 L58 42 L58 32Z" fill="#e0d2ad" ${st(2)}/>
+      <path d="M18 31 L40 40 M25 28 L47 37 M32 25 L52 33" stroke="#9c6b3c" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
+      <path d="M36 12 Q48 8 52 18 Q42 22 36 12Z" fill="${C.green}" ${st(1.6)}/>
+      <path d="M38 13 Q45 14 50 17" stroke="${C.greenD}" stroke-width="1.2" fill="none"/>`,
+    // товары: амфора и тюк, перевязанный верёвкой
+    goods: `<path d="M8 58 Q4 44 10 36 Q16 30 22 36 Q28 44 24 58Z" fill="${C.thatch}" ${st(2)}/>
+      <path d="M12 36 Q16 30 20 36" fill="none" stroke="${C.woodD}" stroke-width="2.4"/>
+      <path d="M8 46 Q16 50 24 46" fill="none" stroke="${C.thatchD}" stroke-width="1.6"/>
+      <path d="M34 8 L46 8 L45 14 L35 14Z" fill="${C.terra}" ${st(1.8)}/>
+      <path d="M35 14 Q24 22 26 36 Q28 48 40 58 Q52 48 54 36 Q56 22 45 14Z" fill="#c9693a" ${st(2)}/>
+      <path d="M35 16 Q26 16 28 26 M45 16 Q54 16 52 26" fill="none" ${st(2.2)}/>
+      <path d="M27 32 Q40 37 53 32" fill="none" stroke="${C.dark}" stroke-width="2"/>
+      <path d="M28 38 Q40 43 52 38" fill="none" stroke="${C.white}" stroke-width="1.6"/>`,
     copper: ingotShape(32, 34, 1.9),
     bronze: `<path d="M10 22 Q20 10 34 18 L54 18 L54 30 L34 30 Q20 38 10 26Z" fill="${C.bronze}" ${st(2)}/>
       <path d="M34 18 L34 30" stroke="${C.bronzeD}" stroke-width="2"/>
@@ -331,7 +373,87 @@ const Art = (() => {
     goat: goat(30, 40, 1.6, C.white),
   };
 
-  const ALL = Object.assign({}, B, S, T);
+  // ---------- медальоны знаний (светлые) и обрядов (тёмные, «ночные») ----------
+  const disc = (bg, rim) => `<circle cx="32" cy="32" r="28" fill="${bg}" stroke="${rim}" stroke-width="2.4"/>`;
+  const tdisc = disc('#f1e4c3', O);
+  const rdisc = disc('#3c3a5c', '#22203a');
+  const star = (x, y, r = 2) => `<path d="M${x} ${y - r * 2} L${x + r * .6} ${y - r * .6} L${x + r * 2} ${y} L${x + r * .6} ${y + r * .6} L${x} ${y + r * 2} L${x - r * .6} ${y + r * .6} L${x - r * 2} ${y} L${x - r * .6} ${y - r * .6}Z" fill="#ffe69a"/>`;
+  const M = {
+    // знания
+    t_cheesemaking: tdisc + `<path d="M14 30 L50 30 Q50 48 32 50 Q14 48 14 30Z" fill="${C.terra}" ${st(2)}/>
+      <ellipse cx="32" cy="30" rx="18" ry="5" fill="${C.white}" ${st(1.6)}/>
+      ${[[26, 28], [33, 31], [39, 28], [30, 32]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="#fbf6e6" stroke="#c9b48c" stroke-width="1"/>`).join('')}
+      <path d="M44 12 Q48 18 44 21 Q40 18 44 12Z" fill="${C.sky}" ${st(1.3)}/>`,
+    t_carving: tdisc + `<path d="M14 46 L18 30 L32 24 L42 32 L40 46Z" fill="${C.pic}" ${st(1.8)}/>
+      <path d="M20 34 L28 38 L34 31" fill="none" stroke="${C.picD}" stroke-width="1.6"/>
+      <path d="M36 30 L50 14" stroke="${C.stoneD}" stroke-width="3" stroke-linecap="round"/>
+      <rect x="44" y="34" width="12" height="7" rx="2" transform="rotate(-35 50 37)" fill="${C.wood}" ${st(1.5)}/>
+      <path d="M44 42 L36 50" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>`,
+    t_granary: tdisc + `<path d="M18 50 L26 36 L34 50Z" fill="${C.mud}" ${st(1.6)}/><circle cx="42" cy="44" r="6" fill="${C.mud}" ${st(1.6)}/>
+      <rect x="24" y="18" width="10" height="10" rx="2" fill="${C.mudD}" ${st(1.4)}/><circle cx="44" cy="24" r="4" fill="${C.mudD}" ${st(1.4)}/>
+      <path d="M29 23 l0 0 M20 46 l0 0" stroke="${O}" stroke-width="2.4" stroke-linecap="round"/>`,
+    t_foundations: tdisc + `${[[12, 40], [24, 40], [36, 40], [18, 30], [30, 30]].map(([x, y]) => `<rect x="${x}" y="${y}" width="12" height="9" rx="2" fill="${C.stone}" ${st(1.5)}/>`).join('')}
+      <path d="M48 12 L48 34" stroke="${O}" stroke-width="1.4"/><path d="M44 34 L52 34 L48 44Z" fill="${C.copper}" ${st(1.4)}/>`,
+    t_redwhite: tdisc + `<path d="M10 28 Q32 26 54 28 Q52 46 32 48 Q12 46 10 28Z" fill="${C.white}" ${st(2)}/>
+      <path d="M12 34 Q32 38 52 34" fill="none" stroke="${C.red}" stroke-width="2.6"/>
+      <path d="M16 40 l4 -4 l4 4 l4 -4 l4 4 l4 -4 l4 4 l4 -4" fill="none" stroke="${C.red}" stroke-width="1.8"/>`,
+    t_nativecopper: tdisc + `<path d="M12 40 Q14 28 24 28 Q30 22 36 28 Q42 30 40 40 Q34 48 24 46 Q14 48 12 40Z" fill="${C.copper}" ${st(1.8)}/>
+      <path d="M20 36 Q26 32 32 36" fill="none" stroke="${C.copperD}" stroke-width="1.6"/>
+      <path d="M44 16 L50 44" stroke="${C.copperD}" stroke-width="3.2" stroke-linecap="round"/><path d="M42 14 L48 12 L46 18Z" fill="${C.wood}" ${st(1.2)}/>`,
+    t_smelting: tdisc + flame(32, 50, 1.2) + `<path d="M18 22 L46 22 L42 40 L22 40Z" fill="${C.stoneD}" ${st(2)}/>
+      <ellipse cx="32" cy="22" rx="14" ry="4" fill="${C.fireL}" ${st(1.6)}/><ellipse cx="32" cy="22" rx="8" ry="2" fill="${C.copper}"/>`,
+    t_seafaring: tdisc + star(20, 18, 2.2) + star(40, 14, 1.6) + star(48, 24, 1.4) +
+      `<path d="M14 40 L50 40 Q46 50 32 50 Q18 50 14 40Z" fill="${C.wood}" ${st(1.8)}/>
+      <path d="M32 40 L32 22" stroke="${C.dark}" stroke-width="2"/><path d="M24 24 L40 24 L38 36 L26 36Z" fill="${C.white}" ${st(1.4)}/>
+      <path d="M8 52 q6 -4 12 0 t12 0 t12 0 t12 0" fill="none" stroke="${C.water}" stroke-width="2.4"/>`,
+    t_ashlar: tdisc + `<rect x="14" y="22" width="30" height="22" fill="${C.stone}" ${st(2)}/>
+      <rect x="18" y="26" width="22" height="14" fill="none" stroke="${C.stoneD}" stroke-width="1.4" stroke-dasharray="2 2"/>
+      <path d="M42 46 L50 46 L50 18" fill="none" stroke="${C.woodD}" stroke-width="3" stroke-linecap="square"/>`,
+    t_bronze: tdisc + `<circle cx="25" cy="32" r="12" fill="${C.copper}" ${st(1.8)}/><circle cx="39" cy="32" r="12" fill="#b9b9b2" ${st(1.8)}/>
+      <path d="M32 22.3 A12 12 0 0 1 32 41.7 A12 12 0 0 1 32 22.3Z" fill="${C.bronze}" ${st(1.4)}/>`,
+    t_oxhide: tdisc + ingotShape(32, 40, .9) + `<path d="M32 12 L32 26 M18 18 L46 18" stroke="${O}" stroke-width="2"/>
+      <path d="M14 18 L22 18 L18 26Z M42 18 L50 18 L46 26Z" fill="${C.bronze}" ${st(1.2)}/>`,
+    t_bronzetools: tdisc + `<path d="M18 46 L40 18" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M34 14 Q44 10 48 20 L40 24Z" fill="${C.bronze}" ${st(1.5)}/>
+      <path d="M46 46 Q20 44 22 22 Q30 34 46 38Z" fill="${C.bronze}" ${st(1.5)}/><path d="M46 38 L52 50" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>`,
+    t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
+      <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
+
+    // обряды
+    r_elders: disc('#e8f0d8', '#55732a') + `<path d="M14 50 Q12 32 22 28 L30 28 Q38 32 36 50Z" fill="${C.thatch}" ${st(1.6)}/>
+      <path d="M18 28 Q26 20 34 28" fill="none" stroke="${C.woodD}" stroke-width="2"/>
+      <path d="M38 50 Q36 38 42 34 L48 34 Q54 38 52 50Z" fill="${C.terra}" ${st(1.6)}/>
+      <path d="M44 34 L44 20 M44 22 q-4 -3 -6 -6 M44 26 q4 -3 6 -6" stroke="${C.wheatD}" stroke-width="2" fill="none"/>`,
+    r_settlers: rdisc + [[20, '#e8c39a'], [32, '#d9a877'], [44, '#e8c39a']].map(([x, c], i) => `<circle cx="${x}" cy="${i === 1 ? 26 : 22}" r="${i === 1 ? 4.5 : 5.5}" fill="${c}" ${st(1.3)}/>
+      <path d="M${x - 6} ${i === 1 ? 50 : 50} L${x - 5} ${i === 1 ? 32 : 30} Q${x} ${i === 1 ? 29 : 27} ${x + 5} ${i === 1 ? 32 : 30} L${x + 6} 50Z" fill="${['#a8402a', '#6d7a3b', '#2c6e95'][i]}" ${st(1.3)}/>`).join('') +
+      `<path d="M25 38 L28 38 M36 38 L39 38" stroke="#e8c39a" stroke-width="3" stroke-linecap="round"/>`,
+    r_harvest: rdisc + `<path d="M18 48 Q14 22 40 16" fill="none" stroke="#d8dce3" stroke-width="4" stroke-linecap="round"/>
+      <path d="M18 48 L22 52" stroke="${C.wood}" stroke-width="4" stroke-linecap="round"/>` + sheaf(40, 50).replace('translate(40 50)', 'translate(40 50) scale(1.4)'),
+    r_hearth: rdisc + flame(32, 46, 1.3) + `<path d="M14 18 L42 46" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/><path d="M10 18 Q14 10 22 14 L16 22Z" fill="#d8dce3" ${st(1.3)}/>
+      <path d="M50 18 L22 46" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/><path d="M44 12 Q52 12 56 18 Q50 16 46 20Z" fill="#d8dce3" ${st(1.3)}/>`,
+    r_herds: rdisc + `<path d="M14 32 Q32 10 50 32" fill="none" stroke="${C.green}" stroke-width="3"/>
+      ${[16, 24, 40, 48].map(x => `<ellipse cx="${x}" cy="${x < 32 ? 26 + (x - 16) * -0.6 : 26 - (48 - x) * 0.6 + 0}" rx="3" ry="1.6" fill="${C.green}"/>`).join('')}` + goat(30, 44, 1.2, C.white),
+    r_festival: rdisc + `<circle cx="32" cy="38" r="13" fill="${C.mud}" ${st(1.8)}/><circle cx="32" cy="38" r="8" fill="none" stroke="${C.mudD}" stroke-width="1.4"/>
+      ${[0, 72, 144, 216, 288].map(a => { const r = a * Math.PI / 180; return `<circle cx="${32 + Math.cos(r) * 13}" cy="${38 + Math.sin(r) * 13}" r="2" fill="${C.bronze}" stroke="${O}" stroke-width=".8"/>`; }).join('')}
+      <path d="M14 16 q4 -4 8 0 q-4 4 -8 0Z M42 14 q4 -4 8 0 q-4 4 -8 0Z" fill="#e88aa8"/><circle cx="18" cy="16" r="1.6" fill="#ffe69a"/><circle cx="46" cy="14" r="1.6" fill="#ffe69a"/>`,
+    r_vigil: rdisc + star(18, 18, 1.6) + star(30, 12, 1.2) + star(44, 20, 1.8) + star(24, 30, 1) + star(50, 32, 1.1) +
+      `<path d="M38 10 Q30 16 34 26 Q40 32 48 28 Q38 26 38 10Z" fill="#ffe69a"/>
+      <path d="M8 52 Q20 40 32 46 Q44 40 56 52Z" fill="#2a2840"/><circle cx="22" cy="42" r="2.4" fill="#2a2840"/><path d="M22 44 L22 50" stroke="#2a2840" stroke-width="3"/>
+      <path d="M23 43 L30 36" stroke="#2a2840" stroke-width="1.6"/>`,
+    r_bullmask: rdisc + `<path d="M20 22 Q8 18 10 8 Q16 16 24 18Z M44 22 Q56 18 54 8 Q48 16 40 18Z" fill="${C.white}" ${st(1.5)}/>
+      <path d="M20 20 L44 20 Q46 36 40 46 Q32 54 24 46 Q18 36 20 20Z" fill="${C.terra}" ${st(1.8)}/>
+      <circle cx="26" cy="30" r="2.6" fill="${C.dark}"/><circle cx="38" cy="30" r="2.6" fill="${C.dark}"/>
+      <path d="M27 42 Q32 46 37 42" fill="none" stroke="${C.dark}" stroke-width="1.6"/>`,
+    r_ingot: rdisc + `<path d="M14 40 Q32 50 50 40 L48 46 Q32 54 16 46Z" fill="${C.woodD}" ${st(1.4)}/>
+      <path d="M32 40 L32 12" stroke="${C.dark}" stroke-width="2"/><path d="M22 14 L42 14 L40 34 L24 34Z" fill="${C.white}" ${st(1.4)}/>
+      <path d="M22 22 L42 22" stroke="${C.red}" stroke-width="2"/>` + ingotShape(32, 54, .5),
+    r_hornedfeast: rdisc + [0, 40, 80, 120, 160, 200, 240, 280, 320].map(a => { const r = a * Math.PI / 180; return `<path d="M${32 + Math.cos(r) * 18} ${34 + Math.sin(r) * 18} L${32 + Math.cos(r) * 25} ${34 + Math.sin(r) * 25}" stroke="#ffe69a" stroke-width="2"/>`; }).join('') +
+      `<path d="M24 30 Q24 20 32 20 Q40 20 40 30 L40 40 Q32 46 24 40Z" fill="${C.bronze}" ${st(1.6)}/>
+      <path d="M24 26 Q12 24 12 12 Q18 20 26 22 M40 26 Q52 24 52 12 Q46 20 38 22" fill="${C.white}" ${st(1.4)}/>
+      <path d="M28 32 l3 0 M33 32 l3 0" stroke="${O}" stroke-width="1.6"/>`,
+  };
+
+  const ALL = Object.assign({}, B, S, T, M);
   const wrap = (inner, cls) => `<svg class="ico ${cls || ''}" viewBox="0 0 64 64" aria-hidden="true">${inner}</svg>`;
 
   return {
