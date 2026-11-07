@@ -51,6 +51,7 @@ const TASK_REWARDS = {
   flip:  { lambda: 4,  name: 'Вспомнить перевод', desc: 'сами оцениваете, вспомнили ли' },
   gr2ru: { lambda: 6,  name: 'Что это значит?', desc: 'выбрать перевод греческого слова' },
   match: { lambda: 5,  name: 'Соедините пары', desc: 'за каждую пару без ошибки' },
+  spell: { lambda: 6,  name: 'Какая буква?', desc: 'как пишется трудное место: ι или η, ο или ω' },
   ru2gr: { lambda: 7,  name: 'Как это по-гречески?', desc: 'выбрать греческое слово' },
   build: { lambda: 12, name: 'Соберите слово', desc: 'набрать слово по буквам или слогам' },
 };
@@ -64,6 +65,58 @@ function dayKey(t = Date.now()) {
 }
 
 const GREEK_RE = /[Ͱ-Ͽἀ-῿]/;
+
+// ------------------------------------------------------------
+//  Обманки: похожие на слух написания (η/ι/υ/ει/οι, ο/ω, ε/αι, σ/ς)
+// ------------------------------------------------------------
+const CONFUSE = [
+  ['ει', ['ι', 'οι', 'η']], ['εί', ['ί', 'οί', 'ή']], ['οι', ['ι', 'ει', 'η']], ['οί', ['ί', 'εί', 'ή']],
+  ['αι', ['ε']], ['αί', ['έ']], ['η', ['ι', 'ει', 'υ']], ['ή', ['ί', 'εί', 'ύ']], ['ι', ['η', 'ει', 'οι']], ['ί', ['ή', 'εί', 'οί']],
+  ['υ', ['ι', 'η']], ['ύ', ['ί', 'ή']], ['ο', ['ω']], ['ό', ['ώ']], ['ω', ['ο']], ['ώ', ['ό']], ['ε', ['αι']], ['έ', ['αί']],
+  ['σ', ['ς']], ['ς', ['σ']],
+];
+/** Все «похожие, но неверные» варианты строки (одна замена в каждом). */
+function confusions(str) {
+  const out = new Set();
+  for (const [from, tos] of CONFUSE) {
+    let i = str.indexOf(from);
+    while (i >= 0) {
+      // не подменяем часть дифтонга одиночной буквой (ει → «ηι» звучит иначе, это не обманка)
+      const prev = str[i - 1] || '', next = str[i + from.length] || '';
+      const inDiph = from.length === 1 && (
+        (/[ιίυύ]/.test(from) && /[αεοηάέόή]/.test(prev)) ||      // вторая буква дифтонга
+        (/[αεοάέό]/.test(from) && /[ιίυύ]/.test(next)));          // первая буква дифтонга
+      if (!inDiph) for (const to of tos) {
+        let v = str.slice(0, i) + to + str.slice(i + from.length);
+        if (to === 'σ' && !next) continue;            // σ в конце слова — явная ошибка, слишком просто
+        if (to === 'ς' && next) v = v;                  // ς в середине — классическая обманка
+        if (v !== str) out.add(v);
+      }
+      i = str.indexOf(from, i + 1);
+    }
+  }
+  return [...out];
+}
+
+/** Места в слове для задания «Какая буква?»: гласные, которые звучат одинаково, а пишутся по-разному.
+ *  Возвращает [{ i, from, opts }], где opts — верный вариант и обманки. σ/ς не берём: там правило, а не память. */
+function spellSpots(word) {
+  const spots = [];
+  const keys = CONFUSE.filter(([f]) => !/[σς]/.test(f)).sort((a, b) => b[0].length - a[0].length);
+  for (const [from, tos] of keys) {
+    let i = word.indexOf(from);
+    while (i >= 0) {
+      const prev = word[i - 1] || '', next = word[i + from.length] || '';
+      const inDiph = from.length === 1 && (
+        (/[ιίυύ]/.test(from) && /[αεοηάέόή]/.test(prev)) || (/[αεοάέό]/.test(from) && /[ιίυύ]/.test(next)));
+      const covered = spots.some(s => i < s.i + s.from.length && s.i < i + from.length);
+      if (!inDiph && !covered) spots.push({ i, from, opts: [from, ...tos.filter(t => t !== from)] });
+      i = word.indexOf(from, i + 1);
+    }
+  }
+  return spots.sort((a, b) => a.i - b.i);
+}
+
 
 const Decks = {
   hasGreek(s) { return GREEK_RE.test(s || ''); },
@@ -218,11 +271,13 @@ const Decks = {
   isLearned(p) { return !!p && p.rev >= 0; },
   /** Слово можно набрать (одно слово, без пробелов и знаков). */
   canType(card) { const n = [...card.front].length; return n >= 2 && n <= 18 && !/[\s.,!?;:()'"«»-]/.test(card.front); },
-  /** Слово готово стать выученным, но ещё ни разу не было набрано — нужен набор. */
+  /** Слово дошло до последнего шага, но ещё ни разу не набрано — последним шагом будет набор. */
   needsBuild(state, card) {
     const p = this.prog(state, card.id);
     return !!p && p.rev < 0 && !p.built && p.step >= this.settings(state).learnSteps - 1 && this.canType(card);
   },
+  /** Есть ли в слове трудное место для «Какая буква?». */
+  hasSpellSpot(card) { return this.canType(card) && spellSpots(card.front).length > 0; },
   /** Сложность задания: 0 — новая, 1–2 — заучивается, 3+ — выучена. */
   level(p) { return !p ? 0 : p.rev >= 0 ? 3 + p.rev : Math.min(2, p.step); },
 
@@ -277,20 +332,24 @@ const Decks = {
     return picks;
   },
 
-  /** Возвращает 'learned', если карточка только что стала выученной. */
-  grade(state, card, correct, kind, typed = false) {
-    const now = Date.now(), set = this.settings(state), iv = this.intervals(state);
+  /** Оценка ответа. Шагов до «выучено» ровно столько, сколько выбрано в настройках; последний — набор слова.
+   *  «Какая буква?» может попасться на любом шаге и тоже считается шагом.
+   *  Ошибка в написании (spell, build) не откатывает перевод: слово остаётся на своём шаге и снова пойдёт на набор.
+   *  Возвращает 'learned' (стало выученным), 'needtype' (осталось набрать) или null. */
+  grade(state, card, correct, kind, task = 'gr2ru') {
+    const now = Date.now(), set = this.settings(state), iv = this.intervals(state), L = set.learnSteps;
     const p = this.prog(state, card.id) || { step: 0, rev: -1, due: 0, right: 0, wrong: 0 };
+    const spelling = task === 'spell' || task === 'build';
     let event = null;
     if (correct) {
       p.right++;
-      if (typed) p.built = true;
+      if (task === 'build') p.built = true;
       if (p.rev < 0) {
         p.step++;
-        if (p.step >= set.learnSteps && !p.built && this.canType(card)) {
+        if (p.step >= L && !p.built && this.canType(card)) {
           // без единого набора слово не выучено: ждём задания «Соберите слово»
-          p.step = set.learnSteps - 1; p.due = now + LEARN_DELAY; event = 'needtype';
-        } else if (p.step >= set.learnSteps) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + iv[p.rev]; event = 'learned'; }
+          p.step = L - 1; p.due = now + LEARN_DELAY; event = 'needtype';
+        } else if (p.step >= L) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + iv[p.rev]; event = 'learned'; }
         else p.due = now + LEARN_DELAY;
       } else if (kind !== 'early') {
         p.rev = Math.min(p.rev + 1, iv.length - 1);
@@ -298,7 +357,11 @@ const Decks = {
       }
     } else {
       p.wrong++;
-      if (p.rev >= 0) { p.back = Math.max(0, p.rev - 1); p.rev = -1; p.step = Math.max(0, set.learnSteps - 1); }
+      if (spelling) {
+        // перевод знает, написание — нет: шаг не откатываем, но слово снова пойдёт на набор
+        p.built = false;
+        if (p.rev >= 0) { p.back = Math.max(0, p.rev - 1); p.rev = -1; p.step = Math.max(0, L - 1); }
+      } else if (p.rev >= 0) { p.back = Math.max(0, p.rev - 1); p.rev = -1; p.step = Math.max(0, L - 1); }
       else p.step = Math.max(0, p.step - 1);
       p.due = now + LEARN_DELAY;
     }
@@ -411,7 +474,7 @@ const Decks = {
       return `<span class="learned-mark">✓ выучено</span> <span class="dim">${left > 0 ? 'повтор через ' + fmtDur(left) : 'пора повторить'}</span>`;
     }
     const L = this.settings(state).learnSteps;
-    return `<span class="steps">${'●'.repeat(p.step)}${'○'.repeat(Math.max(0, L - p.step))}</span>${p.built ? ' <span class="dim" title="Слово уже набирали">✍</span>' : ''}`;
+    return `<span class="steps" title="Шагов пройдено: ${Math.min(p.step, L)} из ${L}">${'●'.repeat(Math.min(p.step, L))}${'○'.repeat(Math.max(0, L - p.step))}</span>${p.built ? ' <span class="dim" title="Слово уже набирали">✍</span>' : ''}`;
   },
 };
 

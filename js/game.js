@@ -20,7 +20,7 @@ const Game = {
       logos: 0, logosEarned: 0,
       pop: 2, popAcc: 0, starveAcc: 0,
       techs: [], buildings: [], nextId: 1,
-      decks: Decks.builtinDecks(), progress: {}, buffs: {}, cooldowns: {}, settings: { ...DEFAULT_SETTINGS },
+      decks: Decks.builtinDecks(), progress: {}, buffs: {}, cooldowns: {}, settings: { ...DEFAULT_SETTINGS }, stash: [],
       stats: { right: 0, wrong: 0, bestStreak: 0, rounds: 0, goats: 0, learned: 0 }, learnLog: {},
       timers: { goat: 40, raid: null },
       log: [], lastSave: Date.now(), finished: false,
@@ -71,6 +71,7 @@ const Game = {
       s.stats.goats = s.stats.goats || 0;
       s.buffs = s.buffs || {};
       s.cooldowns = s.cooldowns || {};
+      s.stash = s.stash || [];
       s.settings = Object.assign({}, DEFAULT_SETTINGS, s.settings || {});
       s.learnLog = s.learnLog || {};
       s.stats.learned = s.stats.learned || 0;
@@ -120,6 +121,9 @@ const Game = {
   buildingAt(x, y) { return this.state.buildings.find(b => b.x === x && b.y === y); },
   count(type) { return this.state.buildings.filter(b => b.type === type).length; },
   built(type) { return this.count(type) > 0; },
+  /** Чудо убрано на склад: не стоит на карте, бонусы не действуют, но поставить можно бесплатно. */
+  stashed(type) { return (this.state.stash || []).includes(type); },
+  owned(type) { return this.built(type) || this.stashed(type); },
   maxLevel() {
     for (let e = this.state.epoch; e >= 0; e--) if (EPOCHS[e].maxLevel) return EPOCHS[e].maxLevel;
     return 1;
@@ -293,6 +297,7 @@ const Game = {
     const B = BUILDINGS[type], s = this.state;
     if (s.epoch < B.epoch) return { ok: false, hidden: true };
     if (B.tech && !this.hasTech(B.tech)) return { ok: false, locked: true, reason: `Нужно знание «${TECH_BY_ID[B.tech].name}»` };
+    if (B.special && this.stashed(type)) return { ok: true, stashed: true, cost: {}, logos: 0 };
     if (B.special && this.built(type)) return { ok: false, done: true, reason: 'Уже построено' };
     const { cost, logos } = this.priceOf(type, mode);
     if (B.max && this.count(type) >= B.max) return { ok: false, cost, logos, reason: `Не больше ${B.max}` };
@@ -315,8 +320,15 @@ const Game = {
     const st = this.buildStatus(type, mode);
     const tile = this.tile(x, y);
     if (!st.ok || !this.canPlaceOn(type, tile)) return false;
-    this.pay(st.cost, st.logos);
     const s = this.state;
+    if (st.stashed) {   // чудо со склада — бесплатно
+      s.stash = s.stash.filter(t => t !== type);
+      s.buildings.push({ id: s.nextId++, type, level: 1, x, y });
+      this.log(`✨ ${BUILDINGS[type].name}: снова в городе`);
+      this.save();
+      return true;
+    }
+    this.pay(st.cost, st.logos);
     s.buildings.push({ id: s.nextId++, type, level: 1, x, y });
     const B = BUILDINGS[type];
     this.log(B.special ? `✨ Возведено чудо Кипра: ${B.name}!` : `Построено: ${this.form(type).name}`);
@@ -367,6 +379,17 @@ const Game = {
     this.pay(up.cost, up.logos);
     b.level++;
     this.log(`${up.newLook ? '✨ Новый облик! ' : ''}Улучшено: ${this.form(b.type).name} → ур. ${b.level}`);
+    this.save();
+    return true;
+  },
+
+  /** Убрать чудо на склад (например, чтобы переставить). */
+  stashWonder(b) {
+    if (!BUILDINGS[b.type].special) return false;
+    const s = this.state;
+    s.buildings = s.buildings.filter(x => x !== b);
+    s.stash.push(b.type);
+    this.log(`📦 ${BUILDINGS[b.type].name}: убрано на склад`);
     this.save();
     return true;
   },
@@ -427,7 +450,7 @@ const Game = {
     if (!a) return null;
     const list = [];
     list.push({ label: `👥 Население ${a.pop}`, have: s.pop, ok: s.pop >= a.pop });
-    for (const sp of a.specials) list.push({ label: `✨ ${BUILDINGS[sp].name}`, have: this.built(sp) ? 'есть' : 'нет', ok: this.built(sp) });
+    for (const sp of a.specials) list.push({ label: `✨ ${BUILDINGS[sp].name}`, have: this.built(sp) ? 'есть' : this.stashed(sp) ? 'на складе' : 'нет', ok: this.owned(sp) });
     if (a.allTechs) {
       const all = TECHS.filter(t => t.epoch === s.epoch), have = all.filter(t => this.hasTech(t.id)).length;
       list.push({ label: `📜 Все знания эпохи (${all.length})`, have: `${have}/${all.length}`, ok: have === all.length });
@@ -463,11 +486,18 @@ const Game = {
 
     for (const b of s.buildings) {
       const p = this.prodOf(b, fx);
+      // здания-переработчики (гавань, литейня…) не тратят сырьё на то, что некуда положить:
+      // все выходы полны — отдыхают, часть полна — сырья уходит пропорционально меньше
+      const outs = Object.keys(p).filter(k => p[k] > 0), ins = Object.keys(p).filter(k => p[k] < 0);
+      let share = 1;
+      if (ins.length && outs.length) share = outs.filter(k => s.res[k] < storage - 0.01).length / outs.length;
+      b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
+      if (share === 0) { b.idle = false; continue; }
       let ok = true;
-      for (const [k, v] of Object.entries(p)) if (v < 0 && s.res[k] < -v * eff * dt) ok = false;
+      for (const k of ins) if (s.res[k] < -p[k] * share * eff * dt) ok = false;
       b.idle = !ok;
       if (!ok) continue;
-      for (const [k, v] of Object.entries(p)) rates[k] += v * eff;
+      for (const [k, v] of Object.entries(p)) rates[k] += v * eff * (v < 0 ? share : 1);
     }
     rates.food -= s.pop * BALANCE.foodPerPop;
 
@@ -500,6 +530,8 @@ const Game = {
     const cost = R.cost || {}, logos = this.ritualLogos(R);
     const cd = (s.cooldowns || {})[R.id];
     if (cd > 0) return { cost, logos, cd, reason: `Можно снова через ${Math.ceil(cd)} с` };
+    const active = Object.keys(s.buffs).filter(id => RITUAL_BY_ID[id]).length;
+    if (R.buff && !s.buffs[R.id] && active >= BALANCE.maxBuffs) return { cost, logos, ok: false, full: true, reason: `Одновременно — не больше ${BALANCE.maxBuffs} благословений` };
     if (R.goat && this.goat) return { cost, logos, ok: this.canAfford(cost, logos) };
     const reason = this.lackReason(cost, logos);
     return { cost, logos, ok: !reason, reason };

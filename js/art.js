@@ -96,11 +96,14 @@ const Art = (() => {
       ${opt.knob ? `<circle cx="0" cy="-22" r="2.4" fill="${C.thatchD}" ${st(1.2)}/>` : ''}
     </g>`;
 
-  // ---------- здания: стадии 0 (ур. 1–3), 1 (4–5), 2 (6+) ----------
-  const B = {
-    house0: shadow(20) + roundHut(32, 36, 1),
-    house1: shadow(22) + smoke(40, 12) + roundHut(32, 36, 1.05, { base: true, wall: C.plaster, knob: true }),
-    house2: shadow(24) + `
+  const ashlar = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1" fill="#ece2c8" ${st(1.4)}/><path d="M${x + 2} ${y + 2} l${w - 4} 0" stroke="#fff" stroke-width="1" opacity=".8"/>`;
+  const olive = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M0 14 Q-2 6 1 0" stroke="${C.woodD}" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <circle cx="-6" cy="-2" r="6" fill="#8d9b5c" ${st(1.3)}/><circle cx="6" cy="-3" r="6.5" fill="#8d9b5c" ${st(1.3)}/><circle cx="0" cy="-8" r="6.5" fill="#9aa866" ${st(1.3)}/>
+      <circle cx="-3" cy="-6" r="1.1" fill="#3c4a2a"/><circle cx="5" cy="-1" r="1.1" fill="#3c4a2a"/><circle cx="1" cy="-11" r="1.1" fill="#3c4a2a"/></g>`;
+  const cheeseStack = (x, y) => [0, 1, 2].map(i => `<ellipse cx="${x}" cy="${y - i * 5}" rx="7" ry="3" fill="#f4e6b8" ${st(1.3)}/><path d="M${x - 4} ${y - i * 5 - 1} l3 2 M${x} ${y - i * 5 - 1} l3 2" stroke="#b9873a" stroke-width="1"/>`).join('');
+  const pennant = (x, y) => `<path d="M${x} ${y} L${x} ${y - 12}" stroke="${C.woodD}" stroke-width="1.8"/><path d="M${x} ${y - 12} L${x + 9} ${y - 9.5} L${x} ${y - 7}Z" fill="${C.red}" ${st(1.1)}/>`;
+  const H2 = `
       <rect x="10" y="26" width="30" height="27" fill="${C.mud}" ${st()}/>
       <rect x="38" y="34" width="17" height="19" fill="${C.mudD}" ${st()}/>
       <rect x="8" y="21" width="34" height="6" fill="${C.woodD}" ${st()}/>
@@ -109,14 +112,28 @@ const Art = (() => {
       <rect x="21" y="38" width="9" height="15" rx="1" fill="${C.dark}" ${st(1.4)}/>
       <rect x="13" y="32" width="5" height="5" fill="${C.dark}" ${st(1.2)}/>
       <rect x="44" y="40" width="5" height="5" fill="${C.dark}" ${st(1.2)}/>
-      <path d="M10 49 L40 49" stroke="${C.stoneD}" stroke-width="2"/>`,
+      <path d="M10 49 L40 49" stroke="${C.stoneD}" stroke-width="2"/>`;
+
+  // ---------- здания: облик меняется с эпохой и на 4-м уровне — и заметно ----------
+  const B = {
+    house0: shadow(20) + roundHut(32, 36, 1),
+    // ур. 4+: уже не хижина, а двор — большой дом на каменном цоколе, вторая хижина, кувшин
+    house1: shadow(29) + smoke(52, 8) + roundHut(48, 31, .62) + roundHut(25, 36, 1.02, { base: true, wall: C.plaster, knob: true }) + pithos(54, 50, .42),
+    house2: shadow(24) + H2,
 
     // поле — «нарисовано» прямо на земле клетки: без подставки и тени
     field0: rows(C.furrow, (x, y) => sprout(x, y, .85)),
-    field1: rows(C.furrow, (x, y) => tuft(x, y, C.green, C.greenD)),
-    field2: rows(C.furrowD, (x, y) => ear(x, y)) + sheaf(52, 54),
+    field1: rows(C.furrow, (x, y) => ear(x, y)),   // ур. 4+: всходы → спелый золотой колос
+    // бронзовый век: орошаемое поле — канал вдоль края
+    field2: `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>
+      <path d="M2.5 8 l0 5 M2.5 30 l0 5 M2.5 50 l0 5" stroke="${C.sky}" stroke-width="1.2"/>` + rows(C.furrowD, (x, y) => ear(x + 2, y)) + sheaf(52, 54),
     goatpen0: shadow(26) + fence(40) + goat(30, 42, 1.25, C.white),
-    goatpen1: shadow(26) + fence(40) + goat(22, 42, 1.05, C.mudD) + goat(42, 44, 1.15, C.white, true),
+    // ур. 4+: каменная овчарня с пастушьей хижиной и стадом
+    goatpen1: shadow(29) + roundHut(51, 24, .48) +
+      `<path d="M5 45 A27 11 0 0 1 59 45" fill="none" stroke="${O}" stroke-width="7.5" stroke-linecap="round"/><path d="M5 45 A27 11 0 0 1 59 45" fill="none" stroke="${C.stone}" stroke-width="4.6" stroke-linecap="round"/>` +
+      goat(28, 40, .78, C.mudD) + goat(17, 47, .95, C.white) + goat(41, 48, 1, C.white, true) +
+      `<path d="M5 45 A27 11 0 0 0 59 45" fill="none" stroke="${O}" stroke-width="7.5" stroke-linecap="round"/><path d="M5 45 A27 11 0 0 0 59 45" fill="none" stroke="${C.stone}" stroke-width="4.6" stroke-linecap="round"/>
+      <path d="M14 53.5 l0 3 M24 55.5 l0 3 M34 56 l0 3 M44 55 l0 3 M53 52 l0 3" stroke="${C.stoneD}" stroke-width="1.3"/>`,
     goatpen2: shadow(28) + `
       <path d="M30 14 L58 14 L58 40 L30 40Z" fill="${C.mudD}" ${st()}/>
       <path d="M26 16 L62 10 L62 16 L26 22Z" fill="${C.woodD}" ${st()}/>
@@ -131,7 +148,7 @@ const Art = (() => {
       <path d="M33 38 L42 14" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
       <path d="M36 16 Q44 10 50 16 L44 22 Q42 17 36 16Z" fill="${C.stone}" ${st(1.5)}/>
       <path d="M12 52 l4 -2 M50 54 l4 -3 M14 46 l3 1" stroke="${C.wheatD}" stroke-width="2"/>`,
-    lumber1: shadow(24) + logEnds(30, 48) + logEnds(24, 38) + logEnds(36, 38) + logEnds(30, 28, .95) + `
+    lumber1: shadow(28) + pine(10, 27, .95) + logEnds(30, 48) + logEnds(24, 38) + logEnds(36, 38) + logEnds(30, 28, .95) + `
       <path d="M50 52 L56 30" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
       <path d="M52 32 Q57 26 62 31 L57 36Z" fill="${C.stone}" ${st(1.4)}/>`,
     lumber2: shadow(28) + pine(12, 34, 1.15) + `
@@ -204,7 +221,10 @@ const Art = (() => {
       <path d="M16 50 L16 32 M40 50 L40 32 M14 32 L42 32" stroke="${C.wood}" stroke-width="3.2" stroke-linecap="round"/>
       <path d="M40 42 L60 42 L57 52 L43 52Z" fill="${C.wood}" ${st()}/>
       <circle cx="46" cy="40" r="3" fill="#4fa58d" ${st(1.2)}/><circle cx="52" cy="39" r="3.2" fill="${C.copper}" ${st(1.2)}/><circle cx="57" cy="41" r="2.4" fill="#4fa58d" ${st(1.2)}/>
-      <circle cx="46" cy="55" r="2.4" fill="${C.dark}"/><circle cx="56" cy="55" r="2.4" fill="${C.dark}"/>`,
+      <circle cx="46" cy="55" r="2.4" fill="${C.dark}"/><circle cx="56" cy="55" r="2.4" fill="${C.dark}"/>
+      <path d="M20 20 L29 3 L38 20" fill="none" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="29" cy="6" r="3.2" fill="${C.woodD}" ${st(1.2)}/><path d="M29 9 L29 30" stroke="${O}" stroke-width="1.1"/>
+      <path d="M2 56 Q6 46 12 46 Q17 48 18 56Z" fill="#6f7d5a" ${st(1.3)}/><circle cx="8" cy="50" r="1.8" fill="#4fa58d"/><circle cx="13" cy="51" r="1.8" fill="${C.copper}"/>`,
     mine2: shadow(30) + `
       <path d="M2 46 Q8 16 24 12 Q40 16 44 46Z" fill="${C.stoneD}" ${st()}/>
       <path d="M12 46 L12 32 Q20 26 28 32 L28 46Z" fill="${C.dark}" ${st()}/>
@@ -254,9 +274,15 @@ const Art = (() => {
       <path d="M44 26 L36 26" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>`,
 
     scribe0: shadow(18) + tablet(32, 36, 1.2) + `<path d="M44 52 L56 26" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>`,
-    scribe1: shadow(24) + tablet(22, 36, 1) + tablet(40, 38, 1.05) + `
-      <rect x="48" y="44" width="8" height="12" rx="3" fill="${C.stone}" ${st(1.3)}/>
-      <path d="M50 47 l4 0 M50 51 l4 0" stroke="${C.stoneD}" stroke-width="1.2"/>`,
+    // ур. 4+: навес писцов — скамья с табличками, печать, кувшин-архив
+    scribe1: shadow(28) + `
+      <path d="M10 22 L10 55 M52 18 L52 55" stroke="${C.woodD}" stroke-width="3"/>
+      <path d="M4 18 L58 12 L59 18 L5 25Z" fill="${C.thatch}" ${st()}/><path d="M14 22 l0 -4 M26 21 l0 -5 M38 19 l0 -4 M50 18 l0 -4" stroke="${C.thatchD}" stroke-width="1.2"/>
+      <rect x="12" y="44" width="38" height="5" rx="1" fill="${C.wood}" ${st(1.4)}/>
+      <path d="M16 49 L16 56 M46 49 L46 56" stroke="${C.woodD}" stroke-width="2.4"/>` +
+      tablet(21, 35, .72) + tablet(34, 36, .66) + `
+      <rect x="42" y="36" width="6" height="8" rx="2.5" fill="${C.stone}" ${st(1.2)}/><path d="M43 39 l4 0 M43 41.5 l4 0" stroke="${C.stoneD}" stroke-width="1"/>` +
+      pithos(58, 49, .45),
     scribe2: shadow(28) + `
       <rect x="8" y="20" width="36" height="34" fill="${C.plaster}" ${st()}/>
       <rect x="6" y="15" width="40" height="6" fill="${C.woodD}" ${st()}/>
@@ -266,13 +292,29 @@ const Art = (() => {
   };
 
   // ---------- бронзовый век, 4+ уровень: тот же облик, но богаче ----------
-  B.house3 = B.house2 + pithos(56, 49, .45) + `<path d="M14 21 L14 13 L22 16 L14 19" fill="${C.red}" ${st(1.1)}/>`;
-  B.field3 = B.field2 + sheaf(12, 56);
-  B.goatpen3 = B.goatpen2 + goat(30, 52, .7, C.mudD, true);
-  B.lumber3 = B.lumber2 + logEnds(18, 54, .7);
-  B.quarry3 = B.quarry2 + block(26, 38, 9, 7);
-  B.workshop3 = B.workshop2 + `<path d="M24 32 Q21 25 25 22 L30 22 Q33 25 31 32Z" fill="${C.white}" ${st(1.2)}/><path d="M22 27 Q27 29 32 27" stroke="${C.red}" stroke-width="1.3" fill="none"/>`;
-  B.store3 = B.store2 + pithos(30, 52, .45, C.white);
+  // ур. 4+ бронзового века: второй этаж, виноградная лоза над пристройкой, флажок
+  B.house3 = shadow(28) + `
+    <rect x="12" y="8" width="26" height="14" fill="${C.plaster}" ${st()}/>
+    <rect x="10" y="4" width="30" height="5" fill="${C.woodD}" ${st()}/>
+    <path d="M13 4 l0 -2.5 M21 4 l0 -2.5 M29 4 l0 -2.5 M37 4 l0 -2.5" stroke="${O}" stroke-width="1.2"/>
+    <rect x="16" y="11" width="6" height="6" fill="${C.dark}" ${st(1.2)}/><rect x="28" y="11" width="6" height="6" fill="${C.dark}" ${st(1.2)}/>` + H2 + `
+    <path d="M38 31 Q47 25 57 30" stroke="${C.greenD}" stroke-width="2.6" fill="none"/>
+    <circle cx="42" cy="29" r="2.6" fill="${C.green}" ${st(1)}/><circle cx="48" cy="27" r="2.8" fill="${C.green}" ${st(1)}/><circle cx="54" cy="28.5" r="2.6" fill="${C.green}" ${st(1)}/>
+    <circle cx="46" cy="31" r="1.4" fill="#6b3b6e"/><circle cx="52" cy="31.5" r="1.4" fill="#6b3b6e"/>` + pennant(58, 30) + pithos(59, 51, .42);
+  B.field3 = B.field2 + olive(52, 16, 1.05) + sheaf(16, 57) + sheaf(31, 59) + pithos(42, 54, .42, C.white);
+  B.goatpen3 = B.goatpen2 + pennant(60, 12) + cheeseStack(12, 34) + goat(30, 53, .72, C.mudD, true) + pithos(6, 52, .4, C.white);
+  B.lumber3 = pine(56, 15, .8) + B.lumber2 + `
+    <rect x="1" y="45" width="24" height="5" rx="1" fill="${C.wood}" ${st(1.4)}/>
+    <circle cx="6" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/><circle cx="20" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/>` + logEnds(14, 41, .55) + logEnds(12, 36, .5);
+  B.quarry3 = B.quarry2 + ashlar(12, 10, 12, 7) + ashlar(22, 6, 11, 7) + `
+    <path d="M6 61 L36 61" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M6 58 L1 55" stroke="${C.woodD}" stroke-width="1.6"/>` + ashlar(9, 53, 25, 7);
+  B.workshop3 = B.workshop2 + `
+    <path d="M3 26 L3 56 M27 26 L27 40" stroke="${C.woodD}" stroke-width="2.4"/>
+    <rect x="1" y="23" width="28" height="3.5" rx="1" fill="${C.wood}" ${st(1.3)}/>` +
+    [6, 14, 22].map((x, i) => `<path d="M${x - 3.5} 23 Q${x - 5} 17 ${x - 2} 14 L${x + 2} 14 Q${x + 5} 17 ${x + 3.5} 23Z" fill="${i === 1 ? C.terra : C.white}" ${st(1.2)}/>
+      <path d="M${x - 4} 19 Q${x} 21 ${x + 4} 19" stroke="${i === 1 ? C.white : C.red}" stroke-width="1.3" fill="none"/>`).join('') + pennant(57, 22);
+  B.store3 = `<path d="M20 13 L40 2 L60 13Z" fill="${C.thatch}" ${st()}/><path d="M28 13 L40 5 M40 5 L52 13 M34 13 L40 5 L46 13" stroke="${C.thatchD}" stroke-width="1.2"/>` + B.store2 +
+    `<rect x="22" y="24" width="36" height="3" fill="${C.red}"/>` + pithos(30, 52, .45, C.white) + ingotShape(47, 57, .38) + ingotShape(47, 53, .38);
 
   // ---------- спецстроения ----------
   const S = {

@@ -99,26 +99,36 @@ const UI = {
     for (const k of RES_KEYS) {
       if (!this.resVisible(k)) continue;
       const r = Game.rates[k] || 0, v = s.res[k], fill = Math.min(100, 100 * v / Game.storage);
-      const full = v >= Game.storage - 0.5;
-      html += `<div class="rs ${full ? 'full' : ''} ${buffed.has(k) ? 'buffed' : ''}" title="${RES[k].name}: ${Math.floor(v)} из ${Game.storage}${Math.abs(r) > 0.05 ? `, ${fmtRate(r)} в секунду` : ''}${full ? ' — склад полон!' : ''}${buffed.has(k) ? ' · под благословением' : ''}">
-        <span class="rs-ic">${Art.res(k)}</span><span class="rs-v"><b>${fmt(v)}</b><small class="${r < 0 ? 'neg' : ''}">${Math.abs(r) > 0.05 ? fmtRate(r) : '&nbsp;'}</small></span>
+      const full = v >= Game.storage - 0.5, falling = r < -0.05;
+      html += `<div class="rs ${full ? 'full' : ''} ${falling ? 'falling' : ''} ${buffed.has(k) ? 'buffed' : ''}" title="${RES[k].name}: ${Math.floor(v)} из ${Game.storage} (вместимость складов)${Math.abs(r) > 0.05 ? `, ${fmtRate(r)} в секунду` : ''}${full ? ' — склад полон!' : ''}${falling ? ` — запас тает${r < 0 && v > 0 ? `, хватит примерно на ${fmtDur(v / -r * 1000)}` : ''}` : ''}${buffed.has(k) ? ' · под благословением' : ''}">
+        <span class="rs-ic">${Art.res(k)}</span><span class="rs-v"><b>${fmt(v)}</b><small class="${falling ? 'neg' : ''}">${Math.abs(r) > 0.05 ? (falling ? '▼ ' : '') + fmtRate(r) : '&nbsp;'}</small></span>
         <i class="rs-bar"><i style="width:${fill.toFixed(0)}%"></i></i></div>`;
     }
-    html += `<div class="rs cap" title="Вместимость складов: столько помещается каждого ресурса"><span class="rs-ic">${Art.svg('store0')}</span><span class="rs-v"><b>${fmt(Game.storage)}</b><small>склад</small></span></div>`;
     $('#resources').innerHTML = html;
 
     // жители и работники — отдельным блоком
-    const short = Game.eff < 0.999;
+    const short = Game.eff < 0.999, hands = Math.floor(s.pop * (1 + ((Game.fx || {}).workers || 0)));
     $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap} мест</small></div>
-      <div class="${short ? 'short' : ''}" title="${short ? `Зданиям нужно ${Game.need} работников, а рук не хватает: всё работает на ${Math.round(Game.eff * 100)}%.` : `Зданиям нужно ${Game.need} работников — рук хватает.`}"><span>⚒</span><b>${Game.need}</b><small>${short ? `нужно · ${Math.round(Game.eff * 100)}%` : plural(Game.need, 'работник', 'работника', 'работников')}</small></div>`;
+      <div class="${short ? 'short' : ''}" title="${short ? `Не хватает работников! Зданиям нужно ${Game.need}, а рук ${hands}: всё производство идёт на ${Math.round(Game.eff * 100)}%. Нужны жилища и зерно — или «Всей семьёй».` : `Зданиям нужно ${Game.need} работников — рук хватает (${hands}).`}"><span>${short ? '⚠' : '⚒'}</span>${short
+        ? `<b>${hands} / ${Game.need}</b><small>мало рук · ${Math.round(Game.eff * 100)}%</small>`
+        : `<b>${Game.need}</b><small>${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`;
 
-    // благословения — отдельной полосой над картой
+    // благословения — полоса над картой: место под неё есть всегда, и она никогда не переносится на вторую строку
     const buffs = Object.entries(s.buffs || {}).filter(([id]) => RITUAL_BY_ID[id]);
-    $('#buffbar').classList.toggle('hidden', !buffs.length);
-    $('#buffbar').innerHTML = buffs.map(([id, left]) => {
+    const bar = $('#buffbar');
+    const pills = buffs.map(([id, left]) => {
       const R = RITUAL_BY_ID[id];
-      return `<span class="bf" title="${esc(R.desc)}">${this.riteIcon(R).replace('class="ico', 'class="ico inl')}<b>${esc(R.name)}</b><small>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</small></span>`;
+      return `<span class="bf" title="${esc(R.name)}: ${esc(R.desc)}">${this.riteIcon(R).replace('class="ico', 'class="ico inl')}<b>${esc(R.name)}</b><small>${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</small></span>`;
     }).join('');
+    const free = Math.max(0, BALANCE.maxBuffs - buffs.length);
+    const slots = Array.from({ length: free }, () => `<span class="bf-slot" title="Свободное место для благословения (одновременно — до ${BALANCE.maxBuffs})"></span>`).join('');
+    const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`);
+    if (bhtml !== this.lastBuffs) {
+      this.lastBuffs = bhtml;
+      bar.classList.remove('hidden', 'compact');
+      bar.innerHTML = bhtml;
+      if (bar.scrollWidth > bar.clientWidth + 1) bar.classList.add('compact');   // тесно — только значки и таймеры
+    }
 
     // кнопка «Учиться»: понятными словами, что ждёт в раунде
     const p = Decks.pending(s), newNow = Math.min(p.fresh, Decks.settings(s).newPerRound);
@@ -149,7 +159,7 @@ const UI = {
         if (b.idle) cls.push('idle');
         if (B.special) inner = `<span class="b">${Art.svg(b.type)}</span>`;
         else {
-          cls.push('stage-' + Game.stage(b.level), 'n' + ic.length);
+          cls.push('stage-' + Game.stage(b.level), 'n' + ic.length, 'bt-' + b.type);
           inner = `<span class="bw">${ic[2] ? `<span class="b b3">${Art.svg(ic[2])}</span>` : ''}${ic[1] ? `<span class="b b2">${Art.svg(ic[1])}</span>` : ''}<span class="b b1">${Art.svg(ic[0])}</span></span><span class="lvl">${b.level}</span>`;
         }
         title = B.special ? F.name : `${F.name} · ур. ${b.level} (Shift+клик — улучшить)`;
@@ -321,6 +331,7 @@ const UI = {
         let body;
         if (st.locked) body = `<div class="item-lock">🔒 ${esc(st.reason)}</div>`;
         else if (st.done) body = `<div class="item-done">✓ Построено</div>`;
+        else if (st.stashed) body = `<div class="item-stash">📦 На складе — бонус не действует, пока чудо не стоит в городе. Поставить можно бесплатно.</div>`;
         else {
           // эффект чуда иконками не передать — здесь текст нужен
           body = `<div class="item-effect">${esc(B.desc)}</div>
@@ -328,7 +339,7 @@ const UI = {
             ${this.reasonHtml(st)}`;
         }
         specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div>
-          ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">Строить</button>`}</div>`;
+          ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">${st.stashed ? 'Поставить' : 'Строить'}</button>`}</div>`;
       } else {
         normal += `<div class="item ${st.ok ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}
           ${B.note ? `<div class="item-note">${esc(B.note)}</div>` : ''}
@@ -507,10 +518,13 @@ const UI = {
     let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
       <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
-      h += `<p>${esc(B.desc)}</p><p class="lore">${B.lore}</p>`;
+      h += `<p>${esc(B.desc)}</p><p class="lore">${B.lore}</p>
+        <p class="dim small">Чудо можно убрать на склад и поставить в другое место бесплатно. Пока оно на складе, его бонус не действует.</p>`;
     } else {
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
+      if (b.rest === 'full') h += `<p class="rest">Отдыхает: всё, что здание даёт, уже не помещается в склады — сырьё не тратится.</p>`;
+      if (b.rest === 'part') h += `<p class="rest">Часть того, что здание даёт, уже не помещается в склады — сырья уходит меньше.</p>`;
       const up = Game.upgradeInfo(b);
       if (up) {
         h += `<div class="upgrade ${up.logos ? 'lv-logos' : ''}">`;
@@ -527,7 +541,7 @@ const UI = {
         h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ, остальные — за ресурсы. Облик здания меняется с эпохой, а уровни делают его чуть наряднее.</div>`;
       }
     }
-    h += `<div class="mb-actions">${B.special ? '<span></span>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
+    h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
       <button class="btn ghost small" data-action="close">Закрыть</button></div>`;
     this.showModal(h);
   },
@@ -587,6 +601,9 @@ const UI = {
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
     if (act === 'demolish' && b) { if (Game.demolish(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } }
+    if (act === 'stash' && b) {
+      if (Game.stashWonder(b)) { this.closeModal(); this.renderMap(); this.renderAll(); this.toast(`📦 ${esc(BUILDINGS[b.type].name)} — на складе. Поставить снова: вкладка «Строить» → «Чудеса».`); }
+    }
   },
 };
 

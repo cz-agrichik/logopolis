@@ -161,7 +161,7 @@ const School = {
     return `<h2>Слова</h2>
       <div class="sw-filters">
         <select data-wf="deck">${opt('all', 'Все колоды', f.deck)}${opt('active', 'Только включённые', f.deck)}${s.decks.map(d => opt(d.id, d.name, f.deck)).join('')}</select>
-        <select data-wf="st">${[['all', 'Любой статус'], ['due', 'Пора повторить'], ['learning', 'Учатся'], ['learned', 'Выучены'], ['new', 'Новые'], ['hard', 'Трудные (есть ошибки)']].map(([v, l]) => opt(v, l, f.st)).join('')}</select>
+        <select data-wf="st">${[['all', 'Любой статус'], ['due', 'Пора повторить'], ['learning', 'Учатся'], ['spelling', 'Осталось набрать ✍'], ['learned', 'Выучены'], ['new', 'Новые'], ['hard', 'Трудные (есть ошибки)']].map(([v, l]) => opt(v, l, f.st)).join('')}</select>
         <input type="search" id="swSearch" placeholder="Поиск по слову или переводу" value="${esc(f.q)}">
         <button class="btn small ghost" data-export-words>Экспорт таблицы</button>
       </div>
@@ -178,6 +178,7 @@ const School = {
       const { st, due, p } = Decks.status(s, c, now);
       if (f.st === 'due' && !(st !== 'new' && due)) continue;
       if (f.st === 'hard' && !(p && p.wrong > 0)) continue;
+      if (f.st === 'spelling' && !Decks.needsBuild(s, c)) continue;
       if (['new', 'learning', 'learned'].includes(f.st) && st !== f.st) continue;
       if (q && !stripAccents((c.front + ' ' + c.back + ' ' + c.hint).toLowerCase()).includes(q)) continue;
       out.push(c);
@@ -212,12 +213,14 @@ const School = {
         <label><span>Новых слов за раунд</span>${opt('newPerRound', set.newPerRound, [[0, '0 — только повторение'], [3, '3'], [5, '5'], [8, '8'], [12, '12']])}</label>
         <label><span>Карточек в раунде</span>${opt('roundSize', set.roundSize, [[6, '6'], [8, '8'], [12, '12'], [16, '16']])}</label>
         <div class="dim small">Выученное сейчас повторяется через: ${(APPETITES[set.appetite] || APPETITES.normal).intervals.map(fmtDur).join(' → ')}, дальше — с последним интервалом.
-          Перед «выучено» каждое слово нужно хотя бы раз набрать.</div>
+          Слово выучено после стольких верных ответов, сколько выбрано выше; последний из них — набор слова.
+          «Какая буква?» может попасться на любом шаге и тоже считается. Ошибка в написании не откатывает слово назад —
+          оно просто ещё раз пойдёт на набор.</div>
       </div>
       <h4>Сколько λ даёт задание</h4>
       <p>Награда зависит только от типа задания: чем сложнее, тем больше. Серии верных ответов не поощряются — ошибка ничего не «сжигает».</p>
       <table class="pt"><tr><th>Задание</th><th>λ за верный ответ</th>${bonus ? `<th>с бонусом +${bonus}%</th>` : ''}</tr>`;
-    const order = ['build', 'ru2gr', 'gr2ru', 'match', 'flip'];
+    const order = ['build', 'ru2gr', 'spell', 'gr2ru', 'match', 'flip'];
     for (const k of order) {
       const R = TASK_REWARDS[k];
       h += `<tr><td><b>${esc(R.name)}</b><br><span class="dim small">${esc(R.desc)}</span></td><td><b>${R.lambda}</b>${k === 'match' ? ' за пару' : ''}</td>${bonus ? `<td>${Math.round(R.lambda * mult)}</td>` : ''}</tr>`;

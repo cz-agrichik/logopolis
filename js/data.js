@@ -24,7 +24,7 @@ const BALANCE = {
   bronzeFromLevel: 9,      // с 9-го — бронзу
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
-  maxBuffMinutes: 30,      // благословения продлеваются, но не дольше
+  maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
