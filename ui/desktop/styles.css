@@ -345,9 +345,7 @@ label.btn { display: inline-block; }
 }
 .q:hover { background: var(--accent); color: #fff; }
 .tile.goat { z-index: 2; }
-.tile.goat .goat-ic { font-size: 1.15em; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); position: relative; animation: goatHop .8s ease-in-out infinite; pointer-events: none; }
-.tile.goat::before { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: rgba(255,240,180,.55); }
-@keyframes goatHop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px) rotate(-4deg); } }
+.tile.goat .goat-ic { filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); pointer-events: none; display: flex; }
 .sect { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); margin-top: 8px; }
 .lore { font-style: italic; color: #4c3d2c; line-height: 1.55; }
 .em-actions { display: flex; gap: 10px; justify-content: center; }
@@ -465,7 +463,7 @@ table.pt tr.lv-logos td:first-child::after { content: ' λ'; font-style: italic;
 .tile .deco { opacity: .8; }
 .tile .deco .ico { width: 1.6em; height: 1.6em; }
 .tile.t-hill .deco { opacity: .55; }
-.tile.goat .goat-ic .ico { width: 1.7em; height: 1.7em; }
+.tile.goat .goat-ic .ico { width: 1.6em; height: 1.6em; }
 table.pt td .ico.inl { width: 28px; height: 28px; vertical-align: middle; }
 table.pt.levels td:nth-child(2) { white-space: nowrap; }
 .newlook .ico.inl { width: 24px; height: 24px; }
@@ -635,3 +633,90 @@ table.days tr.dim td { color: var(--ink-2); opacity: .7; }
 .tile.stage-0:not(.bt-field) .bw .b1 .ico { transform: scale(.82); transform-origin: 50% 60%; }
 .tile.stage-1:not(.bt-field) .bw .b1 .ico, .tile.stage-2:not(.bt-field) .bw .b1 .ico { transform: scale(1.05); transform-origin: 50% 60%; }
 #map { width: min(100%, calc((100vh - 212px) * 18 / 11)); }
+
+/* клетка карты всегда квадратная: содержимое (коза, группы построек) не может её растянуть и сдвинуть карту */
+.tile { contain: size; }
+
+/* ---------- v11: телефон в альбомной ориентации ----------
+   Раскладка та же, что на компьютере (карта слева, панель справа), только плотнее.
+   В портретной ориентации на телефоне — просьба повернуть экран. */
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 700px) {
+  .rotate-hint { display: flex; position: fixed; inset: 0; z-index: 5000; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center; background: var(--head-bg); color: #fbf3e2; font-size: 17px; }
+  .rotate-hint .rh-ic { font-size: 56px; animation: rhTurn 2.4s ease-in-out infinite; }
+  .rotate-hint small { opacity: .8; font-size: 13px; }
+  body > *:not(.rotate-hint) { display: none !important; }   /* в портрете играть нельзя — и ничего не растягивает экран */
+  @keyframes rhTurn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  body { font-size: 13px; }
+  /* шапка */
+  #topbar { gap: 6px; padding: 4px 8px; flex-wrap: nowrap; }
+  #topbar::after { bottom: -5px; height: 5px; background-size: 10px 5px; }
+  .brand .logo, .brand .epoch-sub { display: none; }
+  .brand .epoch-name { font-size: 12px; line-height: 1.1; max-width: 64px; }
+  .logos-medal { padding: 2px 8px 2px 3px; gap: 4px; }
+  .lm-sign { width: 24px; height: 24px; font-size: 15px; }
+  .lm-v b { font-size: 15px; }
+  .lm-v small { display: none; }
+  .resbar { padding: 2px; border-radius: 9px; }
+  .rs { padding: 2px 4px 5px; gap: 3px; max-width: 74px; }
+  .rs-ic, .rs-ic .ico { width: 18px; height: 18px; }
+  .rs-v b { font-size: 12px; }
+  .rs-v small { display: none; }
+  .rs-bar { left: 4px; right: 4px; bottom: 1px; height: 2px; }
+  .popbox { font-size: 11px; }
+  .popbox b { font-size: 12px; }
+  .popbox small { font-size: 9.5px; }
+  .pedia-btn { width: 30px; height: 30px; font-size: 15px; flex: none; }
+  .study-btn { padding: 3px 10px; flex: none; }
+  .study-btn .sb-main { font-size: 13px; }
+  .study-btn .sb-sub { font-size: 9px; }
+  /* карта и панель рядом */
+  main { flex-direction: row; gap: 8px; padding: 8px 8px 6px; }
+  #map { width: min(100%, calc((100vh - 86px) * 18 / 11)); border-radius: 10px; }
+  .tile .lvl { font-size: 8px; padding: 0 2px; }
+  .buffbar { height: 24px; min-height: 24px; margin-bottom: 4px; gap: 4px; }
+  .buffbar .bf b { display: none; }
+  .bf { padding: 1px 6px 1px 2px; font-size: 11px; }
+  .bf .ico.inl { width: 18px; height: 18px; }
+  .bf-slot { width: 18px; height: 18px; }
+  .bf-empty { display: none; }
+  #log { display: none; }
+  .place-hint { font-size: 11px; padding: 4px 8px; }
+  #side { width: min(320px, 42vw); min-height: 0; }
+  .tabs { padding: 4px 4px 0; gap: 2px; }
+  .tabs button { font-size: 11.5px; padding: 6px 2px; }
+  #panel { padding: 6px; margin: 0 4px 4px; }
+  #panel h3 { margin: 10px 2px 6px; font-size: 12px; }
+  .item { padding: 6px; gap: 6px; }
+  .item-ic { width: 34px; height: 34px; }
+  .item-ic .ico { width: 34px; height: 34px; }
+  .item-title { font-size: 13px; }
+  .chip { font-size: 11px; }
+  .btn.small { padding: 4px 8px; font-size: 12px; }
+  /* окна и раунд — на весь экран */
+  .modal { padding: 6px; }
+  .modal-box { max-height: calc(100vh - 12px); padding: 12px 14px; }
+  .study { padding: 4px; }
+  .st-box { min-height: 0; max-height: calc(100vh - 8px); overflow-y: auto; padding: 8px 14px 12px; border-radius: 12px; }
+  .st-body { gap: 8px; }
+  .q-word { font-size: 26px; }
+  .flash { padding: 10px 22px; }
+  .flash-back { font-size: 18px; }
+  .options { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .opt { padding: 7px 10px; }
+  .slot { width: 32px; height: 38px; font-size: 21px; }
+  .slots.syl .slot { min-width: 42px; font-size: 18px; }
+  .tile-l { width: 36px; height: 38px; font-size: 19px; }
+  .tiles.syl .tile-l { width: auto; min-width: 46px; padding: 0 8px; font-size: 17px; }
+  .pedia, .school { padding: 0; }
+  .pedia-box { width: 100%; height: 100%; border-radius: 0; }
+  .pedia-top { padding: 4px 10px 4px 14px; }
+  .pedia-title { font-size: 15px; }
+  .pedia-main { flex-direction: row; }
+  .pedia-nav { width: 170px; max-height: none; }
+  .pn-item { font-size: 12px; padding: 4px 6px; }
+  .pedia-body { padding: 10px 14px 20px; font-size: 13.5px; }
+}

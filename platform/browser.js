@@ -42,4 +42,11 @@ const BrowserIO = {
   /** Пометки на время сеанса (например, «уже предупредили про телефон»). */
   sessionGet(key) { try { return sessionStorage.getItem(key); } catch (e) { return null; } },
   sessionSet(key, v) { try { sessionStorage.setItem(key, v); } catch (e) {} },
+  /** Телефон: попробовать во весь экран и в альбомную ориентацию (работает не везде — только по нажатию). */
+  preferLandscape() {
+    try {
+      const el = document.documentElement, lock = () => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {});
+      if (el.requestFullscreen) el.requestFullscreen().then(lock).catch(lock); else lock();
+    } catch (e) { /* не поддерживается — остаётся подсказка «поверните телефон» */ }
+  },
 };
