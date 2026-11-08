@@ -7,6 +7,11 @@
 const pl = (id, text) => `<a href="#" data-pedia="${id}">${text}</a>`;
 const ri = k => Art.res(k, 'inl');
 const bi = k => Art.svg(k, 'inl');
+/** Облик здания по эпохам для таблиц уровней: у старых зданий — два столбца (медный и бронзовый век). */
+const lookEps = type => BUILDINGS[type].epoch === 0 ? [0, 1] : [BUILDINGS[type].epoch];
+const lookHead = type => lookEps(type).length > 1
+  ? lookEps(type).map(e => `<th>Облик<br><small>${Cat.epochs[e].name.toLowerCase()}</small></th>`).join('') : '<th>Облик</th>';
+const lookCells = (type, L) => lookEps(type).map(e => `<td class="look">${L > Cat.epochs[e].maxLevel ? '<span class="dim">—</span>' : Looks.icons(type, L, e).map(bi).join('')}</td>`).join('');
 
 // Ссылки на фотографии реальных находок и мест (поиск по Wikimedia Commons — свободные лицензии)
 const PHOTOS = {
@@ -301,10 +306,10 @@ const PEDIA_ARTICLES = [
 
   { id: 'upgrade', icon: '⬆️', title: 'Улучшение зданий', html: () => {
     const ex = 'field';
-    let rows = `<tr><td>1</td><td>${Looks.icons(ex, 1).map(bi).join('')}</td><td>${num(Cat.bld[ex].prod.food)}/с <span class="dim">(×1)</span></td><td>${Object.entries(Cat.bld[ex].cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
+    let rows = `<tr><td>1</td>${lookCells(ex, 1)}<td>${num(Cat.bld[ex].prod.food)}/с <span class="dim">(×1)</span></td><td>${Object.entries(Cat.bld[ex].cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
     for (let L = 2; L <= 10; L++) {
       const { cost, logos } = Game.upgradeCost(ex, L);
-      rows += `<tr class="${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Looks.icons(ex, L).map(bi).join('')}</td><td>${num(Cat.bld[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))})</span></td>
+      rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>${lookCells(ex, L)}<td>${num(Cat.bld[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))})</span></td>
         <td>${logos ? `<b>λ ${logos}</b>` : Object.entries(cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`;
     }
     return `
@@ -319,7 +324,7 @@ const PEDIA_ARTICLES = [
     <h4>Облик</h4>
     <ul>
       <li>По-настоящему облик меняется с <b>эпохой</b>: в бронзовом веке хижины становятся домами из сырцового кирпича, корзины — каменными кладовыми, загоны — фермами.</li>
-      <li>Внутри эпохи с 4-го уровня здание чуть наряднее, а на 8-м и 10-м рядом вырастают ещё постройки. Номер уровня — в уголке клетки.</li>
+      <li>Внутри эпохи облик меняется на <b>каждом уровне мудрости</b>: на 4-м здание наряднее, на 6-м рядом появляется вторая постройка, на 8-м — третья, на 10-м все постройки становятся нарядными. Номер уровня — в уголке клетки.</li>
     </ul>
     <h4>Формулы</h4>
     <p class="formula">Выпуск = база × ${BALANCE.upProdGrowth}<sup>уровень−1</sup> × (1 + сумма бонусов) × благословения</p>
@@ -335,7 +340,7 @@ const PEDIA_ARTICLES = [
     </ul>
     <p>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза.</p>
     <h4>Пример: поле</h4>
-    <table class="pt levels"><tr><th>Ур.</th><th>Облик</th><th>Зерно</th><th>Цена</th></tr>${rows}</table>
+    <table class="pt levels"><tr><th>Ур.</th>${lookHead(ex)}<th>Зерно</th><th>Цена</th></tr>${rows}</table>
     <p class="dim">Без бонусов. С Зернохранилищами (+25%) и Святилищем (+20%) поле 6-го уровня даёт ${num(Cat.bld[ex].prod.food * Game.levelMult(6))} × 1.45 = ${num(Cat.bld[ex].prod.food * Game.levelMult(6) * 1.45)}/с.</p>`;
   } },
 
@@ -544,10 +549,10 @@ const PediaBook = {
     else if (B.storage) main = { label: bi('store0') + ' Склад', f: L => '+' + Math.round(B.storage * Game.levelMult(L)) };
     else if (B.logosBonus) main = { label: 'λ Бонус', f: L => '+' + Math.round((B.logosBonus + B.logosBonusPerLevel * (L - 1)) * 100) + '%' };
     const maxL = Cat.epochs[1].maxLevel;
-    let rows = `<tr><td>1</td><td>${Looks.icons(type, 1).map(bi).join('')}</td><td>${main.f(1)}</td><td>${B.workers || 0}</td><td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
+    let rows = `<tr><td>1</td>${lookCells(type, 1)}<td>${main.f(1)}</td><td>${B.workers || 0}</td><td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
     for (let L = 2; L <= maxL; L++) {
       const { cost, logos } = Game.upgradeCost(type, L);
-      rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${Looks.icons(type, L).map(bi).join('')}</td><td>${main.f(L)}</td><td>${B.workers ? B.workers + Math.floor((L - 1) / 2) : 0}</td><td>${this.costText(cost, logos)}</td></tr>`;
+      rows += `<tr class="${B.epoch === 0 && L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>${lookCells(type, L)}<td>${main.f(L)}</td><td>${B.workers ? B.workers + Math.floor((L - 1) / 2) : 0}</td><td>${this.costText(cost, logos)}</td></tr>`;
     }
     const prod = B.prod ? Object.entries(B.prod).map(([k, v]) => `${ri(k)} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после ${pl('t:' + B.prodTech[k], '«' + Cat.tech[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
     return this.head(icon, B.name, 'Здание · с эпохи «' + Cat.epochs[B.epoch].name + '»') + `
@@ -558,7 +563,7 @@ const PediaBook = {
         ${B.max ? `<tr><td>Ограничение</td><td>не больше ${B.max}</td></tr>` : ''}
         <tr><td>Облик по эпохам</td><td><ul class="flat">${forms}</ul></td></tr></table>${req}
       <h4>Уровни</h4>
-      <table class="pt levels"><tr><th>Ур.</th><th>Облик</th><th>${main.label}</th><th>Работники</th><th>Цена</th></tr>${rows}</table>
+      <table class="pt levels"><tr><th>Ур.</th>${lookHead(type)}<th>${main.label}</th><th>Работники</th><th>Цена</th></tr>${rows}</table>
       <p class="dim">Уровни выше ${Cat.epochs[0].maxLevel}-го доступны с бронзового века. Выпуск без бонусов. ${pl('a:upgrade', 'Как устроены улучшения')}.</p>
       <h4>История</h4><p class="lore">${B.lore}</p>`;
   },

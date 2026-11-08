@@ -10,12 +10,17 @@ const UI = {
   dev: /[?&]dev\b/.test(location.search),
 
   init() {
-    document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
-      this.tab = b.dataset.tab;
-      document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
-      this.lastPanel = null;
-      this.renderPanel();
+    document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => this.setTab(b.dataset.tab)));
+    // телефон: та же вкладка ещё раз — убрать панель, другая — переключить и показать
+    document.querySelectorAll('#rail button').forEach(b => b.addEventListener('click', () => {
+      const same = this.tab === b.dataset.tab && this.drawerOpen();
+      this.setTab(b.dataset.tab);
+      this.drawer(!same);
     }));
+    $('#mapWrap').addEventListener('click', e => { if (this.compact() && this.drawerOpen() && !e.target.closest('#map')) this.drawer(false); });
+    $('#placeHint').addEventListener('click', e => { if (e.target.closest('[data-cancel-place]')) this.cancelPlacing(); });
+    const measure = () => document.documentElement.style.setProperty('--top-h', $('#topbar').offsetHeight + 'px');
+    measure(); window.addEventListener('resize', measure);
     $('#map').addEventListener('click', e => this.onMapClick(e));
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
     $('#studyBtn').addEventListener('click', () => Study.start());
@@ -54,6 +59,17 @@ const UI = {
     this.renderMap();
     this.renderAll();
   },
+
+  setTab(tab) {
+    this.tab = tab;
+    document.querySelectorAll('.tabs button, #rail button').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+    this.lastPanel = null;
+    this.renderPanel();
+  },
+  /** Телефон в альбомной ориентации: карта на весь экран, панель — выдвижная. */
+  compact() { return matchMedia('(orientation: landscape) and (max-height: 520px)').matches; },
+  drawerOpen() { return document.body.classList.contains('drawer-open'); },
+  drawer(open) { document.body.classList.toggle('drawer-open', !!open); },
 
   renderAll() {
     this.renderTop();
@@ -158,6 +174,7 @@ const UI = {
   onMapClick(e) {
     const el = e.target.closest('.tile');
     if (!el) return;
+    if (this.compact() && this.drawerOpen()) return this.drawer(false);
     const tile = Game.tile(+el.dataset.x, +el.dataset.y);
     if (Game.goat && Game.goat.x === tile.x && Game.goat.y === tile.y) {
       const g = Game.catchGoat();
@@ -211,8 +228,10 @@ const UI = {
     this.placingMode = mode;
     const B = Cat.bld[type];
     const where = B.terrain.map(t => Cat.terrain[t].name.toLowerCase()).join(' или ') + (B.coast ? ' у моря' : '');
-    $('#placeHint').innerHTML = `Куда поставить «${esc(Cat.form(type).name)}»? Подходит: ${where}. <b>Esc</b> или правый клик — отмена, <b>Shift</b> — строить ещё.`;
+    $('#placeHint').innerHTML = `<span>Куда поставить «${esc(Cat.form(type).name)}»? Подходит: ${where}.<span class="desk-only"> <b>Esc</b> или правый клик — отмена, <b>Shift</b> — строить ещё.</span></span>
+      <button class="btn small mob-only" data-cancel-place>Отмена</button>`;
     $('#placeHint').classList.remove('hidden');
+    if (this.compact()) this.drawer(false);   // на телефоне панель уезжает — видна вся карта
     document.body.classList.add('placing');
     this.renderMap();
   },
@@ -519,7 +538,7 @@ const UI = {
             ${up.reason ? `<div class="item-lock">${esc(Msg.reason(up.reason))}</div>` : ''}
             <button class="btn ${up.logos ? 'gold' : ''}" data-action="upgrade" ${up.ok ? '' : 'disabled'}>Улучшить <kbd>U</kbd></button>`;
         }
-        h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ, остальные — за ресурсы. Облик здания меняется с эпохой, а уровни делают его чуть наряднее.</div>`;
+        h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ, остальные — за ресурсы. Облик здания меняется с эпохой и на каждом λ-уровне.</div>`;
       }
     }
     h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
