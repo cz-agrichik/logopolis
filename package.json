@@ -1,0 +1,13 @@
+{
+  "name": "logos-cyprus",
+  "private": true,
+  "description": "Λόγος · Кипр сквозь эпохи — игра открывается прямо из index.html; npm нужен только для тестов",
+  "scripts": {
+    "test": "node --test tests/core.test.js tests/boundary.test.js",
+    "golden": "node tests/golden.js golden-out",
+    "compare": "python3 tests/compare.py golden-base golden-out"
+  },
+  "devDependencies": {
+    "playwright": "^1.45.0"
+  }
+}

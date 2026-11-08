@@ -109,8 +109,8 @@ const UI = {
     // жители и работники — отдельным блоком
     const short = Game.eff < 0.999, hands = Math.floor(s.pop * (1 + ((Game.fx || {}).workers || 0)));
     $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap} мест</small></div>
-      <div class="${short ? 'short' : ''}" title="${short ? `Не хватает работников! Зданиям нужно ${Game.need}, а рук ${hands}: всё производство идёт на ${Math.round(Game.eff * 100)}%. Нужны жилища и зерно — или «Всей семьёй».` : `Зданиям нужно ${Game.need} работников — рук хватает (${hands}).`}"><span>${short ? '⚠' : '⚒'}</span>${short
-        ? `<b>${hands} / ${Game.need}</b><small>мало рук · ${Math.round(Game.eff * 100)}%</small>`
+      <div class="${short ? 'short' : ''}" title="${short ? `Не хватает работников! Зданиям нужно ${Game.need}, а рук ${hands}. Сначала руки идут на поля и загоны: зерно — ${Math.round(Game.effFood * 100)}%. Остальные здания работают на ${Math.round(Game.effOther * 100)}%. Нужны жилища и зерно — или «Всей семьёй».` : `Зданиям нужно ${Game.need} работников — рук хватает (${hands}).`}"><span>${short ? '⚠' : '⚒'}</span>${short
+        ? `<b>${hands} / ${Game.need}</b><small>мало рук · ${Game.effFood < 0.999 ? `даже зерно ${Math.round(Game.effFood * 100)}%` : `прочее ${Math.round(Game.effOther * 100)}%`}</small>`
         : `<b>${Game.need}</b><small>${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`;
 
     // благословения — полоса над картой: место под неё есть всегда, и она никогда не переносится на вторую строку

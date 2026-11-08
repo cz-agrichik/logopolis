@@ -248,6 +248,8 @@ const Game = {
     for (const b of this.state.buildings) cap += this.houseCapOf(b, fx);
     return cap;
   },
+  /** Зерно в приоритете: поля и загоны получают руки первыми. */
+  foodFirst(b) { const P = BUILDINGS[b.type].prod || {}; return P.food > 0 && !Object.values(P).some(v => v < 0); },
   workersNeeded() {
     let n = 0;
     for (const b of this.state.buildings) n += this.workersOf(b);
@@ -477,9 +479,14 @@ const Game = {
     const s = this.state;
     const fx = this.fx = this.effects();
     const cap = this.popCap(fx);
-    const need = this.workersNeeded();
     const hands = s.pop * (1 + (fx.workers || 0));   // «Всей семьёй» удваивает рабочие руки
+    // рук не хватает — сначала поля и загоны (зерно), остальные здания делят то, что осталось
+    let needFood = 0, needOther = 0;
+    for (const b of s.buildings) { const w = this.workersOf(b); if (this.foodFirst(b)) needFood += w; else needOther += w; }
+    const need = needFood + needOther;
     const eff = need > 0 ? Math.min(1, hands / need) : 1;
+    const effFood = needFood > 0 ? Math.min(1, hands / needFood) : 1;
+    const effOther = needOther > 0 ? Math.min(1, Math.max(0, hands - needFood) / needOther) : 1;
     const storage = this.storageCap(fx);
     const rates = {};
     for (const k of RES_KEYS) rates[k] = 0;
@@ -493,11 +500,12 @@ const Game = {
       if (ins.length && outs.length) share = outs.filter(k => s.res[k] < storage - 0.01).length / outs.length;
       b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
       if (share === 0) { b.idle = false; continue; }
+      const e = this.foodFirst(b) ? effFood : effOther;
       let ok = true;
-      for (const k of ins) if (s.res[k] < -p[k] * share * eff * dt) ok = false;
+      for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
       b.idle = !ok;
       if (!ok) continue;
-      for (const [k, v] of Object.entries(p)) rates[k] += v * eff * (v < 0 ? share : 1);
+      for (const [k, v] of Object.entries(p)) rates[k] += v * e * (v < 0 ? share : 1);
     }
     rates.food -= s.pop * BALANCE.foodPerPop;
 
@@ -518,7 +526,8 @@ const Game = {
     for (const id of Object.keys(s.buffs)) { s.buffs[id] -= dt; if (s.buffs[id] <= 0) delete s.buffs[id]; }
     for (const id of Object.keys(s.cooldowns || {})) { s.cooldowns[id] -= dt; if (s.cooldowns[id] <= 0) delete s.cooldowns[id]; }
 
-    this.rates = rates; this.eff = eff; this.cap = cap; this.need = need; this.storage = storage;
+    this.rates = rates; this.eff = eff; this.effFood = effFood; this.effOther = effOther;
+    this.cap = cap; this.need = need; this.storage = storage;
   },
 
   // ---------- обряды ----------
