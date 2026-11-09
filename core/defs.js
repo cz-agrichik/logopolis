@@ -93,7 +93,7 @@ const BUILDINGS = {
   workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}] },
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}] },
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.16, food: 0.32 }, lp: 14, forms: [null, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, lp: 14, forms: [null, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
   scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}] },
 
@@ -127,17 +127,19 @@ const TECHS = [
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
-// Обряды: instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
+// Обряды. «Сбор припасов» — быстро и на всё, поэтому дороже; благословения — дольше (10–30 минут), но на свои ресурсы.
+// Цены сверены по ценнику труда (README, «Ценник ресурсов»): благословение даёт на 1 λ примерно в 1.2–1.6 раза больше «Сбора».
+// instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
 const RITUALS = [
-  { id: 'elders', epoch: 0, logos: 5, instant: 'elders', cooldown: 120 },
-  { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 900 },
-  { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 300 },
-  { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 300 },
-  { id: 'herds', epoch: 0, logos: 10, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 300, goat: true, cooldown: 60 },
-  { id: 'festival', epoch: 0, logos: 40, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 600 },
+  { id: 'elders', epoch: 0, logos: 8, instant: 'elders', cooldown: 120 },
+  { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800 },
+  { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 600 },
+  { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
+  { id: 'herds', epoch: 0, logos: 5, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 600, goat: true, cooldown: 60 },
+  { id: 'festival', epoch: 0, logos: 40, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900 },
-  { id: 'bullmask', epoch: 1, logos: 30, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 300 },
-  { id: 'ingot', epoch: 1, logos: 40, cost: { copper: 150 }, req: 'sp_ingot', buff: { bmult: { port: 1, foundry: 1 } }, dur: 600 },
-  { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 1 }, dur: 900 },
+  { id: 'bullmask', epoch: 1, logos: 15, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 600 },
+  { id: 'ingot', epoch: 1, logos: 25, cost: { copper: 150 }, req: 'sp_ingot', buff: { bmult: { port: 1, foundry: 1 } }, dur: 1200 },
+  { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.5 }, dur: 900 },
 ];
 const RITUAL_BY_ID = Object.fromEntries(RITUALS.map(r => [r.id, r]));

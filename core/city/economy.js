@@ -140,8 +140,9 @@ Object.assign(Game, {
   /**
    * Выпуск в секунду при данных бонусах и руках. mark — отметить здания (простой, отдых): это делает только такт.
    * Рук не хватает — сначала поля и загоны (зерно), остальные здания делят то, что осталось.
+   * log — массив, куда записать вклад каждого здания (для справки «Доход по ресурсам»).
    */
-  production(fx, hands, dt = 1, mark = false) {
+  production(fx, hands, dt = 1, mark = false, log = null) {
     const s = this.state;
     let needFood = 0, needOther = 0;
     for (const b of s.buildings) { const w = this.workersOf(b); if (this.foodFirst(b)) needFood += w; else needOther += w; }
@@ -161,16 +162,75 @@ Object.assign(Game, {
       let share = 1;
       if (ins.length && outs.length) share = outs.filter(k => s.res[k] < storage - 0.01).length / outs.length;
       if (mark) b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
-      if (share === 0) { if (mark) b.idle = false; continue; }
+      if (share === 0) { if (mark) b.idle = false; if (log) log.push({ b, skip: 'full' }); continue; }
       const e = this.foodFirst(b) ? effFood : effOther;
       let ok = true;
       for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
       if (mark) b.idle = !ok;
-      if (!ok) continue;
-      for (const [k, v] of Object.entries(p)) rates[k] += v * e * (v < 0 ? share : 1);
+      if (!ok) { if (log) log.push({ b, skip: 'idle' }); continue; }
+      for (const [k, v] of Object.entries(p)) {
+        const x = v * e * (v < 0 ? share : 1);
+        rates[k] += x;
+        if (log) log.push({ b, k, v: x, e, share: v < 0 ? share : 1 });
+      }
     }
     rates.food -= s.pop * BALANCE.foodPerPop;
     return { rates, need, eff, effFood, effOther, storage };
+  },
+  /** Источники бонусов — то же, что складывает effects(): [{ kind: 'tech'|'wonder'|'rite', id, effect, left }]. */
+  bonusSources() {
+    const s = this.state, out = [];
+    for (const id of s.techs) { const e = TECH_BY_ID[id] && TECH_BY_ID[id].effect; if (e) out.push({ kind: 'tech', id, effect: e }); }
+    for (const b of s.buildings) { const B = BUILDINGS[b.type]; if (B.special && B.effect && !this.retired(b.type)) out.push({ kind: 'wonder', id: b.type, effect: B.effect }); }
+    for (const [id, left] of Object.entries(s.buffs || {})) if (left > 0 && RITUAL_BY_ID[id] && RITUAL_BY_ID[id].buff) out.push({ kind: 'rite', id, effect: RITUAL_BY_ID[id].buff, left });
+    return out;
+  },
+  /** Из чего складывается множитель здания type по ресурсу k: { perm: [{kind,id,v}], buff: [{kind,id,v}] }. */
+  bonusParts(type, k) {
+    const out = { perm: [], buff: [] };
+    for (const src of this.bonusSources()) {
+      const e = src.effect, v = (e.all || 0) + ((e.mult || {})[k] || 0) + ((e.bmult || {})[type] || 0);
+      if (v) out[src.kind === 'rite' ? 'buff' : 'perm'].push({ kind: src.kind, id: src.id, v, left: src.left });
+    }
+    return out;
+  },
+  /**
+   * Разбор дохода для справки: строки по (ресурс, тип здания, уровень) и расход на жителей. Ничего не меняет;
+   * сумма строк по ресурсу равна доходу в секунду (тот же расчёт, что в такте).
+   */
+  incomeBreakdown() {
+    const s = this.state, fx = this.effects();
+    const hands = s.pop * (1 + (fx.workers || 0)), log = [];
+    const P = this.production(fx, hands, 0.001, false, log);
+    const res = {};
+    for (const k of RES_KEYS) res[k] = { total: P.rates[k], rows: [], skipped: [] };
+    const rows = {};
+    for (const x of log) {
+      const t = x.b.type, L = x.b.level;
+      if (x.skip) {
+        for (const k of Object.keys(BUILDINGS[t].prod || {})) {
+          const key = k + '|' + t + '|' + L + '|' + x.skip;
+          (rows[key] = rows[key] || { k, type: t, level: L, skip: x.skip, n: 0 }).n++;
+        }
+        continue;
+      }
+      const key = x.k + '|' + t + '|' + L + '|' + x.e + '|' + x.share;
+      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base: BUILDINGS[t].prod[x.k], lm: this.levelMult(L), eff: x.e, share: x.share };
+      r.n++; r.total += x.v;
+    }
+    for (const r of Object.values(rows)) {
+      if (r.skip) { res[r.k].skipped.push(r); continue; }
+      if (r.base > 0) {
+        r.perm = 1 + fx.bonus[r.k] + (fx.bbonus[r.type] || 0);
+        r.buff = 1 + fx.buff[r.k] + (fx.bbuff[r.type] || 0);
+      }
+      res[r.k].rows.push(r);
+    }
+    for (const k of RES_KEYS) res[k].rows.sort((a, b) => b.total - a.total);
+    res.food.eaten = { pop: s.pop, per: BALANCE.foodPerPop, total: -s.pop * BALANCE.foodPerPop };
+    const plain = this.plainRates();
+    return { res, hands: Math.floor(hands), need: P.need, effFood: P.effFood, effOther: P.effOther, storage: P.storage,
+      supplies: Object.fromEntries(RES_KEYS.map(k => [k, Math.max(0, plain[k] || 0) * BALANCE.suppliesSec])) };
   },
   /** Выпуск без благословений (и без «Всей семьёй») — для «Сбора припасов». */
   plainRates() { return this.production(this.effects(false), this.state.pop, 0.001).rates; },
