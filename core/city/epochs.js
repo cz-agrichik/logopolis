@@ -5,6 +5,12 @@
 
 Object.assign(Game, {
   // ---------- переход эпох ----------
+  /** Какие чудеса станут обычными зданиями при переходе в следующую эпоху: [[чудо, здание, уровень, на складе?]]. */
+  retiringNext() {
+    const next = this.state.epoch + 1;
+    return Object.entries(BUILDINGS).filter(([t, B]) => B.retire && B.retire.epoch === next && this.owned(t))
+      .map(([t, B]) => [t, B.retire.into, B.retire.level, this.stashed(t)]);
+  },
   epochReqs() {
     const s = this.state, a = EPOCHS[s.epoch].advance;
     if (!a) return null;
@@ -28,6 +34,8 @@ Object.assign(Game, {
     this.pay(a.res, a.logos);
     this.state.epoch++;
     this.log('epoch', { epoch: this.state.epoch });
+    // чудеса прошлой эпохи становятся обычными зданиями 5-го уровня
+    for (const [from, into, level] of this.retireWonders()) this.log('retired', { from, into, level, epoch: this.state.epoch });
     if (EPOCHS[this.state.epoch].locked) this.state.finished = true;
     this.save();
     return true;

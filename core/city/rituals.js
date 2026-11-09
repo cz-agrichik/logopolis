@@ -27,9 +27,10 @@ Object.assign(Game, {
     // результат: { gains: [[ресурс, сколько]] } | { pop } | { minutes } — как показать, решает интерфейс
     let result = {};
     if (R.instant === 'elders') {
-      const gains = [];
+      // выпуск без благословений: «Сбор припасов» не умножает их — он сам по себе
+      const gains = [], plain = this.plainRates();
       for (const k of RES_KEYS) {
-        let g = Math.max(0, (this.rates[k] || 0) * 120);
+        let g = Math.max(0, (plain[k] || 0) * BALANCE.suppliesSec);
         if (['food', 'wood', 'stone'].includes(k)) g = Math.max(g, 30 * (1 + s.epoch));
         g = Math.floor(Math.min(g, cap - s.res[k]));
         if (g > 0) { s.res[k] += g; gains.push([k, g]); }

@@ -20,6 +20,56 @@ test('город: поля дают зерно, жители растут', () =
   assert.notEqual(G.state.res.food, food0);
 });
 
+test('обряды: благословения на один ресурс складываются (×2 и ×2 = ×3)', () => {
+  const G = fresh().get('Game');
+  const field = G.state.buildings.find(b => b.type === 'field') || (G.state.buildings.push({ id: 900, type: 'field', level: 1, x: 0, y: 0 }), G.state.buildings.at(-1));
+  const base = G.prodOf(field, G.effects()).food;
+  G.state.buffs = { harvest: 300, festival: 600 };
+  assert.ok(Math.abs(G.prodOf(field, G.effects()).food - base * 3) < 1e-9);
+});
+
+test('обряды: «Сбор припасов» — 3 минуты выпуска без благословений, раз в 2 минуты', () => {
+  const G = fresh().get('Game');
+  const s = G.state;
+  s.buildings.push({ id: 901, type: 'lumber', level: 3, x: 0, y: 0 });
+  s.pop = 20; s.logos = 100; s.res.wood = 0;
+  s.buffs = { hearth: 300 }; G.tick(0.001);
+  const plain = G.plainRates().wood;
+  assert.ok(G.rates.wood > plain * 1.9, 'благословение действует на обычный выпуск');
+  const r = G.perform('elders');
+  const got = (r.gains.find(([k]) => k === 'wood') || [])[1];
+  assert.equal(got, Math.floor(Math.max(30, plain * 180)));
+  assert.equal(s.cooldowns.elders, 120);
+});
+
+test('эпохи: Лемба и Мастера Суской в бронзовом веке становятся домом и мастерской 5-го уровня', () => {
+  const G = fresh().get('Game');
+  const s = G.state;
+  s.buildings.push({ id: 700, type: 'sp_lemba', level: 1, x: 3, y: 3 }, { id: 701, type: 'sp_souskiou', level: 1, x: 4, y: 3 }, { id: 702, type: 'shrine1', level: 1, x: 5, y: 3 });
+  const houseCost = G.buildCost('house').wood;
+  assert.deepEqual(JSON.parse(JSON.stringify(G.retiringNext().map(r => r.slice(0, 3)))), [['sp_lemba', 'house', 5], ['sp_souskiou', 'workshop', 5]]);
+  s.epoch = 1;
+  const out = G.retireWonders();
+  assert.equal(out.length, 2);
+  const lemba = s.buildings.find(b => b.id === 700), sous = s.buildings.find(b => b.id === 701);
+  assert.equal(lemba.type, 'house'); assert.equal(lemba.level, 5); assert.equal(lemba.from, 'sp_lemba');
+  assert.equal(sous.type, 'workshop'); assert.equal(sous.level, 5);
+  assert.ok(s.buildings.some(b => b.type === 'shrine1'), 'святилище богини не устаревает');
+  assert.equal(G.buildCost('house').wood, houseCost, 'подарок не дорожит следующий дом');
+  assert.ok(G.buildStatus('sp_lemba').hidden, 'устаревшее чудо больше не строится');
+});
+
+test('эпохи: чудо эпохи со склада в новой эпохе ставится обычным зданием', () => {
+  const G = fresh().get('Game');
+  const s = G.state;
+  s.stash = ['sp_lemba']; s.epoch = 1;
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_lemba', t));
+  assert.ok(G.build('sp_lemba', t.x, t.y));
+  const b = G.buildingAt(t.x, t.y);
+  assert.equal(b.type, 'house'); assert.equal(b.level, 5);
+  assert.equal(s.stash.length, 0);
+});
+
 test('город: каждая следующая постройка дороже в 1.25 раза', () => {
   const G = fresh().get('Game');
   const c1 = G.buildCost('field').wood;
@@ -30,10 +80,17 @@ test('город: каждая следующая постройка дорож�
   assert.equal(c1, 25);
 });
 
-test('город: уровни 4, 6, 8, 10 — только за λ', () => {
+test('город: уровни мудрости 3, 5, 7, 9 — только за λ; 3-й и 7-й символические', () => {
   const G = fresh().get('Game');
-  for (const L of [4, 6, 8, 10]) { const u = G.upgradeCost('field', L); assert.equal(JSON.stringify(u.cost), '{}'); assert.ok(u.logos > 0); }
-  for (const L of [2, 3, 5]) assert.equal(G.upgradeCost('field', L).logos, 0);
+  for (const L of [3, 5, 7, 9]) { const u = G.upgradeCost('field', L); assert.equal(JSON.stringify(u.cost), '{}'); assert.ok(u.logos > 0); }
+  for (const L of [2, 4, 6, 8, 10]) assert.equal(G.upgradeCost('field', L).logos, 0);
+  assert.equal(G.upgradeCost('field', 3).logos, G.upgradeCost('mine', 3).logos);
+  assert.ok(G.upgradeCost('field', 9).logos > G.upgradeCost('field', 5).logos);
+  assert.ok(G.upgradeCost('field', 6).cost.copper > 0 && !G.upgradeCost('field', 5).cost.copper);
+  assert.ok(G.upgradeCost('field', 8).cost.bronze > 0 && !G.upgradeCost('field', 6).cost.bronze);
+  // выпуск: ×1.15 за уровень труда, ×1.25 / ×1.4 за уровни мудрости
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  assert.ok(near(G.levelMult(2), 1.15) && near(G.levelMult(3), 1.15 * 1.25) && near(G.levelMult(5), 1.15 * 1.25 * 1.15 * 1.4));
 });
 
 test('город: при нехватке рук сначала работает зерно', () => {

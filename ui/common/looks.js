@@ -11,8 +11,8 @@ const Looks = {
     workshop: 'workshop', storehouse: 'store', mine: 'mine', port: 'port', foundry: 'foundry', scribe: 'scribe',
   },
 
-  /** Стадия облика: меняется на «λ-уровнях» 4, 6, 8, 10. */
-  stage(level) { return level >= 10 ? 4 : level >= 8 ? 3 : level >= 6 ? 2 : level >= 4 ? 1 : 0; },
+  /** Стадия облика: меняется на уровнях мудрости 3, 5, 7, 9. */
+  stage(level) { return level >= 9 ? 4 : level >= 7 ? 3 : level >= 5 ? 2 : level >= 3 ? 1 : 0; },
 
   /** Рисунки здания в эпохе: простой, нарядный и лучший. */
   arts(type, epoch = Game.state.epoch) {
@@ -24,17 +24,17 @@ const Looks = {
   /**
    * Ключи рисунков здания. Облик резко меняется с ЭПОХОЙ (хижина → дом из сырцового кирпича),
    * а внутри эпохи — на КАЖДОМ уровне мудрости:
-   *   1–3: простой (поменьше) · 4: нарядный · 6: рядом вторая постройка · 8: третья · 10: всё лучшее.
+   *   1–2: простой (поменьше) · 3: нарядный · 5: рядом вторая постройка · 7: третья · 9: всё лучшее.
    */
   icons(type, level = 1, epoch = Game.state.epoch) {
     const B = BUILDINGS[type];
     if (B.special) return [type];
     if (!this.ART[type]) return [];
     const [base, fancy, top] = this.arts(type, epoch);
-    if (level >= 10) return [top, fancy, fancy];
-    if (level >= 8) return [fancy, base, base];
-    if (level >= 6) return [fancy, base];
-    if (level >= 4) return [fancy];
+    if (level >= 9) return [top, fancy, fancy];
+    if (level >= 7) return [fancy, base, base];
+    if (level >= 5) return [fancy, base];
+    if (level >= 3) return [fancy];
     return [base];
   },
   /** Сменился ли облик при переходе на level. */

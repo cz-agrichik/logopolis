@@ -56,6 +56,12 @@ const Msg = {
     return '';
   },
   goatLine(roll) { return Lex.goatLines[Math.floor(roll * Lex.goatLines.length)]; },
+  /** Предупреждение о чуде эпохи: во что оно превратится. r — BUILDINGS[тип].retire. */
+  retireNote(r) {
+    return `Чудо эпохи: в эпоху «${Lex.epochs[r.epoch].name}» оно станет обычным зданием — «${this.formName(r.into, r.epoch)}» ${r.level}-го уровня. Бонус чуда тогда пропадёт.`;
+  },
+  /** Что стало с чудом эпохи: «Большой круглый дом Лембы» → дом из сырцового кирпича 5-го уровня. */
+  retiredLine(from, into, level, epoch) { return `«${Lex.bld[from].name}» теперь — ${this.formName(into, epoch).toLowerCase()} ${level}-го уровня`; },
 
   /** Запись летописи. ctx.newLook(type, level, epoch) — интерфейс подсказывает, сменился ли облик. */
   log(e, ctx = {}) {
@@ -71,6 +77,7 @@ const Msg = {
       case 'tech': { const T = Lex.tech[p.id]; return `📜 Новое знание: ${T.name}${T.paths ? ' — ' + T.paths[p.mode][0] : ''}`; }
       case 'rite': { const R = Lex.rite[p.id]; return `${R.icon} ${R.name}: ${this.riteResult(p.result)}`; }
       case 'epoch': return `⏳ Наступает новая эпоха: ${Lex.epochs[p.epoch].name}`;
+      case 'retired': return `🏛️ ${this.retiredLine(p.from, p.into, p.level, p.epoch)}`;
       case 'starve': return '⚠️ Голод: житель покинул поселение';
       case 'goatGone': return '🐐 Коза ушла в горы Троодоса…';
       case 'goat': return `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;

@@ -13,17 +13,21 @@ const BALANCE = {
   buildCostGrowth: 1.25,   // каждое следующее здание того же типа дороже
   upCostBase: 1.5,         // цена улучшения 1→2 = цена постройки × 1.5
   upCostGrowth: 1.5,       // каждое следующее улучшение дороже в 1.5 раза
-  upProdGrowth: 1.2,       // а выпуск растёт лишь в 1.2 раза за уровень (сложный процент)
-  logosFromLevel: 4,       // λ нужен на 4-м уровне и дальше через один: 4, 6, 8, 10
-  logosEvery: 2,
-  logosGrowth: 1.5,        // каждый следующий «λ-уровень» дороже в 1.5 раза
-  logosHighLevel: 7,       // начиная с 8-го λ ещё ×2
-  logosHighMult: 2,
-  copperFromLevel: 7,      // с 7-го уровня улучшения требуют медь
-  bronzeFromLevel: 9,      // с 9-го — бронзу
+  // Лесенка уровней. «Уровни труда» (2, 4, 6, 8, 10) — за ресурсы, выпуск ×1.15.
+  // «Уровни мудрости» — только за λ: 3-й и 7-й символические (выпуск ×1.25), 5-й и 9-й полноценные (×1.4, цена — lp здания).
+  levelGrowth: 1.15,
+  wisdomLevels: {
+    3: { logos: 3, growth: 1.25 },
+    5: { lp: 1, growth: 1.4 },
+    7: { logos: 5, growth: 1.25 },
+    9: { lp: 2.5, growth: 1.4 },
+  },
+  copperFromLevel: 6,      // с 6-го уровня (первого в бронзовом веке) улучшения требуют медь
+  bronzeFromLevel: 8,      // с 8-го — бронзу
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
+  suppliesSec: 180,        // «Сбор припасов»: столько секунд выпуска (без благословений)
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
@@ -68,37 +72,38 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 // Крупные траты λ разнесены по эпохе: в начале — первые знания и чудо, в середине — обязательное святилище
 // (оно не ждёт поздних ресурсов), в конце — последнее знание; сам переход стоит немного λ, главное в нём — запасы.
 const EPOCHS = [
-  { maxLevel: 6, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
+  { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
   { maxLevel: 10, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
   { locked: true },
 ];
 
 // ------------------------------------------------------------
-//  Здания. prod — в секунду на 1-м уровне (минус — сырьё); каждый уровень ×1.2.
+//  Здания. prod — в секунду на 1-м уровне (минус — сырьё); рост по уровням — BALANCE.levelGrowth / wisdomLevels.
 //  forms — облик по эпохам (null — в эту эпоху здания ещё нет); capBonus — доп. места в жилище.
-//  lp — базовая цена в λ для «λ-уровней» (4, 6, 8, 10).
+//  lp — цена в λ 5-го уровня (уровня мудрости); 9-й — lp × 2.5. 3-й и 7-й — символические, одна цена для всех.
 //  special — чудо древнего Кипра: одно на игру, одна цена (logos — λ), effect — постоянный бонус.
+//  retire — чудо эпохи: с эпохи retire.epoch оно становится обычным зданием into уровня level (бонус чуда пропадает).
 // ------------------------------------------------------------
 const BUILDINGS = {
-  house: { terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 12, forms: [{}, { capBonus: 2 }] },
-  field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 15, forms: [{}, {}] },
-  goatpen: { terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1, prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 15, forms: [{}, {}] },
-  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, lp: 15, forms: [{}, {}] },
-  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, lp: 15, forms: [{}, {}] },
-  workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 18, forms: [{}, {}] },
-  storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 18, forms: [{}, {}] },
-  mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 30, forms: [null, {}] },
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.16, food: 0.32 }, lp: 30, forms: [null, {}] },
-  foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 30, forms: [null, {}] },
-  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 35, forms: [null, {}] },
+  house: { terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 10, forms: [{}, { capBonus: 2 }] },
+  field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 12, forms: [{}, {}] },
+  goatpen: { terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1, prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 12, forms: [{}, {}] },
+  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, lp: 12, forms: [{}, {}] },
+  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, lp: 12, forms: [{}, {}] },
+  workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}] },
+  storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}] },
+  mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.16, food: 0.32 }, lp: 14, forms: [null, {}] },
+  foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
+  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
-  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 120, effect: { all: 0.1, cap: 5 } },
+  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 90, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
   sp_troodos: { special: true, epoch: 0, terrain: ['hill'], cost: { food: 1500, wood: 900 }, logos: 0, effect: { bmult: { goatpen: 0.6 }, goats: true } },
-  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 140, effect: { bmult: { workshop: 0.5 } } },
+  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 60, effect: { bmult: { workshop: 1.5 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
   shrine1: { special: true, epoch: 0, terrain: ['plain'], cost: { stone: 300, goods: 80 }, logos: 180, effect: { mult: { food: 0.2 }, growth: 0.5, logos: 0.1 } },
   sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } } },
-  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 300, effect: { mult: { copper: 0.5 }, bmult: { foundry: 0.3 } } },
+  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } } },
   sp_walls: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 6000, wood: 1500 }, logos: 0, effect: { raidShield: true, storagePct: 0.2 } },
   sp_palace: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 800, wood: 500, goods: 150 }, logos: 350, effect: { all: 0.15, storage: 2000 } },
   shrine2: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 600, copper: 200, goods: 200 }, logos: 450, effect: { logos: 0.2, all: 0.1 } },
@@ -124,7 +129,7 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
 // Обряды: instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
 const RITUALS = [
-  { id: 'elders', epoch: 0, logos: 5, instant: 'elders', cooldown: 60 },
+  { id: 'elders', epoch: 0, logos: 5, instant: 'elders', cooldown: 120 },
   { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 900 },
   { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 300 },
   { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 300 },

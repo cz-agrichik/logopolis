@@ -327,6 +327,7 @@ const UI = {
         let body;
         if (st.locked) body = `<div class="item-lock">🔒 ${esc(Msg.reason(st.reason))}</div>`;
         else if (st.done) body = `<div class="item-done">✓ Построено</div>`;
+        else if (st.stashed && st.into) body = `<div class="item-stash">📦 На складе. Эпоха чуда прошла — поставить можно бесплатно, но уже как «${esc(Cat.form(st.into).name)}» ${st.level}-го уровня.</div>`;
         else if (st.stashed) body = `<div class="item-stash">📦 На складе — бонус не действует, пока чудо не стоит в городе. Поставить можно бесплатно.</div>`;
         else {
           // эффект чуда иконками не передать — здесь текст нужен
@@ -334,6 +335,7 @@ const UI = {
             <div class="chips">${this.costHtml(st.cost, st.logos)}${st.logos ? '' : '<span class="chip muted">без λ</span>'}</div>
             ${this.reasonHtml(st)}`;
         }
+        if (B.retire && !st.locked && !st.into) body += `<div class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</div>`;
         specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div>
           ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">${st.stashed ? 'Поставить' : 'Строить'}</button>`}</div>`;
       } else {
@@ -436,7 +438,11 @@ const UI = {
       const done = reqs.filter(r => r.ok).length;
       h += `<h3>Переход: ${esc(next.name)} <small>${done}/${reqs.length}</small></h3><ul class="reqs">`;
       for (const r of reqs) { const t = Msg.req(r); h += `<li class="${r.ok ? 'ok' : ''}"><span>${r.ok ? '✓' : '○'} ${esc(t.label)}</span><small>${esc(t.have)}</small></li>`; }
-      h += `</ul><button class="btn wide gold" data-advance ${reqs.every(r => r.ok) ? '' : 'disabled'}>${next.locked ? 'Завершить эпоху' : 'Перейти в новую эпоху'}</button>
+      h += `</ul>`;
+      const retiring = Game.retiringNext();
+      if (retiring.length) h += `<div class="item-retire">⏳ При переходе чудеса этой эпохи станут обычными зданиями: ${retiring.map(([t, into, level, stashed]) =>
+        `«${esc(Cat.bld[t].name)}» → ${esc(Msg.formName(into, s.epoch + 1).toLowerCase())} ${level}-го уровня${stashed ? ' (со склада — когда поставите)' : ''}`).join('; ')}. Бонусы чудес пропадут.</div>`;
+      h += `<button class="btn wide gold" data-advance ${reqs.every(r => r.ok) ? '' : 'disabled'}>${next.locked ? 'Завершить эпоху' : 'Перейти в новую эпоху'}</button>
         <div class="hint dim">Ресурсы и λ за переход списываются. Цены выше вместимости складов требуют больших складов.</div>`;
     }
     h += `<h3>Хронология</h3><ol class="timeline">`;
@@ -518,7 +524,7 @@ const UI = {
     let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
       <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
-      h += `<p>${esc(B.desc)}</p><p class="lore">${B.lore}</p>
+      h += `<p>${esc(B.desc)}</p>${B.retire ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}<p class="lore">${B.lore}</p>
         <p class="dim small">Чудо можно убрать на склад и поставить в другое место бесплатно. Пока оно на складе, его бонус не действует.</p>`;
     } else {
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
@@ -532,13 +538,13 @@ const UI = {
         else {
           const nextIc = Looks.icons(b.type, up.target);
           h += `<div><b>Улучшение до ${up.target}-го уровня</b>${Looks.newLook(b.type, up.target) ? ` <span class="newlook">наряднее ${nextIc.map(k => Art.svg(k, 'inl')).join('')}</span>` : ''}</div>
-            <div class="dim small">${up.logos ? 'Уровень мудрости: оплачивается только Логосом.' : `Выпуск ×${BALANCE.upProdGrowth} за уровень, цена ресурсами ×${BALANCE.upCostGrowth}. Бонусы знаний и спецстроений умножают уже весь выпуск здания.`}</div>
+            <div class="dim small">${up.logos ? `Уровень мудрости: оплачивается только Логосом, выпуск ×${Game.levelStep(up.target)}.` : `Уровень труда: выпуск ×${Game.levelStep(up.target)}, цена ресурсами растёт ×${BALANCE.upCostGrowth} за уровень. Бонусы знаний и чудес умножают уже весь выпуск здания.`}</div>
             <div class="chips">${this.outputHtml(b, up.target)}</div>
             <div class="chips">${this.costHtml(up.cost, up.logos)}</div>
             ${up.reason ? `<div class="item-lock">${esc(Msg.reason(up.reason))}</div>` : ''}
             <button class="btn ${up.logos ? 'gold' : ''}" data-action="upgrade" ${up.ok ? '' : 'disabled'}>Улучшить <kbd>U</kbd></button>`;
         }
-        h += `</div><div class="dim small">Уровни 4, 6, 8 и 10 — только за λ, остальные — за ресурсы. Облик здания меняется с эпохой и на каждом λ-уровне.</div>`;
+        h += `</div><div class="dim small">Уровни мудрости 3, 5, 7 и 9 — только за λ (3-й и 7-й — символически), остальные — за ресурсы. Облик меняется с эпохой и на каждом уровне мудрости.</div>`;
       }
     }
     h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
@@ -579,9 +585,11 @@ const UI = {
       Логос можно тратить с первых минут: во вкладке «Обряды» <b>Сбор припасов</b> за 5 λ сразу даёт ресурсы,
       а благословения удваивают производство. Можно и не спешить — поиграть без карточек, пока не упрётесь в λ.
       Подробности — в <b>📖 Кипропедии</b>.</p>`;
-    else if (!E.locked) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
+    const retired = first ? [] : (s.log || []).filter(e => e.k === 'retired' && e.p.epoch === s.epoch);
+    if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
+    if (!first && !E.locked) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
       ${s.epoch === 1 ? 'Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.' : ''}</p>`;
-    if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медного века до заката бронзового. Спасибо!</p>`;
+    if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до заката бронзового. Спасибо!</p>`;
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
       <button class="btn gold" data-action="close">${first ? 'Начать' : 'Дальше'}</button></div></div>`;
     this.showModal(h);

@@ -89,6 +89,7 @@ const Game = {
       s.stash = s.stash || [];
       s.log = s.log || [];
       s.techs = s.techs.map(t => t === 'picrolite' ? 'carving' : t);   // переименование v2 → v3
+      const st = this.state; this.state = s; this.retireWonders(); this.state = st;   // старые сохранения: чудеса прошлой эпохи
       return s;
     } catch (e) { return null; }
   },
@@ -118,6 +119,19 @@ const Game = {
   hasTech(id) { return this.state.techs.includes(id); },
   buildingAt(x, y) { return this.state.buildings.find(b => b.x === x && b.y === y); },
   count(type) { return this.state.buildings.filter(b => b.type === type).length; },
+  /** Чудо эпохи, чья эпоха прошла: оно уже стало обычным зданием (BUILDINGS[type].retire). */
+  retired(type) { const r = BUILDINGS[type].retire; return !!r && this.state.epoch >= r.epoch; },
+  /** Превратить прошедшие чудеса эпохи в обычные здания. Возвращает [[чудо, здание, уровень]]. */
+  retireWonders() {
+    const out = [];
+    for (const b of this.state.buildings) {
+      if (!this.retired(b.type)) continue;
+      const r = BUILDINGS[b.type].retire;
+      out.push([b.type, r.into, r.level]);
+      b.from = b.type; b.type = r.into; b.level = r.level;
+    }
+    return out;
+  },
   built(type) { return this.count(type) > 0; },
   /** Чудо убрано на склад: не стоит на карте, бонусы не действуют, но поставить можно бесплатно. */
   stashed(type) { return (this.state.stash || []).includes(type); },

@@ -7,7 +7,8 @@ Object.assign(Game, {
   // ---------- стоимость ----------
   buildCost(type) {
     const B = BUILDINGS[type];
-    const mult = B.special ? 1 : Math.pow(BALANCE.buildCostGrowth, this.count(type));
+    const own = this.state.buildings.filter(b => b.type === type && !b.from).length;   // бывшие чудеса — подарок, цену не поднимают
+    const mult = B.special ? 1 : Math.pow(BALANCE.buildCostGrowth, own);
     const cost = {};
     for (const [k, v] of Object.entries(B.cost || {})) cost[k] = Math.ceil(v * mult);
     return cost;
@@ -47,6 +48,9 @@ Object.assign(Game, {
     const B = BUILDINGS[type], s = this.state;
     if (s.epoch < B.epoch) return { ok: false, hidden: true };
     if (B.tech && !this.hasTech(B.tech)) return { ok: false, locked: true, reason: { code: 'needTech', tech: B.tech } };
+    if (B.special && this.retired(type)) {   // чудо прошлой эпохи: строить нельзя; со склада ставится уже обычным зданием
+      return this.stashed(type) ? { ok: true, stashed: true, into: B.retire.into, level: B.retire.level, cost: {}, logos: 0 } : { ok: false, hidden: true };
+    }
     if (B.special && this.stashed(type)) return { ok: true, stashed: true, cost: {}, logos: 0 };
     if (B.special && this.built(type)) return { ok: false, done: true, reason: { code: 'builtAlready' } };
     const { cost, logos } = this.priceOf(type, mode);
@@ -71,9 +75,9 @@ Object.assign(Game, {
     const tile = this.tile(x, y);
     if (!st.ok || !this.canPlaceOn(type, tile)) return false;
     const s = this.state;
-    if (st.stashed) {   // чудо со склада — бесплатно
+    if (st.stashed) {   // чудо со склада — бесплатно (чудо прошлой эпохи встаёт уже обычным зданием)
       s.stash = s.stash.filter(t => t !== type);
-      s.buildings.push({ id: s.nextId++, type, level: 1, x, y });
+      s.buildings.push(st.into ? { id: s.nextId++, type: st.into, level: st.level, x, y, from: type } : { id: s.nextId++, type, level: 1, x, y });
       this.log('stashBack', { type });
       this.save();
       return true;
@@ -96,16 +100,14 @@ Object.assign(Game, {
     if (target >= BALANCE.bronzeFromLevel) cost.bronze = (cost.bronze || 0) + Math.ceil(8 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.bronzeFromLevel));
     return { cost, logos: this.upgradeLogos(type, target) };
   },
-  /** λ нужен только на «λ-уровнях»: 4, 6, 8, 10. */
-  needsLogos(target) {
-    return target >= BALANCE.logosFromLevel && (target - BALANCE.logosFromLevel) % BALANCE.logosEvery === 0;
-  },
+  /** λ нужен только на «уровнях мудрости»: 3, 5, 7, 9. */
+  needsLogos(target) { return !!BALANCE.wisdomLevels[target]; },
+  /** Символический уровень мудрости (3-й, 7-й) — одна маленькая цена для всех. */
+  symbolicLevel(target) { const w = BALANCE.wisdomLevels[target]; return !!(w && w.logos); },
   upgradeLogos(type, target) {
-    if (!this.needsLogos(target)) return 0;
-    const step = (target - BALANCE.logosFromLevel) / BALANCE.logosEvery;
-    let logos = (BUILDINGS[type].lp || 15) * Math.pow(BALANCE.logosGrowth, step);
-    if (target > BALANCE.logosHighLevel) logos *= BALANCE.logosHighMult;
-    return Math.ceil(logos);
+    const w = BALANCE.wisdomLevels[target];
+    if (!w) return 0;
+    return w.logos || Math.ceil((BUILDINGS[type].lp || 12) * w.lp);
   },
 
   /** Сведения об улучшении до следующего уровня: цена, хватает ли, причина «нельзя» (кодом). */

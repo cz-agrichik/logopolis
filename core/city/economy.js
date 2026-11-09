@@ -26,11 +26,12 @@ Object.assign(Game, {
   /**
    * Сводка бонусов.
    * Постоянные (знания, чудеса) СКЛАДЫВАЮТСЯ: +20% и +30% = +50% — в bonus[ресурс] и bbonus[здание].
-   * Благословения обрядов — отдельные множители (×2), в buff и bbuff.
+   * Благословения обрядов тоже СКЛАДЫВАЮТСЯ между собой (два ×2 на один ресурс = ×3) — в buff[ресурс] и bbuff[здание]
+   * хранится прибавка; на постоянные бонусы они умножаются. withBuffs = false — сводка без благословений.
    */
-  effects() {
+  effects(withBuffs = true) {
     const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false };
-    for (const k of RES_KEYS) { fx.bonus[k] = 0; fx.buff[k] = 1; }
+    for (const k of RES_KEYS) { fx.bonus[k] = 0; fx.buff[k] = 0; }
     const apply = e => {
       if (!e) return;
       if (e.all) for (const k of RES_KEYS) fx.bonus[k] += e.all;
@@ -42,9 +43,9 @@ Object.assign(Game, {
     };
     const applyBuff = e => {
       if (!e) return;
-      if (e.all) for (const k of RES_KEYS) fx.buff[k] *= 1 + e.all;
-      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.buff[k] *= 1 + v;
-      if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbuff[k] = (fx.bbuff[k] || 1) * (1 + v);
+      if (e.all) for (const k of RES_KEYS) fx.buff[k] += e.all;
+      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.buff[k] += v;
+      if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbuff[k] = (fx.bbuff[k] || 0) + v;
       if (e.logos) fx.logos += e.logos;
       if (e.growth) fx.growth += e.growth;
       if (e.workers) fx.workers = (fx.workers || 0) + e.workers;
@@ -52,20 +53,26 @@ Object.assign(Game, {
     for (const id of this.state.techs) apply(TECH_BY_ID[id] && TECH_BY_ID[id].effect);
     for (const b of this.state.buildings) {
       const B = BUILDINGS[b.type];
-      if (B.special) apply(B.effect);
+      if (B.special && !this.retired(b.type)) apply(B.effect);   // чудо прошлой эпохи бонуса не даёт
       if (B.logosBonus) fx.logos += B.logosBonus + (B.logosBonusPerLevel || 0) * (b.level - 1);
     }
-    for (const [id, left] of Object.entries(this.state.buffs || {})) if (left > 0 && RITUAL_BY_ID[id]) applyBuff(RITUAL_BY_ID[id].buff);
+    if (withBuffs) for (const [id, left] of Object.entries(this.state.buffs || {})) if (left > 0 && RITUAL_BY_ID[id]) applyBuff(RITUAL_BY_ID[id].buff);
     return fx;
   },
-  /** Итоговый множитель здания по ресурсу: (1 + сумма постоянных бонусов) × благословения. */
+  /** Итоговый множитель здания по ресурсу: (1 + сумма постоянных бонусов) × (1 + сумма благословений). */
   bonusMult(type, k, fx = this.fx || this.effects()) {
-    return (1 + fx.bonus[k] + (fx.bbonus[type] || 0)) * fx.buff[k] * (fx.bbuff[type] || 1);
+    return (1 + fx.bonus[k] + (fx.bbonus[type] || 0)) * (1 + fx.buff[k] + (fx.bbuff[type] || 0));
   },
   logosMult() { return this.effects().logos; },
 
-  /** Выпуск растёт в 1.2 раза за КАЖДЫЙ уровень: 1.2, 1.44, 1.73… */
-  levelMult(L) { return Math.pow(BALANCE.upProdGrowth, L - 1); },
+  /** Множитель выпуска на уровне L: ×1.15 за уровень труда, ×1.25 / ×1.4 за уровни мудрости (BALANCE.wisdomLevels). */
+  levelMult(L) {
+    let m = 1;
+    for (let l = 2; l <= L; l++) m *= (BALANCE.wisdomLevels[l] || {}).growth || BALANCE.levelGrowth;
+    return m;
+  },
+  /** Во сколько раз растёт выпуск при переходе на уровень L. */
+  levelStep(L) { return (BALANCE.wisdomLevels[L] || {}).growth || BALANCE.levelGrowth; },
   workersOf(b) {
     const B = BUILDINGS[b.type];
     return B.workers ? B.workers + Math.floor((b.level - 1) / 2) : 0;
@@ -129,13 +136,13 @@ Object.assign(Game, {
     return n;
   },
 
-  // ---------- игровой такт ----------
-  tick(dt) {
+  // ---------- выпуск ----------
+  /**
+   * Выпуск в секунду при данных бонусах и руках. mark — отметить здания (простой, отдых): это делает только такт.
+   * Рук не хватает — сначала поля и загоны (зерно), остальные здания делят то, что осталось.
+   */
+  production(fx, hands, dt = 1, mark = false) {
     const s = this.state;
-    const fx = this.fx = this.effects();
-    const cap = this.popCap(fx);
-    const hands = s.pop * (1 + (fx.workers || 0));   // «Всей семьёй» удваивает рабочие руки
-    // рук не хватает — сначала поля и загоны (зерно), остальные здания делят то, что осталось
     let needFood = 0, needOther = 0;
     for (const b of s.buildings) { const w = this.workersOf(b); if (this.foodFirst(b)) needFood += w; else needOther += w; }
     const need = needFood + needOther;
@@ -153,16 +160,28 @@ Object.assign(Game, {
       const outs = Object.keys(p).filter(k => p[k] > 0), ins = Object.keys(p).filter(k => p[k] < 0);
       let share = 1;
       if (ins.length && outs.length) share = outs.filter(k => s.res[k] < storage - 0.01).length / outs.length;
-      b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
-      if (share === 0) { b.idle = false; continue; }
+      if (mark) b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
+      if (share === 0) { if (mark) b.idle = false; continue; }
       const e = this.foodFirst(b) ? effFood : effOther;
       let ok = true;
       for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
-      b.idle = !ok;
+      if (mark) b.idle = !ok;
       if (!ok) continue;
       for (const [k, v] of Object.entries(p)) rates[k] += v * e * (v < 0 ? share : 1);
     }
     rates.food -= s.pop * BALANCE.foodPerPop;
+    return { rates, need, eff, effFood, effOther, storage };
+  },
+  /** Выпуск без благословений (и без «Всей семьёй») — для «Сбора припасов». */
+  plainRates() { return this.production(this.effects(false), this.state.pop, 0.001).rates; },
+
+  // ---------- игровой такт ----------
+  tick(dt) {
+    const s = this.state;
+    const fx = this.fx = this.effects();
+    const cap = this.popCap(fx);
+    const hands = s.pop * (1 + (fx.workers || 0));   // «Всей семьёй» удваивает рабочие руки
+    const { rates, need, eff, effFood, effOther, storage } = this.production(fx, hands, dt, true);
 
     for (const k of RES_KEYS) s.res[k] = Math.min(storage, Math.max(0, s.res[k] + rates[k] * dt));
 
