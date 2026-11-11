@@ -70,6 +70,21 @@ test('эпохи: чудо эпохи со склада в новой эпохе
   assert.equal(s.stash.length, 0);
 });
 
+test('обряды: λ-благословения — раз в 4 и 8 часов по настоящим часам', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state;
+  s.buildings.push({ id: 800, type: 'shrine1', level: 1, x: 2, y: 2 });
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  assert.ok(G.perform('vigil'));
+  assert.equal(G.effects().logos, 1 + 0.1 + 0.5);
+  const R = C.run("RITUAL_BY_ID.vigil");
+  assert.equal(G.ritualStatus(R).reason.code, 'cooldown');
+  C.clock.now += 4 * 3600e3 - 60e3;
+  assert.ok(G.ritualWait(R) > 0 && G.ritualWait(R) <= 60);
+  C.clock.now += 61e3;
+  assert.equal(G.ritualWait(R), 0);
+  assert.equal(C.run("RITUAL_BY_ID.hornedfeast").buff.logos, 0.75);
+});
+
 test('город: каждая следующая постройка дороже в 1.25 раза', () => {
   const G = fresh().get('Game');
   const c1 = G.buildCost('field').wood;

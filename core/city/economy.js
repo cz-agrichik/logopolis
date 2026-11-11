@@ -232,6 +232,32 @@ Object.assign(Game, {
     return { res, hands: Math.floor(hands), need: P.need, effFood: P.effFood, effOther: P.effOther, storage: P.storage,
       supplies: Object.fromEntries(RES_KEYS.map(k => [k, Math.max(0, plain[k] || 0) * BALANCE.suppliesSec])) };
   },
+  /** Множитель Логоса за карточки и из чего он сложен: { total, parts: [{ kind: 'tech'|'wonder'|'building'|'rite', id, v, level, left }] }. */
+  logosBreakdown() {
+    const s = this.state, parts = [];
+    for (const src of this.bonusSources()) if (src.effect.logos) parts.push({ kind: src.kind, id: src.id, v: src.effect.logos, left: src.left });
+    for (const b of s.buildings) {
+      const B = BUILDINGS[b.type];
+      if (B.logosBonus) parts.push({ kind: 'building', id: b.type, level: b.level, v: B.logosBonus + (B.logosBonusPerLevel || 0) * (b.level - 1) });
+    }
+    return { total: this.effects().logos, parts };
+  },
+  /** Вместимость складов и из чего она сложена: база + здания + прибавки, × (1 + проценты). */
+  storageBreakdown() {
+    const fx = this.effects(), rows = {}, flat = [], pct = [];
+    for (const b of this.state.buildings) {
+      const v = this.storageOf(b);
+      if (v) (rows[b.type + ':' + b.level] = rows[b.type + ':' + b.level] || { type: b.type, level: b.level, n: 0, each: v }).n++;
+    }
+    for (const src of this.bonusSources()) {
+      if (src.kind === 'rite') continue;
+      if (src.effect.storage) flat.push({ kind: src.kind, id: src.id, v: src.effect.storage });
+      if (src.effect.storagePct) pct.push({ kind: src.kind, id: src.id, v: src.effect.storagePct });
+    }
+    const list = Object.values(rows).sort((a, b) => b.level - a.level);
+    const sum = BALANCE.baseStorage + list.reduce((a, r) => a + r.each * r.n, 0) + fx.storage;
+    return { base: BALANCE.baseStorage, rows: list, flat, pct, sum, mult: 1 + fx.storagePct, total: this.storageCap(fx) };
+  },
   /** Выпуск без благословений (и без «Всей семьёй») — для «Сбора припасов». */
   plainRates() { return this.production(this.effects(false), this.state.pop, 0.001).rates; },
 

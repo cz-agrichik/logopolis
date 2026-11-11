@@ -20,7 +20,7 @@ const Game = {
       logos: 0, logosEarned: 0,
       pop: 2, popAcc: 0, starveAcc: 0,
       techs: [], buildings: [], nextId: 1,
-      buffs: {}, cooldowns: {}, stash: [],
+      buffs: {}, cooldowns: {}, readyAt: {}, stash: [],
       stats: { goats: 0 },
       timers: { goat: 40, raid: null },
       log: [], lastSave: Date.now(), finished: false,
@@ -86,6 +86,7 @@ const Game = {
       s.stats.goats = s.stats.goats || 0;
       s.buffs = s.buffs || {};
       s.cooldowns = s.cooldowns || {};
+      s.readyAt = s.readyAt || {};
       s.stash = s.stash || [];
       s.log = s.log || [];
       s.techs = s.techs.map(t => t === 'picrolite' ? 'carving' : t);   // переименование v2 → v3

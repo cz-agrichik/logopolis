@@ -17,6 +17,16 @@ function fmtDur(ms) {
   return `${Math.round(h / 24)} дн`;
 }
 
+/** Сколько ждать: «45 с», «12 мин», «3 ч 20 мин». */
+function fmtWait(sec) {
+  sec = Math.ceil(sec);
+  if (sec < 60) return `${sec} с`;
+  const m = Math.ceil(sec / 60);
+  if (m < 60) return `${m} мин`;
+  const h = Math.floor(m / 60), mm = m % 60;
+  return mm ? `${h} ч ${mm} мин` : `${h} ч`;
+}
+
 const Msg = {
   /** Название облика здания в эпохе (если облика для эпохи нет — ближайший предыдущий). */
   formName(type, epoch) {
@@ -41,7 +51,7 @@ const Msg = {
       case 'levelCap': return r.next != null ? `Предел ${r.max}-го уровня в этой эпохе. В эпоху «${Lex.epochs[r.next].name}» — до ${r.nextMax}-го.` : `Максимальный уровень — ${r.max}.`;
       case 'needFirst': return 'Сначала: ' + r.techs.map(id => `«${Lex.tech[id].name}»`).join(', ');
       case 'needBuilding': return `Нужно: ${Lex.bld[r.type].name}`;
-      case 'cooldown': return `Можно снова через ${r.sec} с`;
+      case 'cooldown': return `Можно снова через ${fmtWait(r.sec)}`;
       case 'buffsFull': return `Одновременно — не больше ${r.max} благословений`;
     }
     return r.code;

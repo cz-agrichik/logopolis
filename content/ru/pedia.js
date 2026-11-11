@@ -80,7 +80,7 @@ const TIPS = {
   storehouse: 'Склад — тихий ограничитель: цена больше вместимости недоступна вовсе. Перед большой целью сначала поднимите вместимость.',
   mine: 'Медь — валюта бронзового века: гавани, бронза, высокие уровни зданий.',
   port: 'Гавань ест медь и отдаёт зерно и товары — так медный остров кормится торговлей. Без рудников простаивает. Если зерно или товары уже не помещаются в склады, меди уходит вдвое меньше, а если не помещается ни то ни другое — гавань отдыхает и медь не тратит.',
-  foundry: 'Бронза — самый медленный ресурс. Её просят 9–10-й уровни зданий, «Бронзовые орудия» и переход эпохи. Когда склад бронзы полон, литейня отдыхает и не жжёт медь.',
+  foundry: 'Бронза — самый медленный ресурс. Её просят 8-й уровень зданий, «Бронзовые орудия» и переход эпохи. Когда склад бронзы полон, литейня отдыхает и не жжёт медь.',
   scribe: 'Каждый процент к Логосу работает на каждую карточку — писцы особенно выгодны тем, кто много учится.',
 };
 
@@ -117,7 +117,7 @@ const PEDIA_ARTICLES = [
     <p class="story">Хороший старейшина с одного взгляда знает, сколько зерна в амбарах и сколько рук в поле.</p>
     <table class="pt">
       <tr><td><b>λ Логос</b></td><td>золотой медальон слева — главный ресурс. Под числом — общий бонус к Логосу за карточки от святилищ и писцов.</td></tr>
-      <tr><td>Ресурсы</td><td>число в запасе, под ним — прирост в секунду (красный — убыль); откуда он берётся — в ${pl('a:income', '«Доходе по ресурсам»')}. Тонкая полоска внизу — насколько полон склад; красная — склад полон.
+      <tr><td>Ресурсы</td><td>число в запасе, под ним — прирост в секунду (красный — убыль); откуда он берётся — в ${pl('a:income', '«Хозяйстве в цифрах»')}. Тонкая полоска внизу — насколько полон склад; красная — склад полон.
       Золотая подсветка — ресурс сейчас под благословением.</td></tr>
       <tr><td>🔴 красным</td><td>то, что требует внимания: ресурс тает (ячейка розовеет, рядом ▼ и убыль в секунду), склад полон, не хватает работников.
       Вместимость склада — в подсказке над любым ресурсом и по длине полоски.</td></tr>
@@ -132,7 +132,7 @@ const PEDIA_ARTICLES = [
     <p>Над картой — полоса благословений с таймерами. Место под неё есть всегда: пустые кружки — свободные места
     (одновременно до ${BALANCE.maxBuffs}). Если благословений много и тесно, названия прячутся — остаются значки и время.</p>` },
 
-  { id: 'income', icon: '📊', title: 'Доход по ресурсам', html: () => PediaBook.incomeHtml() },
+  { id: 'income', icon: '📊', title: 'Хозяйство в цифрах', html: () => PediaBook.incomeHtml() },
 
   { id: 'logos', icon: 'λ', title: 'Логос (λ)', html: () => `
     <p class="story"><b>Λόγος</b> — «слово, речь, разум». Гераклит Эфесский называл логосом порядок, который правит миром.
@@ -141,11 +141,11 @@ const PEDIA_ARTICLES = [
     <p>От ${Cat.tasks.flip.lambda} до ${Cat.tasks.build.lambda} λ за верный ответ — смотря по заданию: набрать слово труднее всего и дороже всего.
     Обычный раунд — около 60 λ. Святилища, писцы и «Наблюдение за звёздами» добавляют общий бонус, он виден под медальоном λ.
     ${pl('a:rewards', 'Таблица наград')}.</p>
-    <p>Логос не ограничен складами и не теряется при набегах.</p>
+    <p>Логос не ограничен складами и не теряется при набегах. Ваш множитель Логоса сейчас и из чего он сложен — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>
     <h4>На что тратится</h4>
     <ul>
       <li>${pl('a:techs', 'Знания')} — дорога «с умом»: 30–200 λ и немного ресурсов;</li>
-      <li>${pl('a:specials', 'Чудеса Кипра')} — те, что стоят λ: 120–450 λ и скромные ресурсы;</li>
+      <li>${pl('a:specials', 'Чудеса Кипра')} — те, что стоят λ: 60–450 λ и скромные ресурсы;</li>
       <li>${pl('a:upgrade', 'Улучшения')} на 3, 5, 7 и 9-й уровень — только λ;</li>
       <li>${pl('a:religion', 'Обряды')} — «Сбор припасов» за ${RITUAL_BY_ID.elders.logos} λ, благословения за 10–40 λ на 10–30 минут;</li>
       <li>${pl('a:epochs', 'Переход эпохи')} — ${Cat.epochs[0].advance.logos} λ в бронзовый век.</li>
@@ -304,12 +304,13 @@ const PEDIA_ARTICLES = [
     ${pl('b:storehouse', 'Склад')} добавляет 400 на 1-м уровне и больше с каждым уровнем; Зернохранилища, Тёсаная кладка,
     Циклопические стены и Дворец Аласии увеличивают вместимость ещё.</p>
     <p>Когда склад полон, полоска под ресурсом краснеет и он дальше не копится. <b>Цена, которая больше вместимости,
-    недоступна вовсе</b> — перед большими целями сначала поднимите вместимость.</p>` },
+    недоступна вовсе</b> — перед большими целями сначала поднимите вместимость.</p>
+    <p>Как сложилась ваша вместимость — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>` },
 
   { id: 'upgrade', icon: '⬆️', title: 'Улучшение зданий', html: () => {
     const ex = 'field';
     let rows = `<tr><td>1</td>${lookCells(ex, 1)}<td>${num(Cat.bld[ex].prod.food)}/с <span class="dim">(×1)</span></td><td>${Object.entries(Cat.bld[ex].cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
-    for (let L = 2; L <= 10; L++) {
+    for (let L = 2; L <= Cat.epochs[1].maxLevel; L++) {
       const { cost, logos } = Game.upgradeCost(ex, L);
       rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>${lookCells(ex, L)}<td>${num(Cat.bld[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))})</span></td>
         <td>${logos ? `<b>λ ${logos}</b>` : Object.entries(cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`;
@@ -320,7 +321,7 @@ const PEDIA_ARTICLES = [
     <p>Клик по зданию — что даст следующий уровень; <b>Shift+клик</b> — улучшить сразу.</p>
     <h4>Два вида уровней</h4>
     <ul>
-      <li><b>Уровни труда</b> (2, 4, 6, 8, 10) — только за обычные ресурсы. Выпуск ×${BALANCE.levelGrowth}.</li>
+      <li><b>Уровни труда</b> (2, 4, 6, 8) — только за обычные ресурсы. Выпуск ×${BALANCE.levelGrowth}.</li>
       <li><b>Уровни мудрости</b> (3, 5, 7, 9) — <b>только за λ</b>, без ресурсов. 3-й и 7-й — символические (${BALANCE.wisdomLevels[3].logos} и ${BALANCE.wisdomLevels[7].logos} λ), выпуск ×${BALANCE.wisdomLevels[3].growth};
       5-й и 9-й — полноценные, выпуск ×${BALANCE.wisdomLevels[5].growth}.</li>
       <li>${Cat.epochs[0].maxLevel}-й уровень — предел медно-каменного века; дальше — в бронзовом.</li>
@@ -333,7 +334,7 @@ const PEDIA_ARTICLES = [
     <h4>Формулы</h4>
     <p class="formula">Выпуск = база × множитель уровня × (1 + сумма бонусов) × (1 + сумма благословений)</p>
     <ul>
-      <li><b>Выпуск</b> растёт на каждом уровне: ×${BALANCE.levelGrowth} за уровень труда, ×${BALANCE.wisdomLevels[3].growth} за символический уровень мудрости, ×${BALANCE.wisdomLevels[5].growth} — за полноценный. На ${Cat.epochs[0].maxLevel}-м уровне — ×${num(Game.levelMult(Cat.epochs[0].maxLevel))}, на 10-м — ×${num(Game.levelMult(10), 1)}.</li>
+      <li><b>Выпуск</b> растёт на каждом уровне: ×${BALANCE.levelGrowth} за уровень труда, ×${BALANCE.wisdomLevels[3].growth} за символический уровень мудрости, ×${BALANCE.wisdomLevels[5].growth} — за полноценный. На ${Cat.epochs[0].maxLevel}-м уровне — ×${num(Game.levelMult(Cat.epochs[0].maxLevel))}, на ${Cat.epochs[1].maxLevel}-м — ×${num(Game.levelMult(Cat.epochs[1].maxLevel), 1)}.</li>
       <li><b>Цена</b> ресурсами растёт в ${BALANCE.upCostGrowth} раза за каждый уровень, включая λ-уровни, хоть их и не оплачивают ресурсами:
       4-й уровень стоит как 2-й × ${BALANCE.upCostGrowth} × ${BALANCE.upCostGrowth}. Цена растёт быстрее отдачи — поэтому уровни мудрости так выгодны.</li>
       <li><b>Бонусы</b> знаний и чудес складываются (+20% и +30% = +50%) и умножают весь выпуск здания с учётом уровня.</li>
@@ -507,7 +508,10 @@ const PediaBook = {
     const srcName = p => p.kind === 'tech' ? pl('t:' + p.id, '«' + Cat.tech[p.id].name + '»') : p.kind === 'wonder' ? pl('b:' + p.id, Cat.bld[p.id].name) : Cat.rite[p.id].name;
     const vis = RES_KEYS.filter(k => Game.resVisible(k) || I.res[k].rows.length);
     let h = `<p class="story">Старейшина считает на пальцах: столько полей, столько рук — столько зерна к вечеру.</p>
-      <p>Живой расчёт по вашему городу: числа — на момент открытия страницы. Выпуск каждого здания:</p>
+      <p>Живые расчёты по вашему городу — на момент открытия страницы: <b>доход по ресурсам</b>, <b>Логос за карточки</b>, <b>склады</b>
+      и что дал бы «Сбор припасов».</p>
+      <h3>Доход по ресурсам</h3>
+      <p>Выпуск каждого здания:</p>
       <p class="formula">Выпуск = база × уровень × (1 + бонусы) × (1 + благословения) × занятость</p>
       <ul>
         <li><b>база</b> — выпуск здания на 1-м уровне;</li>
@@ -546,11 +550,55 @@ const PediaBook = {
       }).filter(Boolean);
       if (notes.length) h += `<ul class="income-notes">${notes.join('')}</ul>`;
     }
+    h += this.logosCalcHtml() + this.storageCalcHtml();
     const sup = vis.filter(k => I.supplies[k] >= 1);
-    h += `<h4>«Сбор припасов» сейчас дал бы</h4>
+    h += `<h3>«Сбор припасов» сейчас дал бы</h3>
       <p>${sup.length ? sup.map(k => `${ri(k)} ${Math.floor(I.supplies[k])}`).join(' · ') : 'почти ничего'} <span class="dim">— ${BALANCE.suppliesSec / 60} минуты обычного выпуска без благословений
       (зерна, дерева и камня — не меньше 30) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ.</span></p>`;
     return h;
+  },
+
+  /** Логос за карточки: цены заданий, множитель и из чего он сложен, λ-благословения. */
+  logosCalcHtml() {
+    const L = Game.logosBreakdown(), m = L.total;
+    const name = p => p.kind === 'tech' ? pl('t:' + p.id, '«' + Cat.tech[p.id].name + '»') : p.kind === 'rite' ? Cat.rite[p.id].name
+      : p.kind === 'building' ? `${esc(Cat.form(p.id).name)} <span class="dim">ур. ${p.level}</span>` : pl('b:' + p.id, Cat.bld[p.id].name);
+    const pct = v => '+' + Math.round(v * 100) + '%';
+    let h = `<h3>Логос за карточки</h3>
+      <p class="formula">λ за верный ответ = цена задания × множитель Логоса</p>
+      <p>Досрочное повторение (слову ещё рано) — цена ×${EARLY_FACTOR}. Ответ округляется до целого, но не меньше 1 λ.</p>
+      <table class="pt income"><tr><th>Множитель</th><th></th><th></th></tr>
+        <tr><td>База</td><td class="calc">каждая карточка</td><td>×1</td></tr>
+        ${L.parts.map(p => `<tr><td>${name(p)}</td><td class="calc">${p.kind === 'rite' ? `благословение, ещё ${Math.ceil(p.left / 60)} мин` : p.kind === 'building' ? 'писцы, растёт с уровнем' : 'постоянно'}</td><td>${pct(p.v)}</td></tr>`).join('')}
+        <tr class="sum"><td><b>Итого</b></td><td class="calc">1 ${L.parts.map(p => '+ ' + num(p.v)).join(' ')}</td><td><b>×${num(m)}</b></td></tr></table>`;
+    // λ-благословения: когда можно
+    const golden = RITUALS.filter(R => R.buff && R.buff.logos && R.epoch <= Game.state.epoch);
+    if (golden.length) h += `<ul class="income-notes">${golden.map(R => {
+      const st = Game.ritualStatus(R), left = Game.state.buffs[R.id], C = Cat.rite[R.id];
+      const when = left > 0 ? `идёт, ещё ${Math.ceil(left / 60)} мин` : st.locked ? esc(Msg.reason(st.reason)).replace(/^./, c => c.toLowerCase()) : st.cd ? `снова через ${fmtWait(st.cd)}` : 'можно начать';
+      return `<li><b>${esc(C.name)}</b> (+${Math.round(R.buff.logos * 100)}% на ${R.dur / 60} мин, раз в ${R.cooldown / 3600} ч): ${when}</li>`;
+    }).join('')}</ul>`;
+    h += `<table class="pt income"><tr><th>Задание</th><th>Цена</th><th>Сейчас</th></tr>
+      ${Object.entries(Cat.tasks).filter(([, t]) => t.lambda).map(([id, t]) => `<tr><td>${esc(t.name)}</td><td class="calc">${t.lambda} λ</td><td>${Lesson.reward(id, { kind: 'due' }, m)} λ</td></tr>`).join('')}
+      </table>
+      <p>Обычный раунд из 8 карточек — около 60 λ до бонусов, сейчас — около <b>${Math.round(60 * m)} λ</b>.</p>`;
+    return h;
+  },
+
+  /** Склады: база, здания, прибавки и проценты. */
+  storageCalcHtml() {
+    const S = Game.storageBreakdown();
+    const name = p => p.kind === 'tech' ? pl('t:' + p.id, '«' + Cat.tech[p.id].name + '»') : pl('b:' + p.id, Cat.bld[p.id].name);
+    return `<h3>Склады</h3>
+      <p class="formula">Вместимость = (база + склады + прибавки) × (1 + проценты)</p>
+      <p>Предел общий, но действует на каждый ресурс отдельно: столько зерна, столько дерева, столько камня… Цену больше вместимости заплатить нельзя.</p>
+      <table class="pt income"><tr><th>Откуда</th><th>Расчёт</th><th>Мест</th></tr>
+        <tr><td>Без построек</td><td class="calc">база</td><td>${S.base}</td></tr>
+        ${S.rows.map(r => `<tr><td>${esc(Cat.form(r.type).name)} <span class="dim">ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</span></td><td class="calc">${BUILDINGS[r.type].storage} × ${num(Game.levelMult(r.level))} = ${r.each}${r.n > 1 ? ' × ' + r.n : ''}</td><td>+${r.each * r.n}</td></tr>`).join('')}
+        ${S.flat.map(p => `<tr><td>${name(p)}</td><td class="calc">прибавка</td><td>+${p.v}</td></tr>`).join('')}
+        <tr><td><b>Сумма</b></td><td></td><td>${S.sum}</td></tr>
+        ${S.pct.map(p => `<tr><td>${name(p)}</td><td class="calc">проценты</td><td>+${Math.round(p.v * 100)}%</td></tr>`).join('')}
+        <tr class="sum"><td><b>Вместимость</b></td><td class="calc">${S.sum} × ${num(S.mult)}</td><td><b>${S.total}</b></td></tr></table>`;
   },
 
   head(icon, title, sub) {
@@ -584,7 +632,7 @@ const PediaBook = {
     return this.head(Art.res(k), R.name, 'Ресурс') + (RES_STORY[k] ? `<p class="story">${RES_STORY[k]}</p>` : '') + `
       <p>Появляется: ${Cat.epochs[R.epoch].name}${R.tech ? `, после знания ${pl('t:' + R.tech, '«' + Cat.tech[R.tech].name + '»')}` : ''}.</p>
       ${extra ? `<p>${extra}</p>` : ''}
-      <p>📊 Сколько у вас прибывает сейчас и почему — в ${pl('a:income', '«Доходе по ресурсам»')}.</p>
+      <p>📊 Сколько у вас прибывает сейчас и почему — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>
       <h4>Где добыть</h4><p>${from.join(', ') || '—'}${gather.length ? `; вручную — клик по клетке «${gather.join(', ')}»` : ''}${['food', 'wood', 'stone', 'cheese', 'goods'].includes(k) ? '; ' + pl('a:events', 'беглые козы') : ''}.</p>
       <h4>На что идёт</h4><p>${to.join(', ') || '—'}.</p>
       <p class="dim">Хранится в пределах вместимости ${pl('a:storage', 'складов')}.</p>`;

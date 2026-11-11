@@ -13,7 +13,7 @@ const BALANCE = {
   buildCostGrowth: 1.25,   // каждое следующее здание того же типа дороже
   upCostBase: 1.5,         // цена улучшения 1→2 = цена постройки × 1.5
   upCostGrowth: 1.5,       // каждое следующее улучшение дороже в 1.5 раза
-  // Лесенка уровней. «Уровни труда» (2, 4, 6, 8, 10) — за ресурсы, выпуск ×1.15.
+  // Лесенка уровней (предел — 5 в медно-каменном веке, 9 в бронзовом). «Уровни труда» (2, 4, 6, 8) — за ресурсы, выпуск ×1.15.
   // «Уровни мудрости» — только за λ: 3-й и 7-й символические (выпуск ×1.25), 5-й и 9-й полноценные (×1.4, цена — lp здания).
   levelGrowth: 1.15,
   wisdomLevels: {
@@ -73,7 +73,7 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 // (оно не ждёт поздних ресурсов), в конце — последнее знание; сам переход стоит немного λ, главное в нём — запасы.
 const EPOCHS = [
   { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
-  { maxLevel: 10, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
+  { maxLevel: 9, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
   { locked: true },
 ];
 
@@ -129,6 +129,7 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
 // Обряды. «Сбор припасов» — быстро и на всё, поэтому дороже; благословения — дольше (10–30 минут), но на свои ресурсы.
 // Цены сверены по ценнику труда (README, «Ценник ресурсов»): благословение даёт на 1 λ примерно в 1.2–1.6 раза больше «Сбора».
+// λ-благословения святилищ — «золотой час»: 15 минут, потом перерыв в настоящих часах (realTime — по часам, а не по игровому времени).
 // instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
 const RITUALS = [
   { id: 'elders', epoch: 0, logos: 8, instant: 'elders', cooldown: 120 },
@@ -137,9 +138,9 @@ const RITUALS = [
   { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
   { id: 'herds', epoch: 0, logos: 5, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 600, goat: true, cooldown: 60 },
   { id: 'festival', epoch: 0, logos: 40, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
-  { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900 },
+  { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true },
   { id: 'bullmask', epoch: 1, logos: 15, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 600 },
   { id: 'ingot', epoch: 1, logos: 25, cost: { copper: 150 }, req: 'sp_ingot', buff: { bmult: { port: 1, foundry: 1 } }, dur: 1200 },
-  { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.5 }, dur: 900 },
+  { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.75 }, dur: 900, cooldown: 8 * 3600, realTime: true },
 ];
 const RITUAL_BY_ID = Object.fromEntries(RITUALS.map(r => [r.id, r]));

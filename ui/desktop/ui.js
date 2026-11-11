@@ -400,7 +400,7 @@ const UI = {
 
   riteCard(R) {
     const s = Game.state, st = Game.ritualStatus(R), left = s.buffs[R.id];
-    const btn = st.cd ? `<button class="btn small off" data-rite="${R.id}">⏳ ${Math.ceil(st.cd)} с</button>`
+    const btn = st.cd ? `<button class="btn small off" data-rite="${R.id}" title="Можно снова через ${fmtWait(st.cd)}">⏳ ${fmtWait(st.cd)}</button>`
       : R.buff && left ? `<button class="btn small extend ${st.ok ? '' : 'off'}" data-rite="${R.id}">＋${Math.round(R.dur / 60)} мин</button>`
       : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-rite="${R.id}">${R.instant ? 'Собрать' : 'Начать'}</button>`;
     const mm = left ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}` : '';

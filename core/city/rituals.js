@@ -6,12 +6,18 @@
 Object.assign(Game, {
   // ---------- обряды ----------
   ritualLogos(R) { return Math.ceil(R.logos * Math.pow(1.5, Math.max(0, this.state.epoch - R.epoch))); },
+  /** Сколько секунд ждать до следующего раза. realTime — по настоящим часам (переживает уход из игры), иначе — игровое время. */
+  ritualWait(R) {
+    const s = this.state;
+    if (R.realTime) return Math.max(0, ((s.readyAt || {})[R.id] || 0) - Date.now()) / 1000;
+    return (s.cooldowns || {})[R.id] || 0;
+  },
   ritualStatus(R) {
     const s = this.state;
     if (R.epoch > s.epoch) return { hidden: true };
     if (R.req && !this.built(R.req)) return { locked: true, reason: { code: 'needBuilding', type: R.req } };
     const cost = R.cost || {}, logos = this.ritualLogos(R);
-    const cd = (s.cooldowns || {})[R.id];
+    const cd = this.ritualWait(R);
     if (cd > 0) return { cost, logos, cd, reason: { code: 'cooldown', sec: Math.ceil(cd) } };
     const active = Object.keys(s.buffs).filter(id => RITUAL_BY_ID[id]).length;
     if (R.buff && !s.buffs[R.id] && active >= BALANCE.maxBuffs) return { cost, logos, ok: false, full: true, reason: { code: 'buffsFull', max: BALANCE.maxBuffs } };
@@ -45,7 +51,8 @@ Object.assign(Game, {
       result = { minutes: Math.round(s.buffs[id] / 60) };
     }
     if (R.goat && !this.goat) s.timers.goat = 0;
-    if (R.cooldown) s.cooldowns[id] = R.cooldown;
+    if (R.cooldown && R.realTime) (s.readyAt = s.readyAt || {})[id] = Date.now() + R.cooldown * 1000;
+    else if (R.cooldown) s.cooldowns[id] = R.cooldown;
     this.log('rite', { id, result });
     this.save();
     return result;
