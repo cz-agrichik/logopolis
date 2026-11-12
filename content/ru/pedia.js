@@ -7,11 +7,8 @@
 const pl = (id, text) => `<a href="#" data-pedia="${id}">${text}</a>`;
 const ri = k => Art.res(k, 'inl');
 const bi = k => Art.svg(k, 'inl');
-/** Облик здания по эпохам для таблиц уровней: у старых зданий — два столбца (медно-каменный и бронзовый век). */
-const lookEps = type => BUILDINGS[type].epoch === 0 ? [0, 1] : [BUILDINGS[type].epoch];
-const lookHead = type => lookEps(type).length > 1
-  ? lookEps(type).map(e => `<th>Облик<br><small>${Cat.epochs[e].name.toLowerCase()}</small></th>`).join('') : '<th>Облик</th>';
-const lookCells = (type, L) => lookEps(type).map(e => `<td class="look">${L > Cat.epochs[e].maxLevel ? '<span class="dim">—</span>' : Looks.icons(type, L, e).map(bi).join('')}</td>`).join('');
+/** Во сколько раз вырос выпуск на уровне L по сравнению с прошлым: «×1.15», «×1.25», «×1.4». */
+const stepText = L => '×' + num(Game.levelStep(L));
 
 // Ссылки на фотографии реальных находок и мест (поиск по Wikimedia Commons — свободные лицензии)
 const PHOTOS = {
@@ -39,7 +36,7 @@ const PHOTOS = {
   't:oxhide': [['oxhide ingot', 'слитки «воловья шкура»']],
   't:writing': [['Cypro-Minoan', 'кипро-минойское письмо']],
   't:carving': [['picrolite figurine Cyprus', 'фигурки из пикролита']],
-  'a:goats': [['Cyprus mouflon', 'кипрский муфлон'], ['goats Cyprus', 'козы на Кипре'], ['halloumi', 'халлуми']],
+  'a:events': [['Cyprus mouflon', 'кипрский муфлон'], ['goats Cyprus', 'козы на Кипре'], ['halloumi', 'халлуми']],
   'a:religion': [['Pomos idol', 'идол из Помоса'], ['Kissonerga', 'находки из Киссонерги'], ['Horned God Enkomi', 'Рогатый бог'],
     ['Ingot God Enkomi', 'Слитковый бог'], ['Palaepaphos sanctuary', 'святилище в Палепафосе']],
 };
@@ -137,9 +134,11 @@ const PEDIA_ARTICLES = [
   { id: 'logos', icon: 'λ', title: 'Логос (λ)', html: () => `
     <p class="story"><b>Λόγος</b> — «слово, речь, разум». Гераклит Эфесский называл логосом порядок, который правит миром.
     Здесь это энергия знания: её нельзя добыть киркой, торговлей или козами — только правильными ответами.</p>
+    <p class="tip">📜 <b>Логос — это всё про учёбу.</b> Город лишь показывает, как растут ваши знания греческого: каждый λ — это верный ответ
+    на карточке. Как устроены раунды, задания и повторения — в ${pl('a:study', 'разделе «Учёба»')}, а настроить темп под себя — в ${pl('a:settings', '«Настройках учёбы»')}.</p>
     <h4>Сколько дают карточки</h4>
     <p>От ${Cat.tasks.flip.lambda} до ${Cat.tasks.build.lambda} λ за верный ответ — смотря по заданию: набрать слово труднее всего и дороже всего.
-    Обычный раунд — около 60 λ. Святилища, писцы и «Наблюдение за звёздами» добавляют общий бонус, он виден под медальоном λ.
+    Обычный раунд — около ${ROUND_LAMBDA} λ. Святилища, писцы и «Наблюдение за звёздами» добавляют общий бонус, он виден под медальоном λ.
     ${pl('a:rewards', 'Таблица наград')}.</p>
     <p>Логос не ограничен складами и не теряется при набегах. Ваш множитель Логоса сейчас и из чего он сложен — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>
     <h4>На что тратится</h4>
@@ -159,7 +158,7 @@ const PEDIA_ARTICLES = [
     <table class="pt">
       <tr><td>${pl('a:techs', 'Знания')}</td><td>две дороги к одному знанию: 🧠 с умом (λ + немного ресурсов) или 💪 через силу (только ресурсы, втрое больше)</td></tr>
       <tr><td>${pl('a:specials', 'Чудеса Кипра')}</td><td>у каждого одна цена: одни — λ и скромные ресурсы, другие — без λ, но ресурсов в разы больше</td></tr>
-      <tr><td>${pl('a:upgrade', 'Улучшения')}</td><td>уровни 3, 5, 7, 9 — только λ (3-й и 7-й — символически), остальные — только ресурсы</td></tr>
+      <tr><td>${pl('a:upgrade', 'Улучшения')}</td><td>уровни 3, 5, 7, 9 — только λ (3-й и 7-й — всего по нескольку λ), остальные — только ресурсы</td></tr>
       <tr><td>${pl('a:religion', 'Обряды')}</td><td>λ или подношения, но не помногу того и другого</td></tr>
     </table>
     <p class="dim">Исключение — переход в новую эпоху: это общий рубеж, он требует и запасов, и немного λ.</p>` },
@@ -260,10 +259,33 @@ const PEDIA_ARTICLES = [
       <tr><td>Знакомство с новым словом</td><td>0 — λ дадут за проверку в конце раунда</td></tr>
       <tr><td>Досрочное повторение</td><td>×${EARLY_FACTOR}: слово ещё не пора повторять</td></tr>
     </table>
-    <p>Цена задания видна прямо в вопросе — золотая метка «λ 7». Обычный раунд из 8 карточек приносит около <b>60 λ</b>.</p>
+    <p>Цена задания видна прямо в вопросе — золотая метка «λ 7». Обычный раунд из 8 карточек приносит около <b>${ROUND_LAMBDA} λ</b>.</p>
     <h4>Бонусы</h4>
     <p>Всё это умножается на общий бонус к Логосу: ${pl('b:shrine1', 'святилища')}, ${pl('b:scribe', 'писцы')} и обряд «Наблюдение за звёздами».
     Бонус виден под медальоном λ и в заголовке раунда.</p>` },
+
+  { id: 'settings', part: 'study', icon: '⚙️', title: 'Настройки учёбы', html: () => {
+    const set = Decks.settings(Learn.state), D = DEFAULT_SETTINGS;
+    const iv = k => Cat.appetites[k].intervals.map(fmtDur).join(' → ');
+    const row = (name, now, def, text) => `<tr><td><b>${name}</b><br><span class="dim">сейчас: ${now}${now !== def ? ` · обычно: ${def}` : ''}</span></td><td>${text}</td></tr>`;
+    return `
+    <p class="story">Каждый учится в своём ритме: кому-то хватает пяти минут в автобусе, кто-то садится за греческий на целый вечер.</p>
+    <p>Настройки — в <b>📚 Обучение → ⏱️ Темп и награды</b>. Они меняют только учёбу: город, знания и обряды не трогаются,
+    а все прежние ответы и выученные слова сохраняются.</p>
+    <table class="pt">
+      ${row('Верных ответов до «выучено»', set.learnSteps, D.learnSteps, `Сколько раз нужно правильно ответить на новое слово, чтобы оно стало выученным: 2, 3, 4 или 5.
+        Последний шаг — всегда набрать слово целиком. Больше шагов — больше практики (и λ за каждый шаг), но слова «доходят» медленнее.`)}
+      ${row('Повторять выученное', Cat.appetites[set.appetite].name, Cat.appetites[D.appetite].name, `Как часто возвращаются выученные слова:
+        <ul class="flat">${Object.keys(Cat.appetites).map(k => `<li><b>${Cat.appetites[k].name}</b> — ${iv(k)}, дальше с последним интервалом</li>`).join('')}</ul>
+        Слово, на котором вы ошиблись, снова идёт в работу.`)}
+      ${row('Новых слов за раунд', set.newPerRound, D.newPerRound, `Сколько незнакомых слов добавлять в каждый раунд: 0 (только повторение), 3, 5, 8 или 12.
+        Новое слово сначала показывается — знакомство λ не даёт, — а потом спрашивается.`)}
+      ${row('Карточек в раунде', set.roundSize, D.roundSize, `Длина раунда: 6, 8, 12 или 16 карточек. Раунд из ${D.roundSize} — пара минут и около ${ROUND_LAMBDA} λ до бонусов;
+        вдвое длиннее — примерно вдвое больше λ.`)}
+    </table>
+    <p>Если повторять нечего, раунд можно пройти досрочно — λ тогда меньше (×${EARLY_FACTOR}). ${pl('a:rewards', 'Награды за задания')} ·
+    ${pl('a:cards', 'Задания и повторение')}.</p>`;
+  } },
 
   { id: 'school', part: 'study', icon: '📚', title: 'Экран «Обучение»', html: () => `
     <p class="story">Παιδεία — «воспитание, образование». Греки считали, что город держится не на стенах, а на людях, которых он вырастил.</p>
@@ -308,45 +330,38 @@ const PEDIA_ARTICLES = [
     <p>Как сложилась ваша вместимость — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>` },
 
   { id: 'upgrade', icon: '⬆️', title: 'Улучшение зданий', html: () => {
-    const ex = 'field';
-    let rows = `<tr><td>1</td>${lookCells(ex, 1)}<td>${num(Cat.bld[ex].prod.food)}/с <span class="dim">(×1)</span></td><td>${Object.entries(Cat.bld[ex].cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
-    for (let L = 2; L <= Cat.epochs[1].maxLevel; L++) {
+    const ex = 'field', B = Cat.bld[ex], maxL = Cat.epochs[1].maxLevel;
+    let rows = `<tr><td>1</td><td>${num(B.prod.food)}/с</td><td class="dim">—</td><td>${Object.entries(B.cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
+    for (let L = 2; L <= maxL; L++) {
       const { cost, logos } = Game.upgradeCost(ex, L);
-      rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>${lookCells(ex, L)}<td>${num(Cat.bld[ex].prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))})</span></td>
+      rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>
+        <td>${num(B.prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))} к 1-му)</span></td><td><b>${stepText(L)}</b></td>
         <td>${logos ? `<b>λ ${logos}</b>` : Object.entries(cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`;
     }
+    const w3 = BALANCE.wisdomLevels[3], w5 = BALANCE.wisdomLevels[5], w7 = BALANCE.wisdomLevels[7], w9 = BALANCE.wisdomLevels[9];
     return `
     <p class="story">Дом растёт вместе с семьёй: пристраивают комнату, обносят двор, ставят у входа большой пифос. Но настоящий скачок
     случается, когда меняется сама эпоха.</p>
-    <p>Клик по зданию — что даст следующий уровень; <b>Shift+клик</b> — улучшить сразу.</p>
-    <h4>Два вида уровней</h4>
+    <p>Клик по зданию — что даст следующий уровень и сколько он стоит; <b>Shift+клик</b> — улучшить сразу.</p>
+    <h4>Каждый уровень умножает выпуск</h4>
+    <p>Новый уровень не прибавляет, а <b>умножает</b>: выпуск здания, места в доме, вместимость склада. Множитель зависит от того, чем платите.</p>
+    <table class="pt"><tr><th>Уровни</th><th>Платите</th><th>Рост к прошлому уровню</th></tr>
+      <tr><td>2, 4, 6, 8</td><td>ресурсами; с ${BALANCE.copperFromLevel}-го — ещё и медью, с ${BALANCE.bronzeFromLevel}-го — бронзой</td><td><b>×${BALANCE.levelGrowth}</b></td></tr>
+      <tr class="lv-logos"><td>3 и 7</td><td>Логосом: всего ${w3.logos} и ${w7.logos} λ</td><td><b>×${w3.growth}</b></td></tr>
+      <tr class="lv-logos"><td>5 и 9</td><td>Логосом: своя цена у каждого здания, 9-й — в ${w9.lp} раза дороже 5-го</td><td><b>×${w5.growth}</b></td></tr></table>
+    <p>Множители перемножаются: 5-й уровень — ${BALANCE.levelGrowth} × ${w3.growth} × ${BALANCE.levelGrowth} × ${w5.growth} ≈ <b>×${num(Game.levelMult(5))}</b> к первому,
+    ${maxL}-й — <b>×${num(Game.levelMult(maxL), 1)}</b>.</p>
+    <p>Цена ресурсами растёт в ${BALANCE.upCostGrowth} раза с каждым уровнем, а выпуск — медленнее. Уровни за Логос ресурсов не просят
+    и растят сильнее — это главная награда за учёбу в городе.</p>
     <ul>
-      <li><b>Уровни труда</b> (2, 4, 6, 8) — только за обычные ресурсы. Выпуск ×${BALANCE.levelGrowth}.</li>
-      <li><b>Уровни мудрости</b> (3, 5, 7, 9) — <b>только за λ</b>, без ресурсов. 3-й и 7-й — символические (${BALANCE.wisdomLevels[3].logos} и ${BALANCE.wisdomLevels[7].logos} λ), выпуск ×${BALANCE.wisdomLevels[3].growth};
-      5-й и 9-й — полноценные, выпуск ×${BALANCE.wisdomLevels[5].growth}.</li>
-      <li>${Cat.epochs[0].maxLevel}-й уровень — предел медно-каменного века; дальше — в бронзовом.</li>
+      <li>Предел: ${Cat.epochs[0].maxLevel}-й уровень в медно-каменном веке, ${maxL}-й — в бронзовом.</li>
+      <li>На каждом уровне за Логос зданию нужен ещё один работник (жилищам и складам работники не нужны).</li>
+      <li>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза.</li>
+      <li>С уровнями за Логос здание и выглядит богаче — как именно, увидите сами.</li>
     </ul>
-    <h4>Облик</h4>
-    <ul>
-      <li>По-настоящему облик меняется с <b>эпохой</b>: в бронзовом веке хижины становятся домами из сырцового кирпича, корзины — каменными кладовыми, загоны — фермами.</li>
-      <li>Внутри эпохи облик меняется на <b>каждом уровне мудрости</b>: на 3-м здание наряднее, на 5-м рядом появляется вторая постройка, на 7-м — третья, на 9-м все постройки становятся нарядными. Номер уровня — в уголке клетки.</li>
-    </ul>
-    <h4>Формулы</h4>
-    <p class="formula">Выпуск = база × множитель уровня × (1 + сумма бонусов) × (1 + сумма благословений)</p>
-    <ul>
-      <li><b>Выпуск</b> растёт на каждом уровне: ×${BALANCE.levelGrowth} за уровень труда, ×${BALANCE.wisdomLevels[3].growth} за символический уровень мудрости, ×${BALANCE.wisdomLevels[5].growth} — за полноценный. На ${Cat.epochs[0].maxLevel}-м уровне — ×${num(Game.levelMult(Cat.epochs[0].maxLevel))}, на ${Cat.epochs[1].maxLevel}-м — ×${num(Game.levelMult(Cat.epochs[1].maxLevel), 1)}.</li>
-      <li><b>Цена</b> ресурсами растёт в ${BALANCE.upCostGrowth} раза за каждый уровень, включая λ-уровни, хоть их и не оплачивают ресурсами:
-      4-й уровень стоит как 2-й × ${BALANCE.upCostGrowth} × ${BALANCE.upCostGrowth}. Цена растёт быстрее отдачи — поэтому уровни мудрости так выгодны.</li>
-      <li><b>Бонусы</b> знаний и чудес складываются (+20% и +30% = +50%) и умножают весь выпуск здания с учётом уровня.</li>
-      <li><b>Благословения</b> обрядов складываются между собой (два ×2 на один ресурс — ×3) и умножают всё остальное.</li>
-      <li>Уровни мудрости: 3-й — ${BALANCE.wisdomLevels[3].logos} λ, 7-й — ${BALANCE.wisdomLevels[7].logos} λ для любого здания; 5-й — своя цена здания (10–14 λ), 9-й — в ${BALANCE.wisdomLevels[9].lp} раза дороже 5-го.</li>
-      <li>С ${BALANCE.copperFromLevel}-го уровня нужна медь, с ${BALANCE.bronzeFromLevel}-го — бронза. Предел: ${Cat.epochs[0].maxLevel} в медно-каменном веке, ${Cat.epochs[1].maxLevel} в бронзовом.</li>
-      <li>Жилища и склады растут по той же лесенке. Работников нужно на одного больше за каждые два уровня.</li>
-    </ul>
-    <p>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза.</p>
     <h4>Пример: поле</h4>
-    <table class="pt levels"><tr><th>Ур.</th>${lookHead(ex)}<th>Зерно</th><th>Цена</th></tr>${rows}</table>
-    <p class="dim">Без бонусов. С Зернохранилищами (+25%) и Святилищем (+20%) поле 5-го уровня даёт ${num(Cat.bld[ex].prod.food * Game.levelMult(5))} × 1.45 = ${num(Cat.bld[ex].prod.food * Game.levelMult(5) * 1.45)}/с.</p>`;
+    <table class="pt levels"><tr><th>Ур.</th><th>Зерно</th><th>Рост</th><th>Цена</th></tr>${rows}</table>
+    <p class="dim">Без бонусов. Как выпуск умножают знания, чудеса и обряды — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>`;
   } },
 
   { id: 'techs', icon: '📜', title: 'Знания', html: () => `
@@ -405,23 +420,22 @@ const PEDIA_ARTICLES = [
 
   { id: 'events', icon: '🐐', title: 'События: козы и набеги', html: () => `
     <h4>Беглые козы</h4>
-    <p class="story">Кипрские козы славятся тем, что забираются куда угодно — на крыши, на деревья, в соседский огород.</p>
+    <p class="story">Козы прибыли на Кипр вместе с первыми земледельцами больше десяти тысяч лет назад — на лодках, вместе с овцами,
+    свиньями и даже ланями. С тех пор они повсюду и славятся тем, что забираются куда угодно — на крыши, на деревья, в соседский огород.</p>
     <p>Время от времени на карте появляется коза. Кликните по ней, пока она не ушла в горы (около 14 секунд). Она принесёт одно из двух:
     случайный ресурс за 4 минуты работы поселения или все ресурсы сразу за 1 минуту — и не меньше небольшого минимума.
     ${pl('b:sp_troodos', 'Пастушьи тропы Троодоса')} делают коз частыми гостями и щедрее на 60%; обряд «Благословение стад» призывает козу сразу (раз в минуту).</p>
+    <p>Из козьего и овечьего молока на острове веками делают сыр; самый известный — <b>халлуми</b>, он хорошо держит форму на огне.
+    В игре он и нарисован: белый брусок с полосками от гриля и листиком мяты. А в горах живёт <b>кипрский муфлон</b>
+    (<i>αγρινό</i>, агрино) — дикий баран с огромными закрученными рогами, потомок одичавших древних овец и один из символов Кипра.</p>
+    <p class="tip">Пара слов для карточек: η κατσίκα — коза, το τυρί — сыр, το γάλα — молоко, ο βοσκός — пастух.</p>
     <h4>Набеги «народов моря»</h4>
     <p class="story">Около 1200 г. до н. э. по всему Восточному Средиземноморью горели прибрежные города. Кто были эти разорители — спорят до сих пор.</p>
-    <p>В бронзовом веке примерно раз в 15–25 минут игры с моря приходят разорители и уносят 15% всех запасов (кроме λ).
-    Защищают только ${pl('b:sp_walls', 'Циклопические стены')} — с ними набег отбит, а трофеи достаются вам.</p>` },
-
-  { id: 'goats', icon: '🐏', title: 'Козы и муфлоны Кипра', html: () => `
-    <p class="story">Козы прибыли на Кипр вместе с первыми земледельцами больше десяти тысяч лет назад — на лодках, вместе с овцами,
-    свиньями и даже ланями. С тех пор козы повсюду: на прибрежных холмах, в деревнях, на склонах Троодоса.</p>
-    <p>Из козьего и овечьего молока на острове веками делают сыр; самый известный кипрский сыр — <b>халлуми</b>, хорошо
-    держащий форму на огне. В игре он и нарисован: белый брусок с полосками от гриля и листиком мяты.</p>
-    <p>В горах живёт <b>кипрский муфлон</b> (по-гречески <i>αγρινό</i>, агрино) — дикий баран с огромными закрученными рогами,
-    потомок древних одомашненных овец, одичавших на острове. Сегодня он охраняется и считается одним из символов Кипра.</p>
-    <p class="tip">Пара слов для карточек: η κατσίκα — коза, το τυρί — сыр, το γάλα — молоко, ο βοσκός — пастух.</p>` },
+    <p>В бронзовом веке с моря приходят разорители. <b>Когда — известно заранее</b>: над картой красная плашка «⚔️ Народы моря»
+    с обратным отсчётом — от ${BALANCE.raidEvery[0] / 60} до ${BALANCE.raidEvery[1] / 60} минут игры, после каждого набега срок новый.
+    Уносят <b>от ${BALANCE.raidLoot[0] * 100}% до ${BALANCE.raidLoot[1] * 100}% всех запасов</b> (кроме λ) — сколько, решает случай. Успейте потратить!</p>
+    <p>Пока вас нет в игре, набегов не бывает: отсчёт стоит. Защищают только ${pl('b:sp_walls', 'Циклопические стены')} — с ними набег отбит,
+    а склады вмещают на 50% больше.</p>` },
 
   { id: 'religion', icon: '🛐', title: 'Религия и обряды', html: () => `
     <p class="story">Прежде чем сеять, деревня собиралась у святилища: зерно — земле, первый сыр — богине, песня — для стад.
@@ -468,7 +482,7 @@ const PediaBook = {
     const part = this.partOf(current);
     const parts = [{ id: 'game', title: '🏛️ Игра' }, { id: 'study', title: '📜 Учёба' }];
     if (part === 'study') {
-      const order = ['study', 'cards', 'rewards', 'school', 'import'];
+      const order = ['study', 'settings', 'cards', 'rewards', 'school', 'import'];
       const items = order.map(id => PEDIA_ARTICLES.find(a => a.id === id)).filter(Boolean).map(art);
       return { part, parts, groups: [{ title: 'Учёба', items }], foot: '📚 Открыть «Обучение»' };
     }
@@ -515,7 +529,7 @@ const PediaBook = {
       <p class="formula">Выпуск = база × уровень × (1 + бонусы) × (1 + благословения) × занятость</p>
       <ul>
         <li><b>база</b> — выпуск здания на 1-м уровне;</li>
-        <li><b>уровень</b> — ×${BALANCE.levelGrowth} за уровень труда, ×${BALANCE.wisdomLevels[3].growth} и ×${BALANCE.wisdomLevels[5].growth} за уровни мудрости (${pl('a:upgrade', 'лесенка уровней')});</li>
+        <li><b>уровень</b> — каждый уровень умножает выпуск: ×${BALANCE.levelGrowth} за ресурсы, ×${BALANCE.wisdomLevels[3].growth} или ×${BALANCE.wisdomLevels[5].growth} за Логос (${pl('a:upgrade', 'как растут здания')});</li>
         <li><b>бонусы</b> — знания и чудеса, складываются (+25% и +20% = ×1.45);</li>
         <li><b>благословения</b> — обряды, тоже складываются (два ×2 на один ресурс = ×3);</li>
         <li><b>занятость</b> — хватает ли рук. Сейчас рук ${I.hands} из ${I.need} нужных: поля и загоны работают на ${Math.round(I.effFood * 100)}%, остальное — на ${Math.round(I.effOther * 100)}%.</li>
@@ -581,7 +595,7 @@ const PediaBook = {
     h += `<table class="pt income"><tr><th>Задание</th><th>Цена</th><th>Сейчас</th></tr>
       ${Object.entries(Cat.tasks).filter(([, t]) => t.lambda).map(([id, t]) => `<tr><td>${esc(t.name)}</td><td class="calc">${t.lambda} λ</td><td>${Lesson.reward(id, { kind: 'due' }, m)} λ</td></tr>`).join('')}
       </table>
-      <p>Обычный раунд из 8 карточек — около 60 λ до бонусов, сейчас — около <b>${Math.round(60 * m)} λ</b>.</p>`;
+      <p>Обычный раунд из 8 карточек — около ${ROUND_LAMBDA} λ до бонусов, сейчас — около <b>${Math.round(ROUND_LAMBDA * m)} λ</b>.</p>`;
     return h;
   },
 
@@ -652,18 +666,19 @@ const PediaBook = {
         <h4>История</h4><p class="lore">${B.lore}</p>`;
     }
     const icon = Art.svg(Looks.icons(type, 1)[0]);
-    const forms = B.forms.map((f, i) => f ? `<li>${bi(Looks.icons(type, 1, i)[0])} ${Cat.epochs[i].name}: ${f.name}</li>` : "").join("");
+    const names = B.forms.map((f, i) => f ? `${Cat.epochs[i].name}: ${f.name}` : '').filter(Boolean).join('; ');
     // таблица уровней
-    let main = '';
+    let main = '', step = stepText;
     if (B.prod) { const k = Object.keys(B.prod).find(r => B.prod[r] > 0); main = { label: ri(k) + ' ' + Cat.res[k].name, f: L => num(B.prod[k] * Game.levelMult(L)) + '/с' }; }
     else if (B.cap) main = { label: '👥 Места', f: L => Math.round(B.cap * Game.levelMult(L)) };
     else if (B.storage) main = { label: bi('store0') + ' Склад', f: L => '+' + Math.round(B.storage * Game.levelMult(L)) };
-    else if (B.logosBonus) main = { label: 'λ Бонус', f: L => '+' + Math.round((B.logosBonus + B.logosBonusPerLevel * (L - 1)) * 100) + '%' };
-    const maxL = Cat.epochs[1].maxLevel;
-    let rows = `<tr><td>1</td>${lookCells(type, 1)}<td>${main.f(1)}</td><td>${B.workers || 0}</td><td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
+    else if (B.logosBonus) { main = { label: 'λ Бонус', f: L => '+' + Math.round((B.logosBonus + B.logosBonusPerLevel * (L - 1)) * 100) + '%' }; step = () => '+' + Math.round(B.logosBonusPerLevel * 100) + ' п. п.'; }
+    const maxL = Cat.epochs[1].maxLevel, workers = !!B.workers;
+    const wk = L => workers ? `<td>${B.workers + Math.floor((L - 1) / 2)}</td>` : '';
+    let rows = `<tr><td>1</td><td>${main.f(1)}</td><td class="dim">—</td>${wk(1)}<td>${this.costText(B.cost)} <span class="dim">(постройка)</span></td></tr>`;
     for (let L = 2; L <= maxL; L++) {
       const { cost, logos } = Game.upgradeCost(type, L);
-      rows += `<tr class="${B.epoch === 0 && L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>${lookCells(type, L)}<td>${main.f(L)}</td><td>${B.workers ? B.workers + Math.floor((L - 1) / 2) : 0}</td><td>${this.costText(cost, logos)}</td></tr>`;
+      rows += `<tr class="${B.epoch === 0 && L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${main.f(L)}</td><td><b>${step(L)}</b></td>${wk(L)}<td>${this.costText(cost, logos)}</td></tr>`;
     }
     const prod = B.prod ? Object.entries(B.prod).map(([k, v]) => `${ri(k)} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после ${pl('t:' + B.prodTech[k], '«' + Cat.tech[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
     return this.head(icon, B.name, 'Здание · с эпохи «' + Cat.epochs[B.epoch].name + '»') + `
@@ -672,10 +687,10 @@ const PediaBook = {
       <table class="pt"><tr><td>Где строить</td><td>${terrain}</td></tr>
         ${prod ? `<tr><td>Выпуск на 1-м уровне</td><td>${prod}</td></tr>` : ''}
         ${B.max ? `<tr><td>Ограничение</td><td>не больше ${B.max}</td></tr>` : ''}
-        <tr><td>Облик по эпохам</td><td><ul class="flat">${forms}</ul></td></tr></table>${req}
+        ${B.forms.filter(Boolean).length > 1 ? `<tr><td>По эпохам</td><td>${names}</td></tr>` : ''}</table>${req}
       <h4>Уровни</h4>
-      <table class="pt levels"><tr><th>Ур.</th>${lookHead(type)}<th>${main.label}</th><th>Работники</th><th>Цена</th></tr>${rows}</table>
-      <p class="dim">Уровни выше ${Cat.epochs[0].maxLevel}-го доступны с бронзового века. Выпуск без бонусов. ${pl('a:upgrade', 'Как устроены улучшения')}.</p>
+      <table class="pt levels"><tr><th>Ур.</th><th>${main.label}</th><th>Рост</th>${workers ? '<th>Работники</th>' : ''}<th>Цена</th></tr>${rows}</table>
+      <p class="dim">${B.epoch === 0 ? `Уровни выше ${Cat.epochs[0].maxLevel}-го — с бронзового века. ` : ''}${B.logosBonus ? `Рост — на сколько процентных пунктов бонус больше, чем на прошлом уровне (+${Math.round(B.logosBonus * 100)}% → +${Math.round((B.logosBonus + B.logosBonusPerLevel) * 100)}% → …).` : 'Рост — во сколько раз больше, чем на прошлом уровне.'} Без бонусов. ${pl('a:upgrade', 'Как устроены улучшения')}.</p>
       <h4>История</h4><p class="lore">${B.lore}</p>`;
   },
 

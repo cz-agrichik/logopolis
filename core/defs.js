@@ -19,15 +19,17 @@ const BALANCE = {
   wisdomLevels: {
     3: { logos: 3, growth: 1.25 },
     5: { lp: 1, growth: 1.4 },
-    7: { logos: 5, growth: 1.25 },
-    9: { lp: 2.5, growth: 1.4 },
+    7: { logos: 9, growth: 1.25 },
+    9: { lp: 3, growth: 1.4 },
   },
   copperFromLevel: 6,      // с 6-го уровня (первого в бронзовом веке) улучшения требуют медь
   bronzeFromLevel: 8,      // с 8-го — бронзу
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
-  suppliesSec: 180,        // «Сбор припасов»: столько секунд выпуска (без благословений)
+  suppliesSec: 180,
+  raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
+  raidLoot: [0.1, 0.5],    //   уносят 10–50% всех запасов (без Циклопических стен)        // «Сбор припасов»: столько секунд выпуска (без благословений)
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
@@ -80,7 +82,7 @@ const EPOCHS = [
 // ------------------------------------------------------------
 //  Здания. prod — в секунду на 1-м уровне (минус — сырьё); рост по уровням — BALANCE.levelGrowth / wisdomLevels.
 //  forms — облик по эпохам (null — в эту эпоху здания ещё нет); capBonus — доп. места в жилище.
-//  lp — цена в λ 5-го уровня (уровня мудрости); 9-й — lp × 2.5. 3-й и 7-й — символические, одна цена для всех.
+//  lp — цена в λ 5-го уровня (уровня за Логос); 9-й — lp × 3. 3-й и 7-й — малые: одна цена для всех (3 и 9 λ).
 //  special — чудо древнего Кипра: одно на игру, одна цена (logos — λ), effect — постоянный бонус.
 //  retire — чудо эпохи: с эпохи retire.epoch оно становится обычным зданием into уровня level (бонус чуда пропадает).
 // ------------------------------------------------------------
@@ -104,7 +106,7 @@ const BUILDINGS = {
   shrine1: { special: true, epoch: 0, terrain: ['plain'], cost: { stone: 300, goods: 80 }, logos: 180, effect: { mult: { food: 0.2 }, growth: 0.5, logos: 0.1 } },
   sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } } },
   sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } } },
-  sp_walls: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 6000, wood: 1500 }, logos: 0, effect: { raidShield: true, storagePct: 0.2 } },
+  sp_walls: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 6000, wood: 1500 }, logos: 0, effect: { raidShield: true, storagePct: 0.5 } },
   sp_palace: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 800, wood: 500, goods: 150 }, logos: 350, effect: { all: 0.15, storage: 2000 } },
   shrine2: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 600, copper: 200, goods: 200 }, logos: 450, effect: { logos: 0.2, all: 0.1 } },
 };

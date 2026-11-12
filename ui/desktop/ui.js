@@ -54,8 +54,8 @@ const UI = {
     });
     // события ядра
     Bus.on('log', () => this.renderLog());
-    Bus.on('raid', r => this.toast(r.shielded ? '🧱 Стены отразили набег «народов моря»!'
-      : `⚔️ Набег «народов моря»! Разграблено 15% запасов. Защитят только Циклопические стены.`));
+    Bus.on('raid', r => this.toast(r.shielded ? '🧱 Циклопические стены отразили набег «народов моря»!'
+      : `⚔️ Набег «народов моря»! Унесли ${Math.round(r.pct * 100)}% всех запасов. Защитят только Циклопические стены.`));
     this.renderMap();
     this.renderAll();
   },
@@ -117,7 +117,18 @@ const UI = {
     }).join('');
     const free = Math.max(0, BALANCE.maxBuffs - buffs.length);
     const slots = Array.from({ length: free }, () => `<span class="bf-slot" title="Свободное место для благословения (одновременно — до ${BALANCE.maxBuffs})"></span>`).join('');
-    const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`);
+    // набег «народов моря»: срок известен заранее — обратный отсчёт справа
+    const raidIn = Game.raidIn();
+    let raid = '';
+    if (raidIn != null) {
+      const shield = (Game.fx || Game.effects()).raidShield, mm = `${Math.floor(raidIn / 60)}:${String(Math.floor(raidIn % 60)).padStart(2, '0')}`;
+      const [a, b] = BALANCE.raidLoot;
+      raid = `<span class="bf raid ${shield ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="${shield
+        ? `Набег «народов моря» через ${mm}. Циклопические стены его отразят.`
+        : `Набег «народов моря» через ${mm}: унесут от ${a * 100}% до ${b * 100}% всех запасов. Успейте потратить! Защитят только Циклопические стены.`}">
+        <i class="bf-ic">${shield ? '🧱' : '⚔️'}</i><b>Народы моря</b><small>${mm}</small></span>`;
+    }
+    const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + raid;
     if (bhtml !== this.lastBuffs) {
       this.lastBuffs = bhtml;
       bar.classList.remove('hidden', 'compact');
@@ -285,6 +296,20 @@ const UI = {
   prodChips(p) {
     let h = '';
     for (const [k, v] of Object.entries(p)) h += `<span class="chip ${v < 0 ? 'bad' : 'good'}" title="${Cat.res[k].name}: ${v < 0 ? 'расход' : 'производство'} ${num(Math.abs(v))} в секунду"><i>${Art.res(k)}</i>${v > 0 ? '+' : ''}${num(v)}/с</span>`;
+    return h;
+  },
+  /** Что изменится при улучшении: «было → станет» по каждому выпуску, местам, складу, работникам. */
+  upgradeDeltaHtml(b, target) {
+    const B = Cat.bld[b.type], fx = Game.fx || Game.effects();
+    const now = Game.prodOf(b, fx), next = Game.prodOf(b, fx, target);
+    const chip = (cls, ic, a, z, unit = '') => `<span class="chip ${cls}"><i>${ic}</i>${a} → <b>${z}</b>${unit}</span>`;
+    let h = '';
+    for (const k of Object.keys(next)) h += chip(next[k] < 0 ? 'bad' : 'good', Art.res(k), num(now[k] || 0), num(next[k]), '/с');
+    if (B.cap) h += chip('good', '👥', Game.houseCapOf(b, fx), Game.houseCapOf(b, fx, target), ' мест');
+    if (B.storage) h += chip('good', Art.svg('store0'), '+' + Game.storageOf(b), '+' + Game.storageOf(b, target), ' склад');
+    if (B.logosBonus) { const lb = L => Math.round((B.logosBonus + (B.logosBonusPerLevel || 0) * (L - 1)) * 100); h += chip('good', 'λ', '+' + lb(b.level) + '%', '+' + lb(target) + '%', ' за карточки'); }
+    const w0 = Game.workersOf(b), w1 = Game.workersOf({ type: b.type, level: target });
+    if (w1 !== w0) h += chip('muted', '⚒', w0, w1, ' ' + plural(w1, 'работник', 'работника', 'работников'));
     return h;
   },
   /** Что даёт здание на уровне L (с учётом бонусов). */
@@ -536,15 +561,13 @@ const UI = {
         h += `<div class="upgrade ${up.logos ? 'lv-logos' : ''}">`;
         if (up.capped) h += `<div class="dim">${esc(Msg.reason(up.reason))}</div>`;
         else {
-          const nextIc = Looks.icons(b.type, up.target);
-          h += `<div><b>Улучшение до ${up.target}-го уровня</b>${Looks.newLook(b.type, up.target) ? ` <span class="newlook">наряднее ${nextIc.map(k => Art.svg(k, 'inl')).join('')}</span>` : ''}</div>
-            <div class="dim small">${up.logos ? `Уровень мудрости: оплачивается только Логосом, выпуск ×${Game.levelStep(up.target)}.` : `Уровень труда: выпуск ×${Game.levelStep(up.target)}, цена ресурсами растёт ×${BALANCE.upCostGrowth} за уровень. Бонусы знаний и чудес умножают уже весь выпуск здания.`}</div>
-            <div class="chips">${this.outputHtml(b, up.target)}</div>
-            <div class="chips">${this.costHtml(up.cost, up.logos)}</div>
+          h += `<div class="up-head"><b>Улучшение до ${up.target}-го уровня</b> <span class="up-x" title="Во сколько раз вырастет выпуск">×${num(Game.levelStep(up.target))}</span></div>
+            <div class="chips">${this.upgradeDeltaHtml(b, up.target)}</div>
+            <div class="up-cost"><span class="dim">Цена</span> <span class="chips">${this.costHtml(up.cost, up.logos)}</span></div>
             ${up.reason ? `<div class="item-lock">${esc(Msg.reason(up.reason))}</div>` : ''}
             <button class="btn ${up.logos ? 'gold' : ''}" data-action="upgrade" ${up.ok ? '' : 'disabled'}>Улучшить <kbd>U</kbd></button>`;
         }
-        h += `</div><div class="dim small">Уровни мудрости 3, 5, 7 и 9 — только за λ (3-й и 7-й — символически), остальные — за ресурсы. Облик меняется с эпохой и на каждом уровне мудрости.</div>`;
+        h += `</div>`;
       }
     }
     h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}

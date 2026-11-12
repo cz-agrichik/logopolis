@@ -91,8 +91,8 @@ const Msg = {
       case 'starve': return '⚠️ Голод: житель покинул поселение';
       case 'goatGone': return '🐐 Коза ушла в горы Троодоса…';
       case 'goat': return `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
-      case 'raidShield': return `🧱 Циклопические стены отразили набег «народов моря»! Трофеи: +${p.bonus} ${Lex.res.copper.icon}`;
-      case 'raid': return `⚔️ Набег «народов моря»! Потеряно: ${this.resList(p.lost, '−')}`;
+      case 'raidShield': return '🧱 Циклопические стены отразили набег «народов моря»!';
+      case 'raid': return `⚔️ Набег «народов моря»! ${p.pct ? `Унесли ${Math.round(p.pct * 100)}% запасов: ` : 'Потеряно: '}${this.resList(p.lost, '−')}`;
       case 'decksAdded': return `📚 Добавлены встроенные колоды: ${p.n}`;
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;
       case 'hintGather': return 'Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.';

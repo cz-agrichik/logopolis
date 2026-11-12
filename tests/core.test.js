@@ -85,6 +85,23 @@ test('обряды: λ-благословения — раз в 4 и 8 часо�
   assert.equal(C.run("RITUAL_BY_ID.hornedfeast").buff.logos, 0.75);
 });
 
+test('события: набег через 5–30 минут, срок виден заранее, уносит 10–50%; стены защищают', () => {
+  const G = fresh().get('Game'), s = G.state;
+  assert.equal(G.raidIn(), null, 'в медно-каменном веке набегов нет');
+  s.epoch = 1; G.events(0.01);
+  const t = G.raidIn();
+  assert.ok(t >= 300 - 1 && t <= 1800, 'срок набега известен');
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  G.events(t + 0.1);
+  const pct = 1 - s.res.wood / 1000;
+  assert.ok(pct >= 0.1 - 1e-9 && pct <= 0.5 + 1e-9, 'унесли 10–50%');
+  assert.ok(G.raidIn() >= 300 - 1 && G.raidIn() <= 1800, 'новый срок');
+  s.buildings.push({ id: 880, type: 'sp_walls', level: 1, x: 1, y: 1 }); G.fx = G.effects();
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  G.raid();
+  assert.equal(s.res.wood, 1000, 'стены отразили');
+});
+
 test('город: каждая следующая постройка дороже в 1.25 раза', () => {
   const G = fresh().get('Game');
   const c1 = G.buildCost('field').wood;
@@ -197,7 +214,8 @@ test('обучение: награды по типу задания, серии 
   assert.equal(Ls.reward('build', p), 12);
   assert.equal(Ls.reward('ru2gr', p), 7);
   assert.equal(Ls.reward('spell', p), 6);
-  assert.equal(Ls.reward('flip', p), 4);
+  assert.equal(Ls.reward('flip', p), 1);
+  assert.equal(Ls.reward('match', p), 3);
   assert.equal(Ls.reward('build', { kind: 'early' }), 5);
   assert.equal(Ls.reward('build', p, 1.5), 18);
 });

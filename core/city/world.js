@@ -31,9 +31,9 @@ Object.assign(Game, {
       }
     }
     if (s.epoch >= 1 && !s.finished) {
-      if (s.timers.raid == null) s.timers.raid = rand(900, 1500);
+      if (s.timers.raid == null) s.timers.raid = this.nextRaidIn();
       s.timers.raid -= dt;
-      if (s.timers.raid <= 0) { s.timers.raid = rand(900, 1500); this.raid(); }
+      if (s.timers.raid <= 0) { this.raid(); s.timers.raid = this.nextRaidIn(); }
     }
     return changed;
   },
@@ -63,22 +63,29 @@ Object.assign(Game, {
     return { x: pos.x, y: pos.y, gains, roll };
   },
 
+  /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery). */
+  nextRaidIn() { const [a, b] = BALANCE.raidEvery; return rand(a, b); },
+  /** Сколько секунд до набега — его видно заранее; null — набегов нет (не бронзовый век или игра окончена). */
+  raidIn() {
+    const s = this.state;
+    return s.epoch >= 1 && !s.finished && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
+  },
+  /** Набег: без Циклопических стен уносят случайную долю (BALANCE.raidLoot) всех запасов. */
   raid() {
     const s = this.state, fx = this.fx || this.effects();
     if (fx.raidShield) {
-      const bonus = 60;
-      s.res.copper = Math.min(this.storageCap(fx), s.res.copper + bonus);
-      this.log('raidShield', { bonus });
-      Bus.emit('raid', { shielded: true, bonus });
+      this.log('raidShield');
+      Bus.emit('raid', { shielded: true });
       return;
     }
+    const [a, b] = BALANCE.raidLoot, pct = Math.round(rand(a, b) * 100) / 100;
     const lost = [];
     for (const k of RES_KEYS) {
-      const d = Math.floor(s.res[k] * 0.15);
+      const d = Math.floor(s.res[k] * pct);
       if (d > 0) { s.res[k] -= d; lost.push([k, d]); }
     }
-    this.log('raid', { lost });
-    Bus.emit('raid', { shielded: false, lost });
+    this.log('raid', { lost, pct });
+    Bus.emit('raid', { shielded: false, lost, pct });
   },
 
   /**
