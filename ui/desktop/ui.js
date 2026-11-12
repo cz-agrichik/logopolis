@@ -23,7 +23,8 @@ const UI = {
     measure(); window.addEventListener('resize', measure);
     $('#map').addEventListener('click', e => this.onMapClick(e));
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
-    $('#studyBtn').addEventListener('click', () => Study.start());
+    // в новой игре сначала спрашиваем, что учить (если игрок ещё не ответил)
+    $('#studyBtn').addEventListener('click', () => Game.state.planPending ? this.showLearnPlan(true) : Study.start());
     $('#pediaBtn').addEventListener('click', () => Pedia.open());
     $('#schoolBtn').addEventListener('click', () => School.open());
     $('#logosMedal').addEventListener('click', () => Pedia.open('a:logos'));
@@ -614,8 +615,47 @@ const UI = {
       ${s.epoch === 1 ? 'Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.' : ''}</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до заката бронзового. Спасибо!</p>`;
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
-      <button class="btn gold" data-action="close">${first ? 'Начать' : 'Дальше'}</button></div></div>`;
+      <button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'Дальше →' : 'Дальше'}</button></div></div>`;
     this.showModal(h);
+  },
+
+  /** «Что будем учить?» — в начале каждой новой игры и из «Обучения». thenStudy — после выбора сразу начать раунд. */
+  showLearnPlan(thenStudy = false) {
+    const s = Learn.state, cur = Decks.planOf(s);
+    const started = Object.keys(s.progress).length > 0;
+    this.planThenStudy = thenStudy;
+    let h = `<div class="plan-modal"><div class="dim">Учёба</div><h2>Что будем учить?</h2>
+      <p>Логос дают за карточки. Выберите, какие слова пойдут в раунды, — поменять можно в любой момент в «📚 Обучении».
+      ${started ? 'Прогресс по всем словам сохранится, что бы вы ни выбрали.' : ''}</p>
+      <div class="plans">`;
+    for (const id of Decks.plans(s)) {
+      const P = Cat.plans[id], st = Decks.planStats(s, id);
+      const mark = started && id === cur;
+      h += `<button class="plan ${mark ? 'cur' : ''}" data-action="plan-pick" data-plan="${id}">
+        <span class="plan-ico">${P.icon}</span>
+        <span class="plan-txt"><span class="plan-title"><b>${esc(P.name)}</b>${mark ? '<span class="badge">сейчас</span>' : ''}</span>
+          <span class="plan-desc">${esc(P.desc)}</span>
+          <span class="plan-meta">${st.words} ${plural(st.words, 'слово', 'слова', 'слов')}${st.learned ? ` · выучено ${st.learned}` : ''}</span></span>
+      </button>`;
+    }
+    h += `</div><div class="em-actions">
+      <button class="btn ghost small" data-action="plan-manual">Выбрать колоды вручную</button>
+      ${started ? `<button class="btn small" data-action="plan-keep">Оставить как сейчас${cur ? '' : ' (свой набор)'}</button>` : ''}
+      </div></div>`;
+    this.showModal(h);
+  },
+  pickPlan(id) {
+    const s = Learn.state;
+    delete Game.state.planPending;
+    if (id !== 'keep') {
+      Decks.applyPlan(s, id); Learn.save();
+      const st = Decks.planStats(s, id);
+      this.toast(`🎯 Учим: ${esc(Cat.plans[id].name)} — ${st.words} ${plural(st.words, 'слово', 'слова', 'слов')}`);
+    }
+    const study = this.planThenStudy; this.planThenStudy = false;
+    this.closeModal(); this.renderTop();
+    if (School.isOpen()) School.render(true);
+    if (study) Study.start();
   },
 
   /** Подтверждение внутри игры (без window.confirm — он может быть заблокирован). */
@@ -631,6 +671,10 @@ const UI = {
     const act = a.dataset.action;
     if (act === 'confirm-yes') { const f = this.pendingConfirm; this.pendingConfirm = null; this.closeModal(); if (f) f(); return; }
     if (act === 'close') return this.closeModal();
+    if (act === 'plan') return this.showLearnPlan();
+    if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
+    if (act === 'plan-keep') return this.pickPlan('keep');
+    if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
     if (act === 'demolish' && b) { if (Game.demolish(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } }

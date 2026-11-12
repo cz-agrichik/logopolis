@@ -93,7 +93,7 @@ const Msg = {
       case 'goat': return `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
       case 'raidShield': return '🧱 Циклопические стены отразили набег «народов моря»!';
       case 'raid': return `⚔️ Набег «народов моря»! ${p.pct ? `Унесли ${Math.round(p.pct * 100)}% запасов: ` : 'Потеряно: '}${this.resList(p.lost, '−')}`;
-      case 'decksAdded': return `📚 Добавлены встроенные колоды: ${p.n}`;
+      case 'decksAdded': return `📚 Добавлены встроенные колоды: ${p.n}. Включить их можно в «📚 Обучении» → «Колоды»`;
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;
       case 'hintGather': return 'Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.';
       case 'hintLogos': return 'λ Логос даётся только за карточки — кнопка «📜 Учиться».';

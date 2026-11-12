@@ -250,6 +250,89 @@ test('импорт колоды: разные разделители', () => {
   assert.equal(r.cards[2].back, 'хлеб');
 });
 
+test('колоды: A1 включены с первого дня, A2 и B1 приходят выключенными', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks');
+  const lvl = l => L.state.decks.filter(d => D.levelOf(d) === l);
+  assert.ok(lvl('A1').length >= 8 && lvl('A1').every(d => d.active));
+  assert.ok(lvl('A2').length >= 5 && lvl('A2').every(d => !d.active));
+  assert.ok(lvl('B1').length >= 5 && lvl('B1').every(d => !d.active));
+  const fronts = new Set(D.activeCards(L.state).map(c => c.front));
+  assert.ok(!fronts.has('ξενώνας'), 'слово из A2 не попадает в раунды, пока колода выключена');
+  // греческое слово встречается во встроенных колодах A1–B1 один раз
+  const seen = new Map();
+  for (const d of L.state.decks) if (D.levelOf(d)) for (const c of d.cards) {
+    assert.ok(!seen.has(c.front), `${c.front}: ${seen.get(c.front)} и ${d.id}`);
+    seen.set(c.front, d.id);
+  }
+});
+
+test('«Что будем учить?»: подборка включает свои колоды, остальные выключает; прогресс не трогается', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  const PL = C.get('LEARN_PLANS');
+  for (const P of Object.values(PL)) for (const id of P.decks || []) assert.ok(s.decks.some(d => d.id === id), `колода ${id} существует`);
+  assert.equal(D.planOf(s), 'a1', 'новое обучение — весь A1 (A1+)');
+  assert.deepEqual([...D.plans(s)], ['a1start', 'a1', 'a2', 'b1', 'verbs'], 'без своих колод «Свои колоды» не предлагаем');
+  const a1card = s.decks.find(d => d.id === 'a1-fem').cards[0];
+  s.progress[a1card.id] = { step: 3, rev: 0, due: 0, right: 3, wrong: 0, built: true };
+  D.applyPlan(s, 'a1start');
+  assert.equal(D.planOf(s), 'a1start');
+  assert.ok(D.planStats(s, 'a1start').words < D.planStats(s, 'a1').words);
+  D.applyPlan(s, 'a2');
+  assert.equal(D.planOf(s), 'a2');
+  assert.ok(s.decks.every(d => d.active === (D.levelOf(d) === 'A2')));
+  assert.ok(s.progress[a1card.id], 'прогресс A1 на месте');
+  assert.ok(D.selectRound(s).every(p => D.levelOf(D.deckOfCard(s, p.card.id)) === 'A2'));
+  D.applyPlan(s, 'verbs');
+  assert.ok(D.activeCards(s).length > 200 && s.decks.filter(d => d.active).every(d => /omega|contr|mid|verbs/.test(d.id)));
+  s.decks.find(d => d.id === 'a2-verbs').active = false;
+  assert.equal(D.planOf(s), null, 'выключили колоду вручную — свой набор');
+  s.decks.push(D.makeDeck('Моя', [{ front: 'νερό', back: 'вода' }]));
+  assert.ok(D.plans(s).includes('own'));
+  D.applyPlan(s, 'own');
+  assert.deepEqual([...s.decks.filter(d => d.active).map(d => d.name)], ['Моя']);
+});
+
+test('колоды: встроенная колода, которой больше нет, уходит из сохранения со своим прогрессом', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  const gone = D.makeDeck('B1 · Фразы для письма', [{ front: 'Φιλιά,', back: 'Целую,' }], { id: 'b1-phr', builtin: true });
+  const mine = D.makeDeck('Мои фразы', [{ front: 'Φιλιά,', back: 'Целую,' }]);
+  s.decks.push(gone, mine);
+  s.progress[gone.cards[0].id] = { step: 1, rev: -1, due: 0, right: 1, wrong: 0 };
+  s.progress[mine.cards[0].id] = { step: 1, rev: -1, due: 0, right: 1, wrong: 0 };
+  D.ensureBuiltins(s);
+  assert.ok(!s.decks.some(d => d.id === 'b1-phr'));
+  assert.equal(s.progress[gone.cards[0].id], undefined);
+  assert.ok(s.decks.includes(mine) && s.progress[mine.cards[0].id], 'свои колоды не трогаются');
+});
+
+test('колоды: слово переехало из A1 в A2 — прогресс идёт за ним', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks');
+  const s = L.state;
+  // сохранение со старыми колодами (v2): «ξενώνας» ещё в A1, колод A2/B1 нет
+  const cur = s.decks.find(d => d.id === 'a1-masc');
+  const old = D.makeDeck(cur.name, [...cur.cards, { front: 'ξενώνας', back: 'гостевой дом', hint: 'ο ξενώνας' }], { id: 'a1-masc', builtin: true });
+  old.ver = 2;
+  s.decks = s.decks.filter(d => !/^(a2|b1)-/.test(d.id)).map(d => d.id === 'a1-masc' ? old : d);
+  const was = old.cards.at(-1).id, stay = old.cards[0].id;
+  s.progress[was] = { step: 3, rev: 2, due: 0, right: 5, wrong: 1, built: true };
+  s.progress[stay] = { step: 1, rev: -1, due: 0, right: 1, wrong: 0 };
+  const learned = D.learnedCount(s);
+  const added = D.ensureBuiltins(s);
+  assert.ok(added >= 10, 'добавились колоды A2 и B1');
+  const a2 = s.decks.find(d => d.id === 'a2-masc'), moved = a2.cards.find(c => c.front === 'ξενώνας');
+  assert.equal(a2.active, false);
+  assert.deepEqual(s.progress[moved.id], { step: 3, rev: 2, due: 0, right: 5, wrong: 1, built: true });
+  assert.equal(s.progress[was], undefined);
+  assert.ok(s.progress[stay], 'прогресс оставшихся в A1 слов не трогается');
+  assert.ok(!s.decks.find(d => d.id === 'a1-masc').cards.some(c => c.front === 'ξενώνας'));
+  assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
+  assert.equal(D.ensureBuiltins(s), 0, 'повторный запуск ничего не меняет');
+});
+
 test('сохранение: старое общее сохранение делится на город и обучение', () => {
   const C = loadCore();
   C.run('Game.genMap();');

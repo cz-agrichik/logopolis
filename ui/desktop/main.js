@@ -20,6 +20,7 @@
   const firstScreen = () => {
     if (!saved || Game.state.introPending) {
       delete Game.state.introPending;
+      Game.state.planPending = true;   // «Что будем учить?» — после вступления или перед первым раундом
       Game.log('hintGather');
       Game.log('hintLogos');
       if (saved) Game.log('newGameKept');

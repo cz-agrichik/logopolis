@@ -26,6 +26,7 @@ const Cat = (() => {
     res, terrain, epochs, bld, techs, tech: byId(techs), rites, rite: byId(rites),
     appetites: merge(APPETITES, Lex.appetite),
     tasks: merge(TASK_REWARDS, Lex.task),
+    plans: merge(LEARN_PLANS, Lex.plan),
     /** Облик здания в эпохе: { name, icon, capBonus }. */
     form(type, epoch = Game.state.epoch) {
       const B = bld[type];

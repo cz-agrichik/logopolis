@@ -83,6 +83,8 @@ const School = {
     const allA = s.stats.right + s.stats.wrong;
     let h = `<h2>Обзор</h2>
       <p class="lead">Активные колоды: <b>${s.decks.filter(d => d.active).length}</b> из ${s.decks.length}, слов в них — <b>${t.total}</b>.</p>
+      <div class="plan-now">🎯 Учим: <b>${(() => { const id = Decks.planOf(s); return id ? esc(Cat.plans[id].name) : 'свой набор колод'; })()}</b>
+        <button class="link" data-plan-open>Сменить</button></div>
       ${this.bar(t, true)}
       <div class="kpis">
         ${this.tile(t.learned, 'выучено', 'Слово выучено: верно отвечено нужное число раз и хотя бы раз набрано')}
@@ -123,13 +125,19 @@ const School = {
     return parts.length ? parts.join(' · ') : 'досрочное повторение';
   },
 
-  s_decks() {
-    const s = Learn.state;
-    let h = `<h2>Колоды</h2><p class="dim">Включённые колоды участвуют в раундах. Выключенная колода сохраняет свой прогресс.</p>
-      <div class="bar-legend"><span><i class="learned"></i>выучено</span><span><i class="learning"></i>учатся</span><span><i class="fresh"></i>новые</span></div>`;
-    for (const d of s.decks) {
-      const st = Decks.stats(s, d);
-      h += `<div class="deck ${d.active ? '' : 'off'}">
+  /** Группы колод для списка: стартовая, A1, A2, B1, свои. */
+  deckGroups() {
+    const s = Learn.state, groups = [];
+    const put = (key, d) => { let g = groups.find(x => x.key === key); if (!g) groups.push(g = { key, decks: [] }); g.decks.push(d); };
+    for (const d of s.decks) put(Decks.groupOf(d), d);
+    const order = ['start', 'A1', 'A2', 'B1', 'own'];
+    return groups.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  },
+  groupTitle: { start: 'Стартовый набор', A1: 'A1 · начальный уровень', A2: 'A2 · базовый уровень', B1: 'B1 · средний уровень', own: 'Свои колоды' },
+
+  deckHtml(d) {
+    const s = Learn.state, st = Decks.stats(s, d);
+    return `<div class="deck ${d.active ? '' : 'off'}">
         <label class="deck-head"><input type="checkbox" data-deck-toggle="${d.id}" ${d.active ? 'checked' : ''}> <b>${esc(d.name)}</b>${d.builtin ? '' : ' <span class="badge">своя</span>'}</label>
         ${this.bar(st)}
         <div class="deck-stats">${st.total} ${plural(st.total, 'слово', 'слова', 'слов')} · выучено ${st.learned} · учатся ${st.learning} · новых ${st.fresh}${st.due ? ` · пора повторить ${st.due}` : ''}</div>
@@ -138,6 +146,24 @@ const School = {
           <button class="link danger" data-deck-reset="${d.id}">Сбросить прогресс</button>
           ${d.builtin ? '' : `<button class="link danger" data-deck-del="${d.id}">Удалить</button>`}</div>
       </div>`;
+  },
+
+  s_decks() {
+    const s = Learn.state;
+    this.groupOpen = this.groupOpen || {};
+    let h = `<h2>Колоды</h2><p class="dim">Включённые колоды участвуют в раундах. Выключенная колода сохраняет свой прогресс.
+      Колоды A2 и B1 сначала выключены — включайте их, когда A1 станет лёгким.</p>
+      <div class="bar-legend"><span><i class="learned"></i>выучено</span><span><i class="learning"></i>учатся</span><span><i class="fresh"></i>новые</span></div>`;
+    for (const g of this.deckGroups()) {
+      const on = g.decks.filter(d => d.active).length, words = g.decks.reduce((n, d) => n + d.cards.length, 0);
+      const open = this.groupOpen[g.key] ?? (on > 0 || g.key === 'own');
+      const many = g.decks.length > 1;
+      h += `<details class="dgroup" data-dgroup="${g.key}" ${open ? 'open' : ''}>
+        <summary><b>${esc(this.groupTitle[g.key])}</b>
+          <span class="dim small">${many ? `${g.decks.length} ${plural(g.decks.length, 'колода', 'колоды', 'колод')} · ` : ''}${words} ${plural(words, 'слово', 'слова', 'слов')} · ${many ? (on === g.decks.length ? 'включены все' : on ? `включено ${on} из ${g.decks.length}` : 'все выключены') : on ? 'включена' : 'выключена'}</span></summary>
+        ${many ? `<div class="dgroup-actions">${on < g.decks.length ? `<button class="link" data-group-on="${g.key}">Включить все</button>` : ''}${on ? `<button class="link" data-group-off="${g.key}">Выключить все</button>` : ''}</div>` : ''}
+        ${g.decks.map(d => this.deckHtml(d)).join('')}
+      </details>`;
     }
     h += `<p class="dim small">Встроенные колоды нельзя удалить — только выключить. Свою колоду можно добавить в разделе
       <a href="#" data-sec="io">«Импорт и экспорт»</a>.</p>`;
@@ -149,7 +175,7 @@ const School = {
     const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
     return `<h2>Слова</h2>
       <div class="sw-filters">
-        <select data-wf="deck">${opt('all', 'Все колоды', f.deck)}${opt('active', 'Только включённые', f.deck)}${s.decks.map(d => opt(d.id, d.name, f.deck)).join('')}</select>
+        <select data-wf="deck">${opt('all', 'Все колоды', f.deck)}${opt('active', 'Только включённые', f.deck)}${this.deckGroups().map(g => `<optgroup label="${esc(this.groupTitle[g.key])}">${g.decks.map(d => opt(d.id, d.name, f.deck)).join('')}</optgroup>`).join('')}</select>
         <select data-wf="st">${[['all', 'Любой статус'], ['due', 'Пора повторить'], ['learning', 'Учатся'], ['spelling', 'Осталось набрать ✍'], ['learned', 'Выучены'], ['new', 'Новые'], ['hard', 'Трудные (есть ошибки)']].map(([v, l]) => opt(v, l, f.st)).join('')}</select>
         <input type="search" id="swSearch" placeholder="Поиск по слову или переводу" value="${esc(f.q)}">
         <button class="btn small ghost" data-export-words>Экспорт таблицы</button>
@@ -316,12 +342,20 @@ const School = {
       this.sec = a.dataset.sec; this.render();
       return;
     }
+    const sum = e.target.closest('.dgroup > summary');
+    if (sum) { const g = sum.parentElement; this.groupOpen[g.dataset.dgroup] = !g.open; return; }
     const t = e.target.closest('button');
     if (!t) return;
     const s = Learn.state, d = t.dataset;
     const deckBy = id => s.decks.find(x => x.id === id);
     if ('study' in d) { this.close(true); return Study.start(); }
+    if ('planOpen' in d) return UI.showLearnPlan();
     if ('import' in d) return this.doImport();
+    if (d.groupOn || d.groupOff) {
+      const g = this.deckGroups().find(x => x.key === (d.groupOn || d.groupOff));
+      if (g) { for (const x of g.decks) x.active = !!d.groupOn; this.groupOpen[g.key] = true; Learn.save(); this.render(true); UI.renderTop(); }
+      return;
+    }
     if (d.deckWords) { this.filter = { deck: d.deckWords, st: 'all', q: '' }; this.sec = 'words'; return this.render(); }
     if (d.exportDeck || 'exportDeckSel' in d) {
       const deck = deckBy(d.exportDeck || $('#ioDeck').value);

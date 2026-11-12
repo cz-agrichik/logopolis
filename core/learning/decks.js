@@ -3,6 +3,16 @@
 //  Колоды: стартовые, встроенные, импорт
 // ============================================================
 
+/** Подборки колод для вопроса «Что будем учить?»: decks — id колод, groups — целые группы ('start', 'A1', 'A2', 'B1', 'own'). */
+const LEARN_PLANS = {
+  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-adv', 'a1-omega1', 'a1-omega2'] },
+  a1:      { groups: ['start', 'A1'] },
+  a2:      { groups: ['A2'] },
+  b1:      { groups: ['B1'] },
+  verbs:   { decks: ['a1-omega1', 'a1-omega2', 'a1-contr', 'a1-mid', 'a2-verbs', 'a2-verbs2', 'b1-verbs', 'b1-verbs2'] },
+  own:     { groups: ['own'] },
+};
+
 const Decks = {
   hasGreek(s) { return GREEK_RE.test(s || ''); },
 
@@ -31,35 +41,84 @@ const Decks = {
       { id: SAMPLE_DECK.id, builtin: true });
   },
 
-  /** Все встроенные колоды: стартовая + A1 из words.js. */
+  /** Все встроенные колоды: стартовая + A1/A2/B1 из words.js. Колоды с off: true приходят выключенными. */
   builtinDecks() {
     const list = [this.sampleDeck()];
     if (typeof WORD_DECKS !== 'undefined') {
       for (const d of WORD_DECKS) {
         const deck = this.makeDeck(d.name, d.cards.map(([front, back, hint]) => ({ front, back, hint })), { id: d.id, builtin: true });
         deck.ver = typeof WORD_DECKS_VERSION !== 'undefined' ? WORD_DECKS_VERSION : 1;
+        if (d.off) deck.active = false;
         list.push(deck);
       }
     }
     return list;
   },
 
-  /** Добавляет в сохранение встроенные колоды, которых там ещё нет. */
-  ensureBuiltins(state) {
-    let added = 0;
-    for (const fresh of this.builtinDecks()) {
-      const old = state.decks.find(d => d.id === fresh.id);
-      if (!old) { state.decks.push(fresh); added++; continue; }
-      // обновлённая встроенная колода (например, новый перевод): переносим прогресс по греческому слову
-      if ((old.ver || 1) < (fresh.ver || 1)) {
-        const byFront = new Map(fresh.cards.map(c => [c.front, c]));
-        for (const c of old.cards) {
-          const n = byFront.get(c.front), p = state.progress[c.id];
-          if (n && p && n.id !== c.id) { state.progress[n.id] = p; delete state.progress[c.id]; }
-        }
-        old.cards = fresh.cards; old.ver = fresh.ver; old.name = fresh.name;
-      }
+  /** Уровень встроенной колоды по её id: 'A1', 'A2', 'B1' или '' (стартовая и свои). */
+  levelOf(deck) {
+    const m = deck.builtin && /^([ab][12])-/.exec(deck.id);
+    return m ? m[1].toUpperCase() : '';
+  },
+  /** Группа колоды: 'start' (стартовый набор), 'A1', 'A2', 'B1' или 'own' (свои). */
+  groupOf(deck) { return this.levelOf(deck) || (deck.builtin ? 'start' : 'own'); },
+
+  // ---------- «Что будем учить?»: подборки колод ----------
+  /** Входит ли колода в подборку. */
+  inPlan(id, deck) {
+    const P = LEARN_PLANS[id];
+    return P.decks ? P.decks.includes(deck.id) : P.groups.includes(this.groupOf(deck));
+  },
+  /** Подборки, которые можно выбрать сейчас ('own' — только если есть свои колоды). */
+  plans(state) {
+    return Object.keys(LEARN_PLANS).filter(id => id !== 'own' || state.decks.some(d => this.groupOf(d) === 'own'));
+  },
+  /** Включить колоды подборки, остальные выключить. Прогресс не трогается. */
+  applyPlan(state, id) {
+    if (!LEARN_PLANS[id]) return false;
+    for (const d of state.decks) d.active = this.inPlan(id, d);
+    return true;
+  },
+  /** Какая подборка сейчас включена или null — свой набор колод. */
+  planOf(state) {
+    return this.plans(state).find(id => state.decks.every(d => d.active === this.inPlan(id, d))) || null;
+  },
+  /** Сколько слов в колодах плана и сколько из них уже выучено. */
+  planStats(state, id) {
+    const out = { decks: 0, words: 0, learned: 0 };
+    for (const d of state.decks) {
+      if (!this.inPlan(id, d)) continue;
+      out.decks++; out.words += d.cards.length;
+      for (const c of d.cards) if (this.isLearned(this.prog(state, c.id))) out.learned++;
     }
+    return out;
+  },
+
+  /** Добавляет в сохранение встроенные колоды, которых там ещё нет, и обновляет устаревшие. */
+  ensureBuiltins(state) {
+    const fresh = this.builtinDecks();
+    // слово могло переехать в другую встроенную колоду (например, из A1 в A2) — ищем его по греческому написанию
+    const anywhere = new Map();
+    for (const d of fresh) if (d.id !== SAMPLE_DECK.id) for (const c of d.cards) if (!anywhere.has(c.front)) anywhere.set(c.front, c);
+    for (const nd of fresh) {
+      const old = state.decks.find(d => d.id === nd.id);
+      if (!old || (old.ver || 1) >= (nd.ver || 1)) continue;
+      // обновлённая колода (новый перевод, слово переехало): прогресс идёт за греческим словом
+      const here = new Map(nd.cards.map(c => [c.front, c]));
+      for (const c of old.cards) {
+        const p = state.progress[c.id];
+        if (!p) continue;
+        const n = here.get(c.front) || anywhere.get(c.front);
+        if (n && n.id !== c.id && !state.progress[n.id]) { state.progress[n.id] = p; delete state.progress[c.id]; }
+      }
+      old.cards = nd.cards; old.ver = nd.ver; old.name = nd.name;
+    }
+    // встроенная колода, которой больше нет (например, «Фразы для письма»), уходит вместе со своим прогрессом
+    const ids = new Set(fresh.map(d => d.id));
+    for (const d of state.decks) if (d.builtin && !ids.has(d.id)) for (const c of d.cards) delete state.progress[c.id];
+    state.decks = state.decks.filter(d => !d.builtin || ids.has(d.id));
+    let added = 0;
+    for (const nd of fresh) if (!state.decks.some(d => d.id === nd.id)) { state.decks.push(nd); added++; }
     return added;
   },
 

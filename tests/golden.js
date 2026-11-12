@@ -135,6 +135,16 @@ const SOLVE = `((wrongAt) => {
 })`;
 
 (async () => {
+  /** Закрыть вступление новой игры; где есть «Что будем учить?» — снять его и выбрать «С нуля». */
+  async function startGame(page, snap = false) {
+    if (await page.$('[data-action=plan]')) {
+      await page.click('[data-action=plan]');
+      if (snap) { await shot(page, '01b_plan'); await text(page, 'plan', '#modalBox'); }
+      await page.click('[data-plan=a1]');
+      await page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
+    } else await page.click('[data-action=close]');
+  }
+
   const browser = await chromium.launch();
 
   // ---------- 1. Первый запуск, вкладки, богатое состояние ----------
@@ -143,7 +153,7 @@ const SOLVE = `((wrongAt) => {
     await page.goto(URL + '?reset');
     await shot(page, '01_intro');
     await text(page, 'intro', '#modalBox');
-    await page.click('[data-action=close]');
+    await startGame(page, true);
     await shot(page, '02_start');
     for (const tab of panelTabs) { await page.click(`[data-tab=${tab}]`); await shot(page, '03_tab_' + tab); await text(page, 'tab_' + tab, '#panel'); }
     await page.click('[data-tab=build]');
@@ -178,7 +188,7 @@ const SOLVE = `((wrongAt) => {
   {
     const { ctx, page } = await newPage(browser);
     await page.goto(URL + '?reset');
-    await page.click('[data-action=close]');
+    await startGame(page);
     await page.evaluate(BRONZE_STATE);
     await shot(page, '10_bronze');
     await text(page, 'top_bronze', '#topbar');
@@ -209,7 +219,7 @@ const SOLVE = `((wrongAt) => {
   {
     const { ctx, page } = await newPage(browser, { width: 1200, height: 800 });
     await page.goto(URL + '?reset');
-    await page.click('[data-action=close]');
+    await startGame(page);
     await page.evaluate(BRONZE_STATE);
     await shot(page, '15_narrow');
     await ctx.close();
@@ -219,7 +229,7 @@ const SOLVE = `((wrongAt) => {
   {
     const { ctx, page } = await newPage(browser);
     await page.goto(URL + '?reset');
-    await page.click('[data-action=close]');
+    await startGame(page);
     const res = await page.evaluate(`(() => {
       const s = Game.state, out = [];
       // ядро отдаёт коды и данные; тексты — через словарь (если он есть в этой версии)
@@ -269,7 +279,7 @@ const SOLVE = `((wrongAt) => {
   {
     const { ctx, page } = await newPage(browser);
     await page.goto(URL + '?reset');
-    await page.click('[data-action=close]');
+    await startGame(page);
     const roundLog = [];
     for (let r = 0; r < 10; r++) {
       await page.evaluate(() => Study.start());

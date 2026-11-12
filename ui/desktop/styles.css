@@ -213,6 +213,13 @@ body.placing .tile.valid:hover { background-color: #c4e39a; }
 .dev { margin-top: 14px; padding: 8px; border: 1px dashed var(--ink-2); border-radius: 8px; font-size: 13px; }
 
 .deck { background: #fff8; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.dgroup { margin: 0 0 10px; }
+.dgroup > summary { cursor: pointer; padding: 8px 4px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; border-bottom: 1px solid var(--parch-3); margin-bottom: 8px; }
+.dgroup > summary { list-style: none; }
+.dgroup > summary::-webkit-details-marker { display: none; }
+.dgroup > summary::before { content: '▸'; color: var(--accent); width: 12px; }
+.dgroup[open] > summary::before { content: '▾'; }
+.dgroup-actions { display: flex; gap: 14px; margin: 0 0 8px 4px; font-size: 13px; }
 .deck.off { opacity: .6; }
 .deck-head { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .deck-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin: 8px 0 4px; background: var(--parch-3); }
@@ -268,6 +275,8 @@ label.btn { display: inline-block; }
 .badge.new { background: #dce9c6; color: #34511c; }
 .q-word { font-size: 40px; font-weight: 700; text-align: center; display: flex; align-items: center; gap: 10px; }
 .q-word.greek { color: var(--accent); }
+.q-word.long { font-size: 26px; }   /* фразы-шаблоны */
+.options.long .opt { font-size: 16px; }
 .say { border: 0; background: #fff9; border-radius: 50%; width: 36px; height: 36px; font-size: 17px; cursor: pointer; }
 .say:hover { background: #fff; }
 .q-hint { font-style: italic; color: var(--ink-2); font-size: 15px; }
@@ -782,3 +791,35 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .bf.raid.soon { animation: raidPulse 1s ease-in-out infinite; }
 @keyframes raidPulse { 50% { box-shadow: inset 0 0 0 2px #c8553a, 0 0 16px rgba(200, 85, 58, .7); } }
 @media (orientation: landscape) and (max-height: 520px) { .bf.raid { margin-left: 0; margin-top: auto; } }
+/* длинные фразы на телефоне — мельче, чтобы варианты помещались на экран */
+@media (orientation: landscape) and (max-height: 520px) { .q-word.long { font-size: 17px; } .options.long .opt { font-size: 13px; line-height: 1.25; } }
+@media (orientation: portrait) and (max-width: 700px) { .q-word.long { font-size: 19px; } .options.long .opt { font-size: 14px; } }
+/* «Что будем учить?» */
+.modal-box:has(.plan-modal) { width: min(680px, 100%); }
+.plan-modal { text-align: center; }
+.plan-modal h2 { font-size: 26px; color: var(--accent); margin-top: 4px; }
+.plan-modal > p { text-align: left; font-size: 14px; line-height: 1.5; }
+.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0 12px; }
+.plan { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--parch-3);
+  background: #fff; color: var(--ink); cursor: pointer; font: inherit; }
+.plan:hover, .plan:focus-visible { border-color: var(--accent); }
+.plan.cur { border-color: var(--gold); background: #fff8dc; }
+.plan-ico { font-size: 24px; line-height: 1; }
+.plan-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plan-txt b { font-size: 15px; }
+.plan-title { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.plan-desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.plan-meta { font-size: 12px; color: var(--accent); margin-top: 2px; }
+.plan-modal .em-actions { flex-wrap: wrap; }
+.plan-now { margin: -4px 0 10px; font-size: 14px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 6px 0 8px; }
+  .plan { padding: 6px 8px; gap: 6px; }
+  .plan-ico { font-size: 18px; }
+  .plan-desc { font-size: 11px; }
+  .plan-modal h2 { font-size: 20px; }
+  .plan-modal > p { font-size: 12.5px; margin: 4px 0; }
+}
+@media (orientation: portrait) and (max-width: 700px) { .plans { grid-template-columns: 1fr; } }
+.plan:last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (orientation: landscape) and (max-height: 520px) { .plan:last-child:nth-child(odd) { grid-column: auto; } }

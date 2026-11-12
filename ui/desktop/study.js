@@ -84,7 +84,8 @@ const Study = {
 
   wordHtml(text, big = true) {
     const g = Decks.hasGreek(text);
-    return `<div class="q-word ${g ? 'greek' : ''} ${big ? '' : 'small'}">${esc(text)}${g ? `<button class="say" data-say="${esc(text)}" title="Произнести">🔊</button>` : ''}</div>`;
+    const long = (text || '').length > 36 ? 'long' : '';
+    return `<div class="q-word ${g ? 'greek' : ''} ${big ? '' : 'small'} ${long}">${esc(text)}${g ? `<button class="say" data-say="${esc(text)}" title="Произнести">🔊</button>` : ''}</div>`;
   },
   badge(p) {
     return p.kind === 'new' ? '<span class="badge new">новое</span>' : p.kind === 'early' ? '<span class="badge" title="Карточку ещё не пора повторять — λ меньше">досрочно</span>' : '';
@@ -107,7 +108,7 @@ const Study = {
     return `<div class="q-label">${label} ${this.badge(t.p)} ${this.valueBadge(t.type, t.p)}</div>
       ${this.wordHtml(c[from])}
       <div class="q-hint reveal">${esc(c.hint)}</div>
-      <div class="options">${t.opts.map((o, i) => `<button class="opt ${Decks.hasGreek(o) ? 'greek' : ''}" data-opt="${i}"><kbd>${i + 1}</kbd><span>${esc(o)}</span></button>`).join('')}</div>
+      <div class="options ${t.opts.some(o => o.length > 40) ? 'long' : ''}">${t.opts.map((o, i) => `<button class="opt ${Decks.hasGreek(o) ? 'greek' : ''}" data-opt="${i}"><kbd>${i + 1}</kbd><span>${esc(o)}</span></button>`).join('')}</div>
       <div class="feedback"></div>`;
   },
 
