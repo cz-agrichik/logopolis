@@ -6,13 +6,13 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const CORE_FILES = [
-  'core/util.js', 'core/defs.js',
-  'core/learning/greek.js', 'core/learning/decks.js', 'core/learning/srs.js', 'core/learning/lesson.js',
-  'core/learning/journal.js', 'core/learning/learn.js',
-  'core/city/state.js', 'core/city/economy.js', 'core/city/build.js', 'core/city/research.js',
-  'core/city/rituals.js', 'core/city/epochs.js', 'core/city/world.js', 'core/city/changes.js', 'core/session.js',
-];
+// Список и порядок скриптов ядра — из index.html (ASSETS), чтобы не держать его в двух местах.
+const ASSETS = (() => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const list = html.slice(html.indexOf('var ASSETS = ['), html.indexOf('];', html.indexOf('var ASSETS = [')));
+  return [...list.matchAll(/'([^']+\.js)'/g)].map(m => m[1]);
+})();
+const CORE_FILES = ASSETS.filter(f => f.startsWith('core/'));
 const CONTENT_FILES = ['content/ru/words.js'];
 
 /** Новый независимый экземпляр ядра. seed — для повторяемой случайности. */
@@ -39,4 +39,4 @@ function memoryIO(init = {}) {
   return { data, load: k => (k in data ? data[k] : null), save: (k, v) => { data[k] = v; }, remove: k => { delete data[k]; }, restart() { this.restarted = true; } };
 }
 
-module.exports = { loadCore, memoryIO, ROOT, CORE_FILES };
+module.exports = { loadCore, memoryIO, ROOT, CORE_FILES, ASSETS };

@@ -8,7 +8,6 @@ const pl = (id, text) => `<a href="#" data-pedia="${id}">${text}</a>`;
 const ri = k => Art.res(k, 'inl');
 const bi = k => Art.svg(k, 'inl');
 /** Во сколько раз вырос выпуск на уровне L по сравнению с прошлым: «×1.15», «×1.25», «×1.4». */
-const stepText = L => '×' + num(Game.levelStep(L));
 
 // Ссылки на фотографии реальных находок и мест (поиск по Wikimedia Commons — свободные лицензии)
 const PHOTOS = {
@@ -40,16 +39,18 @@ const PHOTOS = {
   'a:religion': [['Pomos idol', 'идол из Помоса'], ['Kissonerga', 'находки из Киссонерги'], ['Horned God Enkomi', 'Рогатый бог'],
     ['Ingot God Enkomi', 'Слитковый бог'], ['Palaepaphos sanctuary', 'святилище в Палепафосе']],
 };
-// Короткие истории к ресурсам и знаниям
-/** Благословения, доступные в текущей эпохе: разброс цены в λ и длительности — для текстов справки. */
-const riteRange = () => {
-  const list = RITUALS.filter(R => R.buff && R.logos && R.epoch <= Game.state.epoch);
-  const l = list.map(R => Game.ritualLogos(R)), m = list.map(R => R.dur / 60);
-  const span = a => Math.min(...a) === Math.max(...a) ? `${Math.min(...a)}` : `${Math.min(...a)}–${Math.max(...a)}`;
-  return { logos: span(l), minutes: span(m) };
+// Расчёты (что откуда берётся, таблицы уровней, разбросы цен) — в core/city/facts.js; здесь из них собираются тексты.
+/** «30–320»: разброс чисел для текстов справки. */
+const lSpan = a => Math.min(...a) === Math.max(...a) ? `${Math.min(...a)}` : `${Math.min(...a)}–${Math.max(...a)}`;
+/** Благословения, доступные в текущей эпохе: разброс цены в λ и длительности — строками. */
+const riteRange = () => { const r = Game.blessingRanges(); return { logos: lSpan(r.logos), minutes: lSpan(r.minutes) }; };
+/** Пометка в таблице обрядов: когда обряд уйдёт. */
+const riteGone = R => {
+  const g = Game.riteLeaves(R);
+  if (!g) return '';
+  return g.wonder ? ` · уходит, когда святилище станет «${Cat.bld[g.wonder].name}»` : ` · уходит после знания «${Cat.tech[g.tech].name}»`;
 };
-/** Самый высокий уровень зданий во всех открытых эпохах. */
-const topLevel = () => Math.max(...Cat.epochs.map(E => E.maxLevel || 0));
+// Короткие истории к ресурсам и знаниям
 
 const RES_STORY = {
   food: 'Ячмень и пшеница кормили остров тысячи лет: каша, лепёшки, зерно в запас на зиму. Неурожайный год означал голод.',
@@ -84,7 +85,7 @@ const TECH_STORY = {
   pharaoh: 'Геродот пишет, что египетский фараон Амасис (VI в. до н. э.) был «первым из людей», кто покорил Кипр и заставил его платить дань.',
   irontools: 'У Гомера ослеплённый глаз Циклопа шипит, «как шипит топор или тесло, когда кузнец окунает их в холодную воду, — в этом и сила железа».',
   doctors: 'Бронзовая табличка из Идалиона: царь Стасикипр и город обещают врачу Онасилу и его братьям за лечение раненых талант серебра — а если серебра не дадут, то землю в царском уделе, навечно и без податей.',
-  fleet: 'В 480 г. до н. э. киприоты привели в персидский флот 150 кораблей. Цари, по Геродоту, были в повязках-тюрбанах, а гребцы — откуда угодно: из Саламина и Афин, Аркадии, Финикии.',
+  fleet: 'В 480 г. до н. э. киприоты привели в персидский флот 150 кораблей; цари, по Геродоту, были в повязках-тюрбанах. А свой род, по словам самих киприотов, одни вели из Саламина и Афин, другие — из Аркадии, Финикии и даже Эфиопии.',
   gifts: 'Персы прозвали царя Дария «торгашом»: при Кире и Камбисе им несли подарки, а Дарий первым установил твёрдую подать. Кипр платил её вместе с Финикией и Сирией — 350 талантов серебра на всех.',
 };
 
@@ -128,7 +129,7 @@ const PEDIA_ARTICLES = [
       ${pl('a:upgrade', 'уровни 3, 5, 7, 9, 11')} — только за λ. ${pl('a:prices', 'Почему так')}.</li>
       <li><b>Ускоряйтесь обрядами.</b> «Сбор припасов» и ${pl('a:religion', 'благословения')} превращают λ в ресурсы и удвоенную работу.</li>
       <li><b>Расширяйте ${pl('a:storage', 'склады')}</b> — большие цены не поместятся в маленькие амбары.</li>
-      <li><b>Переходите в новую эпоху</b> — ${pl('a:epochs', 'медно-каменный век → бронзовый')}.</li>
+      <li><b>Переходите в новую эпоху</b> — ${pl('a:epochs', 'медно-каменный век → бронзовый → железный')}.</li>
     </ol>
     <h4>Сколько это займёт</h4>
     <p>Медно-каменный век рассчитан на несколько дней. Чем больше учитесь, тем быстрее идёте, но играть можно и без карточек — просто медленнее.
@@ -168,8 +169,8 @@ const PEDIA_ARTICLES = [
     <p>Логос не ограничен складами и не теряется при набегах. Ваш множитель Логоса сейчас и из чего он сложен — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>
     <h4>На что тратится</h4>
     <ul>
-      <li>${pl('a:techs', 'Знания')} — дорога «с умом»: 30–200 λ и немного ресурсов;</li>
-      <li>${pl('a:specials', 'Чудеса Кипра')} — те, что стоят λ: 60–450 λ и скромные ресурсы;</li>
+      <li>${pl('a:techs', 'Знания')} — дорога «с умом»: ${lSpan(Game.logosPrices('techs'))} λ и немного ресурсов;</li>
+      <li>${pl('a:specials', 'Чудеса Кипра')} — те, что стоят λ: ${lSpan(Game.logosPrices('wonders'))} λ и скромные ресурсы;</li>
       <li>${pl('a:upgrade', 'Улучшения')} на 3, 5, 7, 9 и 11-й уровень — только λ;</li>
       <li>${pl('a:religion', 'Обряды')} — «Сбор припасов» за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, благословения за ${riteRange().logos} λ на ${riteRange().minutes} минут;</li>
       <li>${pl('a:epochs', 'Переход эпохи')} — ${Cat.epochs.filter(E => E.advance).map((E, i) => `${E.advance.logos} λ в эпоху «${Cat.epochs[i + 1].name}»`).join(', ')}.</li>
@@ -230,16 +231,18 @@ const PEDIA_ARTICLES = [
     <kbd>Backspace</kbd> — стереть, <kbd>Esc</kbd> — выйти.</p>
     <p>🔊 — произношение. Если звука нет, в Windows добавьте греческий голос: Параметры → Время и язык → Речь → Добавить голоса → Ελληνικά.</p>` },
 
-  { id: 'import', part: 'study', icon: '📥', title: 'Колоды, импорт и экспорт', html: () => `
+  { id: 'import', part: 'study', icon: '📥', title: 'Колоды, импорт и экспорт', html: () => {
+    const nW = l => '~' + Math.round(WORD_DECKS.filter(d => d.id.startsWith(l + '-')).reduce((t, d) => t + d.cards.length, 0) / 10) * 10;
+    return `
     <p class="story">Каждая колода — как свиток в библиотеке писцов: включите нужные, а остальные пусть подождут на полке.</p>
     <h4>Встроенные колоды</h4>
     <p>Стартовый набор «Кипр» и слова из учебника «Κλικ στα ελληνικά» с русским переводом, по уровням:</p>
     <table class="pt">
-      <tr><td><b>A1</b></td><td>~385 слов, включены с самого начала: существительные мужского и женского рода, люди и профессии,
-        наречия и числа, глаголы на -ω, на -άω/-ώ и на -μαι.</td></tr>
-      <tr><td><b>A2</b></td><td>~200 слов: связки и наречия, существительные трёх родов, люди и профессии, прилагательные, глаголы
+      <tr><td><b>A1</b></td><td>${nW('a1')} слов, включены с самого начала: существительные трёх родов, прилагательные, люди и профессии,
+        числа, наречия и связки, глаголы на -ω, на -άω/-ώ и на -μαι.</td></tr>
+      <tr><td><b>A2</b></td><td>${nW('a2')} слов: связки и наречия, существительные трёх родов, люди и профессии, прилагательные, глаголы
         и «Язык учебника» — термины грамматики и слова из заданий («подчеркните», «сопоставьте»).</td></tr>
-      <tr><td><b>B1</b></td><td>~160 слов тех же разделов: связки для письма, существительные, прилагательные, глаголы.</td></tr>
+      <tr><td><b>B1</b></td><td>${nW('b1')} слов тех же разделов: связки для письма, существительные, люди и профессии, прилагательные, глаголы.</td></tr>
     </table>
     <p>В начале каждой новой игры город спрашивает <b>«Что будем учить?»</b> и предлагает подборки колод: «A1 · начинающий»,
     «A1+» (весь A1), «A2», «B1», «Глаголы A1–B1» и, если есть, свои колоды. Выбор включает колоды подборки и выключает остальные; прогресс по словам не теряется.
@@ -267,7 +270,8 @@ const PEDIA_ARTICLES = [
       <tr><td>Колода (.tsv)</td><td>слова без прогресса: «греческий ⇥ перевод ⇥ подсказка». Её можно снова импортировать сюда или в Anki.</td></tr>
       <tr><td>Слова с прогрессом (.tsv)</td><td>таблица для Excel или Google Таблиц: статус, сколько раз верно и с ошибкой, когда следующий повтор.</td></tr>
     </table>
-    <p class="dim">Игра хранит всё только в этом браузере. Копия обучения — единственная страховка, если почистить данные сайта.</p>` },
+    <p class="dim">Игра хранит всё только в этом браузере. Копия обучения — единственная страховка, если почистить данные сайта.</p>`;
+  } },
 
   { id: 'study', part: 'study', icon: '📜', title: 'Как устроена учёба', html: () => `
     <p class="story">В бронзовом веке писцы Кипра записывали слова кипро-минойским письмом, которое мы до сих пор не умеем читать.
@@ -348,10 +352,11 @@ const PEDIA_ARTICLES = [
   { id: 'pop', icon: '👥', title: 'Жители и работники', html: () => `
     <p class="story">В энеолитической деревне дом — это семья: в одном круглом доме жили, ели, работали и хоронили предков.
     Кто живёт в поселении, тот и выходит в поле.</p>
-    <p><b>Места.</b> Жилище даёт 4 места на 1-м уровне, и их становится больше с каждым уровнем (на уровнях за Логос — заметно); в бронзовом веке дома из сырцового кирпича
-    дают ещё +2. Знания «Каменные основания» и «Тёсаная кладка» добавляют места каждому дому, Большой дом Лембы — ещё 5.</p>
+    <p><b>Места.</b> Жилище даёт 4 места на 1-м уровне, и их становится больше с каждым уровнем (на уровнях за Логос — заметно); с бронзового века
+    каждое жилище даёт ещё +2. Знания «Каменные основания», «Тёсаная кладка» и ${pl('t:doctors', '«Врачи Идалиона»')} добавляют места каждому дому,
+    Большой дом Лембы — ещё 5.</p>
     <p><b>Рост.</b> Пока есть свободные места и больше 5 зерна, каждые ${BALANCE.growthTime} секунд приходит новый житель
-    (быстрее со ${pl('b:shrine1', 'Святилищем богини плодородия')} и во время Праздника плодородия).</p>
+    (быстрее со ${pl('b:shrine1', 'Святилищем богини плодородия')} и ${pl('b:sp_aphrodite', 'Афродиты')}, с «Врачами Идалиона» и во время Праздника плодородия).</p>
     <p><b>Еда.</b> Каждый житель съедает ${BALANCE.foodPerPop} зерна в секунду. Если зерно кончилось — голод, и люди уходят.</p>
     <p><b>Работники.</b> Каждому зданию нужны работники: базовое число плюс один за каждые два уровня. Если рук меньше, чем нужно,
     <b>сначала руки получают поля и козьи загоны</b> — зерно работает на 100%, чтобы поселение не скатилось в голод.
@@ -370,14 +375,13 @@ const PEDIA_ARTICLES = [
     <p>Как сложилась ваша вместимость — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>` },
 
   { id: 'upgrade', icon: '⬆️', title: 'Улучшение зданий', html: () => {
-    const ex = 'field', B = Cat.bld[ex], maxL = topLevel();
-    let rows = `<tr><td>1</td><td>${num(B.prod.food)}/с</td><td class="dim">—</td><td>${Object.entries(Game.liveCost(B.cost)).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`;
-    for (let L = 2; L <= maxL; L++) {
-      const { cost, logos } = Game.upgradeCost(ex, L);
-      rows += `<tr class="${L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td>
-        <td>${num(B.prod.food * Game.levelMult(L))}/с <span class="dim">(×${num(Game.levelMult(L))} к 1-му)</span></td><td><b>${stepText(L)}</b></td>
-        <td>${logos ? `<b>λ ${logos}</b>` : Object.entries(cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`;
-    }
+    // пример — поле (Game.levelTable): выпуск, рост к прошлому уровню и цена каждого уровня
+    const maxL = Game.topLevel();
+    const rows = Game.levelTable('field').rows.map(r => r.level === 1
+      ? `<tr><td>1</td><td>${num(r.value)}/с</td><td class="dim">—</td><td>${Object.entries(r.cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')} <span class="dim">постройка</span></td></tr>`
+      : `<tr class="${r.level > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${r.logos ? 'lv-logos' : ''}"><td>${r.level}</td>
+        <td>${num(r.value)}/с <span class="dim">(×${num(Game.levelMult(r.level))} к 1-му)</span></td><td><b>×${num(r.step)}</b></td>
+        <td>${r.logos ? `<b>λ ${r.logos}</b>` : Object.entries(r.cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`).join('');
     const w3 = BALANCE.wisdomLevels[3], w5 = BALANCE.wisdomLevels[5], w7 = BALANCE.wisdomLevels[7], w9 = BALANCE.wisdomLevels[9], w11 = BALANCE.wisdomLevels[11];
     return `
     <p class="story">Дом растёт вместе с семьёй: пристраивают комнату, обносят двор, ставят у входа большой пифос. Но настоящий скачок
@@ -414,7 +418,7 @@ const PEDIA_ARTICLES = [
     <ul>
       <li><b>🧠 С умом</b> — Логос плюс немного ресурсов. Быстро: награда за учёбу.</li>
       <li><b>💪 Через силу</b> — без λ, но ресурсная часть цены ×${BALANCE.laborTechMult}, а каждый λ заменяется ${BALANCE.laborPerLogos} единицами
-      дерева и камня (в бронзовом веке — дерева, камня и товаров; меди этот путь не просит).</li>
+      дерева и камня (с бронзового века — дерева, камня и товаров, а после «Финикийцев» вместо товаров серебро; меди этот путь не просит).</li>
       <li>Во второй половине железного века «через силу» — значит <b>купить у чужеземцев</b>: нанять врача из чужих краёв,
       кузнецов из Тира, корабли в Сидоне. Каждый λ цены заменяется ${BALANCE.laborSilverPerLogos} серебра — по ценнику столько же, сколько обычная замена.</li>
       <li>С каждой эпохой этот путь <b>жёстче</b>: в железном веке вся его цена ещё ×${BALANCE.laborEpochMult[2]}. Чем дальше, тем ценнее учёба.</li>
@@ -427,12 +431,14 @@ const PEDIA_ARTICLES = [
   { id: 'specials', icon: '✨', title: 'Чудеса древнего Кипра', html: () => `
     <p class="story">У каждого острова есть места, о которых рассказывают внукам: огромный круглый дом, где собиралась вся деревня,
     гора, куда летом уходят стада, святилище, где богине приносят первый сыр.</p>
-    <p>Уникальные постройки по мотивам реальных памятников Кипра. Каждое возводится один раз и заметно меняет экономику; улучшать их не нужно.
-    Святилище богини плодородия, Дворец Аласии и Святилище Рогатого бога нужны для перехода эпох.</p>
+    <p>Уникальные постройки по мотивам реальных памятников Кипра. Каждое возводится один раз и заметно меняет экономику; уровней у них нет,
+    но в железном веке некоторые старые чудеса ${pl('a:changes', 'улучшаются на месте')} — святилища и Троодос.
+    Для перехода эпох нужны ${Game.advanceWonders().map(t => pl('b:' + t, Cat.bld[t].name)).join(', ')}.</p>
     <p>Цена у каждого одна: одни стоят λ и скромные ресурсы, другие — только ресурсы, зато их в разы больше.</p>
     <p><b>⏳ Чудеса эпохи.</b> Большой круглый дом Лембы и Мастера Суской принадлежат медно-каменному веку: с переходом в бронзовый
-    они становятся обычными зданиями 5-го уровня — домом и мастерской (бонус чуда пропадает, место и уровень остаются). Если чудо в этот момент
-    на складе, его можно поставить позже — уже как такое здание.</p>
+    они становятся обычными зданиями 5-го уровня — домом и мастерской (бонус чуда пропадает, место и уровень остаются). Так же с переходом
+    в железный век Гавань Хала-Султан-Текке становится гаванью, а Святилище Слиткового бога — бронзолитейней, обе 9-го уровня.
+    Если чудо в этот момент на складе, его можно поставить позже — уже как такое здание.</p>
     <p><b>📦 Склад чудес.</b> Чудо можно убрать с карты (кнопка в его окне) и потом бесплатно поставить в другое место —
     во вкладке «Строить» оно будет отмечено «На складе». Пока чудо на складе, его бонус не действует; для перехода эпохи оно всё равно засчитывается.</p>
     ${Cat.epochs.map((E, e) => {
@@ -448,8 +454,10 @@ const PEDIA_ARTICLES = [
     <p><b>Логос по ходу эпохи.</b> Крупные траты λ разнесены, чтобы не копить всё к концу: в начале — первые знания и
     ${pl('b:sp_lemba', 'Большой дом Лембы')} (в бронзовом веке — ${pl('b:sp_palace', 'Дворец Аласии')}); в середине — обязательное святилище
     (${pl('b:shrine1', 'богини плодородия')} или ${pl('b:shrine2', 'Рогатого бога')}) — оно не ждёт поздних ресурсов;
-    в конце — последнее знание эпохи и высокие уровни зданий. Сам переход стоит немного λ: главное в нём — запасы и население.</p>
-    <p>С новой эпохой все здания перерисовываются, поднимается предел улучшения, появляются новые ресурсы, знания, чудеса и обряды.</p>
+    в конце — последнее знание эпохи и высокие уровни зданий. В железном веке λ ждут ${pl('b:sp_aphrodite', 'Святилище Афродиты')}
+    и обязательные ${pl('b:sp_salamis', 'Царские гробницы Саламина')}. Сам переход стоит немного λ: главное в нём — запасы и население.</p>
+    <p>С новой эпохой поднимается предел улучшения, у зданий появляется новый облик на новых верхних уровнях, появляются новые ресурсы,
+    знания, чудеса и обряды.</p>
     <ul>${Cat.epochs.map((E, i) => `<li>${pl('e:' + i, E.name)} <span class="dim">${E.sub}</span>${E.locked ? ' — в следующей версии' : ''}</li>`).join('')}</ul>` },
 
   { id: 'offline', icon: '🌙', title: 'Пока вас нет', html: () => `
@@ -459,12 +467,12 @@ const PEDIA_ARTICLES = [
       <li>первые ${Math.round(BALANCE.offlineFullSec / 60)} минут — в полную силу, как будто вы в игре;</li>
       <li>дальше — вполовину, но не дольше ${BALANCE.offlineMaxHours} часов; всё упирается в склады;</li>
       <li>время идёт по-настоящему: благословения работают, пока не истекут, перерывы обрядов тоже проходят;</li>
-      <li>в бронзовом веке может прийти набег «народов моря»: если его срок подошёл, набег будет один — в самом конце,
-        по всему накопленному. После возвращения отсчёт до следующего набега начинается заново;</li>
+      <li>в бронзовом веке может прийти набег «народов моря», в железном — сборщики ${pl('a:events', 'дани')}: если срок подошёл, они придут
+        один раз — в самом конце, по всему накопленному. После возвращения отсчёт начинается заново;</li>
       <li>беглых коз в ваше отсутствие не бывает.</li>
     </ul>
     <p>При возвращении появится окно «С возвращением!»: сколько чего прибавилось, сколько пришло жителей, какие благословения закончились
-    и что унёс набег.</p>` },
+    и что унёс набег или забрала дань.</p>` },
 
   { id: 'events', icon: '🐐', title: 'События: козы и набеги', html: () => `
     <h4>Беглые козы</h4>
@@ -526,8 +534,8 @@ const PEDIA_ARTICLES = [
       <li><b>Геродот, III, 89 и 91.</b> При Кире и Камбисе персам несли подарки, а Дарий первым установил твёрдую подать —
         за это его и прозвали «торгашом». Пятый округ — от Посидея до Египта, с Финикией, Палестинской Сирией и Кипром — платил 350 талантов.
         ${src('https://lexundria.com/hdt/3.89/mcly', 'Геродот 3.89')} · ${src('https://lexundria.com/hdt/3.91/mcly', 'Геродот 3.91')}</li>
-      <li><b>Геродот, VII, 90.</b> В флоте Ксеркса (480 г. до н. э.) киприоты дали 150 кораблей; цари были в повязках на голове,
-        а экипажи, по словам самих киприотов, — из Саламина и Афин, Аркадии, Кифноса, Финикии и Эфиопии.
+      <li><b>Геродот, VII, 90.</b> Во флот Ксеркса (480 г. до н. э.) киприоты дали 150 кораблей; цари были в повязках на голове.
+        А сами киприоты, по их словам, вели род кто из Саламина и Афин, кто из Аркадии, Кифноса, Финикии и Эфиопии — остров собирал людей отовсюду.
         ${src('https://lexundria.com/hdt/7.90/mcly', 'Геродот 7.90')} · ${src('https://livius.org/articles/place/cyprus/cyprus-3', 'Livius: Persian Cyprus')}</li>
     </ul>
     <h4>Серебро и врачи</h4>
@@ -588,7 +596,7 @@ const PEDIA_ARTICLES = [
     <p>Вкладка «Обряды». Сверху — <b>«Сбор припасов»</b>: не обряд, а мгновенная выдача: 3 минуты обычного производства (благословения не учитываются) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, раз в ${RITUAL_BY_ID.elders.cooldown / 60} минуты.
     Ниже — благословения: они удваивают производство своих ресурсов на ${riteRange().minutes} минут — дольше и выгоднее «Сбора припасов», но не на всё сразу. Благословения на один ресурс складываются: два «×2» дают ×3, а не ×4. Идущее благословение светится золотом, его можно продлить
     (до ${BALANCE.maxBuffMinutes} минут), но не усилить. Одновременно — не больше ${BALANCE.maxBuffs} благословений. Активные показаны над картой.</p>
-    <table class="pt">${Cat.rites.map(R => `<tr><td>${Looks.riteIcon(R).replace('class="ico', 'class="ico inl')} ${R.name}</td><td>${R.desc}<br><span class="dim">${[R.logos ? 'λ ' + Game.ritualLogos(R) : 'без λ', ...Object.entries(Game.liveCost(R.cost)).map(([k, v]) => ri(k) + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, Cat.bld[R.req].name)}` : ''}${R.epoch ? ` · с эпохи «${Cat.epochs[R.epoch].name}»` : ''}</span></td></tr>`).join('')}</table>
+    <table class="pt">${Cat.rites.map(R => `<tr><td>${Looks.riteIcon(R).replace('class="ico', 'class="ico inl')} ${R.name}</td><td>${R.desc}<br><span class="dim">${[R.logos ? 'λ ' + Game.ritualLogos(R) : 'без λ', ...Object.entries(Game.liveCost(R.cost)).map(([k, v]) => ri(k) + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, Cat.bld[R.req].name)}` : ''}${R.epoch ? ` · с эпохи «${Cat.epochs[R.epoch].name}»` : ''}${riteGone(R)}</span></td></tr>`).join('')}</table>
     <p class="dim">Цены — для вашей эпохи: обряды прошлых эпох с каждой новой стоят в 1.5 раза больше λ.</p>
     <h4>Религия медно-каменного века</h4>
     <p>Письменных источников нет — только находки. Главный образ эпохи — фигурки с раскинутыми руками, похожие на крест:
@@ -598,7 +606,12 @@ const PEDIA_ARTICLES = [
     <h4>Религия бронзового века</h4>
     <p>Появляются настоящие святилища. В Энкоми почитают бога в рогатом шлеме и «Слиткового бога», стоящего на медном слитке, —
     покровителя главного богатства острова. В святилищах Энкоми и Китиона находят бычьи черепа, обработанные так, чтобы их
-    можно было надеть: жрецы, по-видимому, выступали в бычьих масках. Около 1200 г. до н. э. в Палепафосе основано святилище богини, которую греки позже назовут Афродитой.</p>` },
+    можно было надеть: жрецы, по-видимому, выступали в бычьих масках. Около 1200 г. до н. э. в Палепафосе основано святилище богини, которую греки позже назовут Афродитой.</p>
+    <h4>Религия железного века</h4>
+    <p>Богиня Пафоса становится Афродитой Пафосской; на Кипре её сближают с финикийской Астартой — в Китионе ей построили большой храм
+    прямо на руинах святилища бронзового века. Цари Кипра — ещё и жрецы: царский род Пафоса вёл себя от Кинира, первого жреца богини.
+    В Курионе почитают Аполлона Гилата — «лесного», а в сельском святилище Айя-Ирини у алтаря нашли около двух тысяч глиняных фигурок:
+    воинов, колесницы, быков.</p>` },
 
   { id: 'keys', icon: '⌨️', title: 'Управление', html: () => `
     <table class="pt">
@@ -679,7 +692,7 @@ const PediaBook = {
         <li><b>благословения</b> — обряды, тоже складываются (два ×2 на один ресурс = ×3);</li>
         <li><b>занятость</b> — хватает ли рук. Сейчас рук ${I.hands} из ${I.need} нужных: поля и загоны работают на ${Math.round(I.effFood * 100)}%, остальное — на ${Math.round(I.effOther * 100)}%.</li>
       </ul>
-      <p>Сырьё переработчиков (медь у гаваней и литеен) = база × уровень × занятость: бонусы его не увеличивают.
+      <p>Сырьё переработчиков (медь у гаваней и литеен, дерево у кузниц) = база × уровень × занятость: бонусы его не увеличивают.
       Если склад для того, что здание делает, полон, оно отдыхает и сырьё не тратит. Жители съедают по ${BALANCE.foodPerPop} зерна в секунду.</p>
       <h4>Итого</h4>
       <table class="pt income"><tr><th>Ресурс</th><th>В секунду</th><th>За 10 минут</th><th>Запас / склад</th></tr>
@@ -689,14 +702,14 @@ const PediaBook = {
       h += `<h4>${ri(k)} ${Cat.res[k].name}: ${sign(R.total)} в секунду</h4>
         <table class="pt income"><tr><th>Откуда</th><th>Расчёт на одно здание</th><th>В секунду</th></tr>`;
       for (const r of R.rows) {
-        const who = `${esc(Cat.form(r.type).name)} <span class="dim">ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</span>`;
+        const who = `${esc(Looks.name(r.type, r.level))} <span class="dim">ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</span>`;
         const calc = r.base > 0
           ? `${num(r.base, 3)} × ${num(r.lm)} × ${num(r.perm)} × ${num(r.buff)} × ${Math.round(r.eff * 100)}% = ${num(r.perOne, 3)}`
           : `−${num(-r.base, 3)} × ${num(r.lm)} × ${Math.round(r.eff * 100)}%${r.share < 1 ? ` × ${num(r.share)} <span class="dim">(часть склада полна)</span>` : ''} = −${num(-r.perOne, 3)}`;
         h += `<tr><td>${who}${r.base < 0 ? ' <span class="dim">сырьё</span>' : ''}</td><td class="calc">${calc}</td><td>${sign(r.total, 3)}</td></tr>`;
       }
       if (R.eaten && R.eaten.pop) h += `<tr><td>Жители</td><td class="calc">${R.eaten.pop} × ${R.eaten.per}</td><td>${sign(R.eaten.total, 3)}</td></tr>`;
-      for (const r of R.skipped) h += `<tr class="dim"><td>${esc(Cat.form(r.type).name)} ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</td><td>${r.skip === 'full' ? 'отдыхает: склад полон' : 'простаивает: не хватает сырья'}</td><td>0</td></tr>`;
+      for (const r of R.skipped) h += `<tr class="dim"><td>${esc(Looks.name(r.type, r.level))} ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</td><td>${r.skip === 'full' ? 'отдыхает: склад полон' : 'простаивает: не хватает сырья'}</td><td>0</td></tr>`;
       if (!R.rows.length && !(R.eaten && R.eaten.pop) && !R.skipped.length) h += `<tr><td colspan="3" class="dim">Пока ничего не производится.</td></tr>`;
       h += `<tr class="sum"><td><b>Итого</b></td><td></td><td><b>${sign(R.total, 3)}</b></td></tr></table>`;
       // из чего сложились бонусы и благословения
@@ -721,7 +734,7 @@ const PediaBook = {
   logosCalcHtml() {
     const L = Game.logosBreakdown(), m = L.total;
     const name = p => p.kind === 'tech' ? pl('t:' + p.id, '«' + Cat.tech[p.id].name + '»') : p.kind === 'rite' ? Cat.rite[p.id].name
-      : p.kind === 'building' ? `${esc(Cat.form(p.id).name)} <span class="dim">ур. ${p.level}</span>` : pl('b:' + p.id, Cat.bld[p.id].name);
+      : p.kind === 'building' ? `${esc(Looks.name(p.id, p.level))} <span class="dim">ур. ${p.level}</span>` : pl('b:' + p.id, Cat.bld[p.id].name);
     const pct = v => '+' + Math.round(v * 100) + '%';
     let h = `<h3>Логос за карточки</h3>
       <p class="formula">λ за верный ответ = цена задания × множитель Логоса</p>
@@ -731,7 +744,7 @@ const PediaBook = {
         ${L.parts.map(p => `<tr><td>${name(p)}</td><td class="calc">${p.kind === 'rite' ? `благословение, ещё ${Math.ceil(p.left / 60)} мин` : p.kind === 'building' ? 'писцы, растёт с уровнем' : 'постоянно'}</td><td>${pct(p.v)}</td></tr>`).join('')}
         <tr class="sum"><td><b>Итого</b></td><td class="calc">1 ${L.parts.map(p => '+ ' + num(p.v)).join(' ')}</td><td><b>×${num(m)}</b></td></tr></table>`;
     // λ-благословения: когда можно
-    const golden = RITUALS.filter(R => R.buff && R.buff.logos && R.epoch <= Game.state.epoch);
+    const golden = Game.goldenRites();   // сменённые новыми не показываем
     if (golden.length) h += `<ul class="income-notes">${golden.map(R => {
       const st = Game.ritualStatus(R), left = Game.state.buffs[R.id], C = Cat.rite[R.id];
       const when = left > 0 ? `идёт, ещё ${Math.ceil(left / 60)} мин` : st.locked ? esc(Msg.reason(st.reason)).replace(/^./, c => c.toLowerCase()) : st.cd ? `снова через ${fmtWait(st.cd)}` : 'можно начать';
@@ -753,7 +766,7 @@ const PediaBook = {
       <p>Предел общий, но действует на каждый ресурс отдельно: столько зерна, столько дерева, столько камня… Цену больше вместимости заплатить нельзя.</p>
       <table class="pt income"><tr><th>Откуда</th><th>Расчёт</th><th>Мест</th></tr>
         <tr><td>Без построек</td><td class="calc">база</td><td>${S.base}</td></tr>
-        ${S.rows.map(r => `<tr><td>${esc(Cat.form(r.type).name)} <span class="dim">ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</span></td><td class="calc">${BUILDINGS[r.type].storage} × ${num(Game.storeMult(r.level))} = ${r.each}${r.n > 1 ? ' × ' + r.n : ''}</td><td>+${r.each * r.n}</td></tr>`).join('')}
+        ${S.rows.map(r => `<tr><td>${esc(Looks.name(r.type, r.level))} <span class="dim">ур. ${r.level}${r.n > 1 ? ' × ' + r.n : ''}</span></td><td class="calc">${BUILDINGS[r.type].storage} × ${num(Game.storeMult(r.level))} = ${r.each}${r.n > 1 ? ' × ' + r.n : ''}</td><td>+${r.each * r.n}</td></tr>`).join('')}
         ${S.flat.map(p => `<tr><td>${name(p)}</td><td class="calc">прибавка</td><td>+${p.v}</td></tr>`).join('')}
         <tr><td><b>Сумма</b></td><td></td><td>${S.sum}</td></tr>
         ${S.pct.map(p => `<tr><td>${name(p)}</td><td class="calc">проценты</td><td>+${Math.round(p.v * 100)}%</td></tr>`).join('')}
@@ -770,19 +783,18 @@ const PediaBook = {
   },
 
   resArticle(k) {
-    const R = Cat.res[k];
-    const from = [], to = [];
-    for (const [id, B] of Object.entries(Cat.bld)) {
-      const name = B.special ? B.name : B.name;
-      if (B.prod && B.prod[k] > 0) from.push(pl('b:' + id, name));
-      if (B.prod && B.prod[k] < 0) to.push(pl('b:' + id, name) + ' (сырьё)');
-      if (B.trade && B.trade.in[k]) to.push(pl('b:' + id, name) + ` (после «${Cat.tech[B.trade.tech].name}»)`);
-      if (B.trade && B.trade.out[k]) from.push(pl('b:' + id, name) + ` (сверх работы, после «${Cat.tech[B.trade.tech].name}»)`);
-      if (B.cost && B.cost[k]) to.push(pl('b:' + id, name));
-    }
-    for (const t of Cat.techs) if (t.cost[k]) to.push(pl('t:' + t.id, t.name));
-    Cat.epochs.forEach((E, i) => { if (E.advance && E.advance.res[k]) to.push(pl('e:' + i, 'переход: ' + E.name)); });
-    const gather = Object.entries(Cat.terrain).filter(([, T]) => T.gather === k).map(([, T]) => T.name.toLowerCase());
+    const R = Cat.res[k], U = Game.resourceUses(k);   // всё «сейчас»: ушедший ресурс (товары) уже пересчитан в преемника (серебро)
+    const after = t => `после знания «${Cat.tech[t].name}»`;
+    const from = U.from.map(x => pl('b:' + x.type, Cat.bld[x.type].name) + (x.via === 'trade' ? ` (сверх работы, ${after(x.tech)})` : ''));
+    const to = U.to.map(x => x.kind === 'tech' ? pl('t:' + x.id, Cat.tech[x.id].name)
+      : x.kind === 'epoch' ? pl('e:' + x.epoch, 'переход из эпохи «' + Cat.epochs[x.epoch].name + '»')
+      : pl('b:' + x.type, Cat.bld[x.type].name) + (x.via === 'input' ? ' (сырьё)' : x.via === 'trade' ? ` (${after(x.tech)})` : ''));
+    // ресурс уходит (бронза, товары, сыр в железном веке) — во что и после какого знания
+    const g = U.gone;
+    const goneNote = g ? `<p class="tip">${g.done ? 'Ушёл из хозяйства' : 'В железном веке уйдёт из хозяйства'}: после знания ${pl('t:' + g.tech, '«' + Cat.tech[g.tech].name + '»')} ${g.stock === 0
+      ? `запасы пропадают, а цены пересчитываются в ${Cat.res[g.into].name.toLowerCase()} 1 : 1`
+      : `${g.prodToo ? 'запасы, цены и выпуск зданий' : 'запасы и цены'} переходят в ${Cat.res[g.into].name.toLowerCase()} — ${Math.round(1 / g.rate)} : 1`}.</p>` : '';
+    const gather = U.gather.map(t => Cat.terrain[t].name.toLowerCase());
     const extra = {
       food: 'Жители съедают по ' + BALANCE.foodPerPop + ' зерна в секунду. Без зерна — голод.',
       cheese: 'Сыр делают в козьих загонах после знания ' + pl('t:cheesemaking', '«Сыроделие»') + '. Нужен для обрядов в святилище и для перехода в бронзовый век.',
@@ -798,9 +810,9 @@ const PediaBook = {
     }[k] || '';
     return this.head(Art.res(k), R.name, 'Ресурс') + (RES_STORY[k] ? `<p class="story">${RES_STORY[k]}</p>` : '') + `
       <p>Появляется: ${Cat.epochs[R.epoch].name}${R.tech ? `, после знания ${pl('t:' + R.tech, '«' + Cat.tech[R.tech].name + '»')}` : ''}.</p>
-      ${extra ? `<p>${extra}</p>` : ''}
+      ${extra ? `<p>${extra}</p>` : ''}${goneNote}
       <p>📊 Сколько у вас прибывает сейчас и почему — в ${pl('a:income', '«Хозяйстве в цифрах»')}.</p>
-      <h4>Где добыть</h4><p>${from.join(', ') || '—'}${gather.length ? `; вручную — клик по клетке «${gather.join(', ')}»` : ''}${['food', 'wood', 'stone', 'cheese', 'goods'].includes(k) ? '; ' + pl('a:events', 'беглые козы') : ''}.</p>
+      <h4>Где добыть</h4><p>${from.join(', ') || '—'}${gather.length ? `; вручную — клик по клетке «${gather.join(', ')}»` : ''}${U.goats ? '; ' + pl('a:events', 'беглые козы') : U.maenads ? '; ' + pl('a:events', 'вакханки') : ''}.</p>
       <h4>На что идёт</h4><p>${to.join(', ') || '—'}.</p>
       <p class="dim">Хранится в пределах вместимости ${pl('a:storage', 'складов')}.</p>`;
   },
@@ -819,21 +831,21 @@ const PediaBook = {
         <h4>История</h4><p class="lore">${B.lore}</p>`;
     }
     const icon = Art.svg(Looks.icons(type, 1)[0]);
-    const names = B.forms.map((f, i) => f ? `${Cat.epochs[i].name}: ${f.name}` : '').filter(Boolean).join('; ');
-    // таблица уровней
-    let main = '', step = stepText;
-    if (B.prod) { const k = Object.keys(B.prod).find(r => B.prod[r] > 0); main = { label: ri(k) + ' ' + Cat.res[k].name, f: L => num(B.prod[k] * Game.levelMult(L)) + '/с' }; }
-    else if (B.cap) main = { label: '👥 Места', f: L => Math.round(B.cap * Game.levelMult(L)) };
-    else if (B.storage) { main = { label: bi('store0') + ' Склад', f: L => '+' + Math.round(B.storage * Game.storeMult(L)) }; step = L => '×' + num(Game.storeMult(L) / Game.storeMult(L - 1)); }
-    else if (B.logosBonus) { main = { label: 'λ Бонус', f: L => '+' + Math.round((B.logosBonus + B.logosBonusPerLevel * (L - 1)) * 100) + '%' }; step = () => '+' + Math.round(B.logosBonusPerLevel * 100) + ' п. п.'; }
-    const maxL = topLevel(), workers = !!B.workers;
-    const wk = L => workers ? `<td>${B.workers + Math.floor((L - 1) / 2)}</td>` : '';
-    let rows = `<tr><td>1</td><td>${main.f(1)}</td><td class="dim">—</td>${wk(1)}<td>${this.costText(Game.liveCost(B.cost))} <span class="dim">(постройка)</span></td></tr>`;
-    for (let L = 2; L <= maxL; L++) {
-      const { cost, logos } = Game.upgradeCost(type, L);
-      rows += `<tr class="${B.epoch === 0 && L > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${logos ? 'lv-logos' : ''}"><td>${L}</td><td>${main.f(L)}</td><td><b>${step(L)}</b></td>${wk(L)}<td>${this.costText(cost, logos)}</td></tr>`;
-    }
-    const prod = B.prod ? Object.entries(B.prod).map(([k, v]) => `${ri(k)} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после ${pl('t:' + B.prodTech[k], '«' + Cat.tech[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
+    // названия обликов по уровням (Looks.formsByLevel); рисунки — сюрприз, их не показываем
+    const names = Looks.formsByLevel(type).map(x => `${B.forms[x.form].name} — ${x.from > 1
+      ? `с ${x.from}-го уровня${x.epoch > B.epoch ? ` (${['', 'с бронзового века', 'в железном веке'][x.epoch]})` : ''}` : 'сначала'}`);
+    // таблица уровней (Game.levelTable): числа из ядра, здесь — подписи и формат
+    const LT = Game.levelTable(type), workers = !!B.workers;
+    const label = { prod: LT.res && ri(LT.res) + ' ' + (Cat.res[LT.res] || {}).name, cap: '👥 Места', storage: bi('store0') + ' Склад', logos: 'λ Бонус' }[LT.kind] || '';
+    const val = v => ({ prod: num(v) + '/с', cap: v, storage: '+' + v, logos: '+' + v + '%' }[LT.kind]);
+    const stp = v => LT.kind === 'logos' ? '+' + v + ' п. п.' : '×' + num(v);
+    const rows = LT.rows.map(r => r.level === 1
+      ? `<tr><td>1</td><td>${val(r.value)}</td><td class="dim">—</td>${workers ? `<td>${r.workers}</td>` : ''}<td>${this.costText(r.cost)} <span class="dim">(постройка)</span></td></tr>`
+      : `<tr class="${B.epoch === 0 && r.level > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${r.logos ? 'lv-logos' : ''}"><td>${r.level}</td><td>${val(r.value)}</td><td><b>${stp(r.step)}</b></td>${workers ? `<td>${r.workers}</td>` : ''}<td>${this.costText(r.cost, r.logos)}</td></tr>`).join('');
+    const prod = LT.prod ? Object.entries(LT.prod).map(([k, v]) => `${ri(k)} ${v > 0 ? '+' : ''}${v}/с${B.prodTech && B.prodTech[k] ? ` (после знания ${pl('t:' + B.prodTech[k], '«' + Cat.tech[B.prodTech[k]].name + '»')})` : ''}`).join(', ') : '';
+    // устаревает со знанием: во что перестроить (Game.obsoleteAfter)
+    const OA = Game.obsoleteAfter(type);
+    const gone = OA ? `<tr><td>Устаревает</td><td>после знания ${pl('t:' + OA.tech, '«' + Cat.tech[OA.tech].name + '»')}: можно перестроить → ${OA.into.map(t => pl('b:' + t, '«' + Cat.bld[t].forms.find(Boolean).name + '»')).join(' / ')} (уровень сохраняется) или продать (${pl('a:changes', 'как это')})</td></tr>` : '';
     return this.head(icon, B.name, 'Здание · с эпохи «' + Cat.epochs[B.epoch].name + '»') + `
       <p class="lead">${esc(B.desc)}</p>
       ${TIPS[type] ? `<p class="tip">${TIPS[type]}</p>` : ''}
@@ -841,10 +853,10 @@ const PediaBook = {
         ${prod ? `<tr><td>Выпуск на 1-м уровне</td><td>${prod}</td></tr>` : ''}
         ${B.trade ? `<tr><td>Сверх работы</td><td>${Object.entries(B.trade.in).map(([k, v]) => `${ri(k)} −${v}/с`).concat(Object.entries(B.trade.out).map(([k, v]) => `${ri(k)} +${v}/с`)).join(' → ')}
           (после ${pl('t:' + B.trade.tech, '«' + Cat.tech[B.trade.tech].name + '»')}). ${esc(B.tradeNote || '')}.</td></tr>` : ''}
-        ${B.max ? `<tr><td>Ограничение</td><td>не больше ${B.max}</td></tr>` : ''}
-        ${B.forms.filter(Boolean).length > 1 ? `<tr><td>По эпохам</td><td>${names}</td></tr>` : ''}</table>${req}
+        ${B.max ? `<tr><td>Ограничение</td><td>не больше ${B.max}</td></tr>` : ''}${gone}
+        ${names.length > 1 ? `<tr><td>Облик</td><td>${names.join('; ')}</td></tr>` : ''}</table>${req}
       <h4>Уровни</h4>
-      <table class="pt levels"><tr><th>Ур.</th><th>${main.label}</th><th>Рост</th>${workers ? '<th>Работники</th>' : ''}<th>Цена</th></tr>${rows}</table>
+      <table class="pt levels"><tr><th>Ур.</th><th>${label}</th><th>Рост</th>${workers ? '<th>Работники</th>' : ''}<th>Цена</th></tr>${rows}</table>
       <p class="dim">${B.epoch === 0 ? `Уровни выше ${Cat.epochs[0].maxLevel}-го — с бронзового века. ` : ''}${B.epoch <= 1 ? `Выше ${Cat.epochs[1].maxLevel}-го — с железного. ` : ''}${B.logosBonus ? `Рост — на сколько процентных пунктов бонус больше, чем на прошлом уровне (+${Math.round(B.logosBonus * 100)}% → +${Math.round((B.logosBonus + B.logosBonusPerLevel) * 100)}% → …).` : 'Рост — во сколько раз больше, чем на прошлом уровне.'} Без бонусов. ${pl('a:upgrade', 'Как устроены улучшения')}.</p>
       <h4>История</h4><p class="lore">${B.lore}</p>`;
   },
@@ -852,8 +864,9 @@ const PediaBook = {
   techArticle(id) {
     const T = Cat.tech[id];
     if (!T) return this.article('a:basics');
-    const opens = Object.entries(Cat.bld).filter(([, B]) => B.tech === id).map(([bid, B]) => pl('b:' + bid, B.special ? B.name : B.forms.find(Boolean).name));
-    const leadsTo = Cat.techs.filter(t => (t.req || []).includes(id)).map(t => pl('t:' + t.id, t.name));
+    const TL = Game.techLinks(id);
+    const opens = TL.opens.map(b => pl('b:' + b, Cat.bld[b].special ? Cat.bld[b].name : Cat.bld[b].forms.find(Boolean).name));
+    const leadsTo = TL.leadsTo.map(t => pl('t:' + t, Cat.tech[t].name));
     const st = Game.hasTech(id) ? '<span class="chip good">✓ изучено</span>' : '';
     return this.head(Looks.techIcon(T), T.name, 'Знание · ' + Cat.epochs[T.epoch].name) + `
       ${TECH_STORY[id] ? `<p class="story">${TECH_STORY[id]}</p>` : ''}

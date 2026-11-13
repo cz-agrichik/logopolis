@@ -1,3 +1,5 @@
 node_modules/
 golden-out/
 golden-base/
+__pycache__/
+*.pyc

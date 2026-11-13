@@ -19,3 +19,15 @@ for (const f of CORE_FILES) {
     assert.ok(!cyr, `${f}: русский текст в коде ядра: «${cyr && cyr[0]}» — тексты живут в content/ru`);
   });
 }
+
+// index.html: все скрипты из ASSETS существуют, а каждый .js из слоёв подключён
+test('index.html: список скриптов полон, версия — одна', () => {
+  const { ASSETS } = require('./load-core');
+  for (const f of ASSETS) assert.ok(fs.existsSync(path.join(ROOT, f)), `нет файла ${f}`);
+  const walk = d => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(d + '/' + e.name) : [d + '/' + e.name]);
+  for (const d of ['core', 'content', 'ui', 'assets', 'platform']) for (const f of walk(d).filter(f => f.endsWith('.js')))
+    assert.ok(ASSETS.includes(f), `${f} не подключён в index.html (ASSETS)`);
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.equal((html.match(/\?v=\d/g) || []).length, 0, 'номера версий — только в ASSET_V');
+  assert.match(html, /var ASSET_V = \d+;/);
+});

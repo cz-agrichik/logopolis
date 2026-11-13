@@ -174,7 +174,7 @@ Object.assign(Game, {
   demolish(b) {
     if (BUILDINGS[b.type].special) return false;
     this.state.buildings = this.state.buildings.filter(x => x !== b);
-    this.log('demolished', { type: b.type, epoch: this.state.epoch });
+    this.log('demolished', { type: b.type, epoch: this.state.epoch, level: b.level });
     this.save();
     return true;
   },

@@ -185,7 +185,8 @@ const UI = {
           cls.push('stage-' + Looks.stage(b.level), 'n' + ic.length, 'bt-' + b.type);
           inner = `<span class="bw">${ic[2] ? `<span class="b b3">${Art.svg(ic[2])}</span>` : ''}${ic[1] ? `<span class="b b2">${Art.svg(ic[1])}</span>` : ''}<span class="b b1">${Art.svg(ic[0])}</span></span><span class="lvl">${b.level}</span>`;
         }
-        title = B.special ? F.name : Game.obsoleteType(b.type) ? `${F.name} · ур. ${b.level} — устарело: перестройте или продайте` : `${F.name} · ур. ${b.level} (Shift+клик — улучшить)`;
+        const nm = B.special ? F.name : Looks.name(b.type, b.level);
+        title = B.special ? nm : Game.obsoleteType(b.type) ? `${nm} · ур. ${b.level} — устарело: перестройте или продайте` : `${nm} · ур. ${b.level} (Shift+клик — улучшить)`;
       } else if (t.t === 'forest') inner = `<span class="deco">${Art.svg('tree')}</span>`;
       else if (t.t === 'hill') inner = `<span class="deco">${Art.svg('hill')}</span>`;
       if (Game.goat && Game.goat.x === t.x && Game.goat.y === t.y) {
@@ -256,7 +257,7 @@ const UI = {
     this.placingMode = mode;
     const B = Cat.bld[type];
     const where = B.terrain.map(t => Cat.terrain[t].name.toLowerCase()).join(' или ') + (B.coast ? ' у моря' : '');
-    $('#placeHint').innerHTML = `<span>Куда поставить «${esc(Cat.form(type).name)}»? Подходит: ${where}.<span class="desk-only"> <b>Esc</b> или правый клик — отмена, <b>Shift</b> — строить ещё.</span></span>
+    $('#placeHint').innerHTML = `<span>Куда поставить «${esc(Looks.name(type, 1))}»? Подходит: ${where}.<span class="desk-only"> <b>Esc</b> или правый клик — отмена, <b>Shift</b> — строить ещё.</span></span>
       <button class="btn small mob-only" data-cancel-place>Отмена</button>`;
     $('#placeHint').classList.remove('hidden');
     if (this.compact()) this.drawer(false);   // на телефоне панель уезжает — видна вся карта
@@ -368,10 +369,10 @@ const UI = {
     for (const [type, B] of Object.entries(Cat.bld)) {
       const st = Game.buildStatus(type);
       if (st.hidden) continue;
-      const F = Cat.form(type), icon = Looks.icons(type, 1)[0];
+      const icon = Looks.icons(type, 1)[0], name = Looks.name(type, 1);
       const n = Game.count(type);
       const head = `<div class="item-ic">${Art.svg(icon)}</div><div class="item-body">
-          <div class="item-title">${esc(F.name)}${!B.special && n ? ` <small>×${n}</small>` : ''} ${this.pediaBtn('b:' + type)}</div>`;
+          <div class="item-title">${esc(name)}${!B.special && n ? ` <small>×${n}</small>` : ''} ${this.pediaBtn('b:' + type)}</div>`;
       if (B.special) {
         let body;
         if (st.locked) body = `<div class="item-lock">🔒 ${esc(Msg.reason(st.reason))}</div>`;
@@ -563,7 +564,7 @@ const UI = {
   },
   /** Текст записи летописи. */
   logText(e) {
-    return Msg.log(e, { newLook: (type, level, epoch) => Looks.newLook(type, level, epoch) });
+    return Msg.log(e, { newLook: (type, level, epoch) => Looks.newLook(type, level, epoch), name: (type, level, epoch) => Looks.name(type, level, epoch) });
   },
 
   // ---------------- окна ----------------
@@ -579,9 +580,9 @@ const UI = {
 
   showBuilding(b) {
     this.modalBuilding = b;
-    const B = Cat.bld[b.type], F = Cat.form(b.type);
+    const B = Cat.bld[b.type];
     const icon = Looks.icons(b.type, b.level)[0];
-    let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
+    let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(Looks.name(b.type, b.level))} ${this.pediaBtn('b:' + b.type)}</h2>
       <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
       const upT = Object.keys(BUILDINGS).find(t => BUILDINGS[t].upgradeOf === b.type), upSt = upT && Game.buildStatus(upT);
@@ -667,9 +668,9 @@ const UI = {
       Подробности — в <b>📖 Кипропедии</b>.</p>`;
     const retired = first ? [] : (s.log || []).filter(e => e.k === 'retired' && e.p.epoch === s.epoch);
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
-    if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
+    if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Здания с 5-го уровня сменили облик на бронзовый, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
       Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.</p>`;
-    if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо.
+    if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо, а на 9-м и 11-м у зданий железный облик.
       Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:changes">как это устроено</a>'}).
       «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до заката бронзового. Спасибо!</p>`;

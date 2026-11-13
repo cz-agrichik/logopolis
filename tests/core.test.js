@@ -563,6 +563,30 @@ test('колоды: слово переехало из A1 в A2 — прогре
   assert.equal(D.ensureBuiltins(s), 0, 'повторный запуск ничего не меняет');
 });
 
+test('колоды v4: большую колоду A1 поделили надвое — прогресс переехавших слов идёт за ними; новые колоды A1 включены', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  // сохранение v3: в «a1-fem» обе половины, «a1-fem2», «a1-neut», «a1-adj», «a1-conn» ещё нет
+  const f1 = s.decks.find(d => d.id === 'a1-fem'), f2 = s.decks.find(d => d.id === 'a1-fem2');
+  const old = D.makeDeck('A1 · Существительные ж. р. (η)', [...f1.cards, ...f2.cards], { id: 'a1-fem', builtin: true });
+  old.ver = 3;
+  s.decks = s.decks.filter(d => !['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].includes(d.id)).map(d => d.id === 'a1-fem' ? old : d);
+  const was = old.cards.at(-1), stay = old.cards[0];
+  s.progress[was.id] = { step: 3, rev: 2, due: 0, right: 5, wrong: 1, built: true };
+  s.progress[stay.id] = { step: 1, rev: -1, due: 0, right: 1, wrong: 0 };
+  const learned = D.learnedCount(s);
+  assert.equal(D.ensureBuiltins(s), 4, 'добавились a1-fem2, a1-neut, a1-adj, a1-conn');
+  const moved = s.decks.find(d => d.id === 'a1-fem2').cards.find(c => c.front === was.front);
+  assert.ok(s.progress[moved.id] && s.progress[moved.id].right === 5);
+  assert.ok(s.progress[stay.id], 'прогресс оставшихся слов на месте');
+  assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
+  assert.ok(['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].every(id => s.decks.find(d => d.id === id).active), 'новые колоды A1 включены');
+  // колоды стали по 16–45 слов, в A1/A2/B1 прибавилось по 100
+  const lvl = l => s.decks.filter(d => D.levelOf(d) === l).reduce((t, d) => t + d.cards.length, 0);
+  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [485, 301, 263]);
+  assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length <= 70));
+});
+
 test('сохранение: старое общее сохранение делится на город и обучение', () => {
   const C = loadCore();
   C.run('Game.genMap();');
@@ -663,4 +687,32 @@ test('вторая половина железного века: «через с
   assert.ok(reqs.some(q => q.kind === 'special' && q.type === 'sp_salamis' && !q.ok));
   assert.ok(reqs.some(q => q.kind === 'techs' && q.need === C.get('TECHS').filter(x => x.epoch === 2).length));
   assert.ok(reqs.some(q => q.kind === 'res' && q.res === 'silver') && reqs.some(q => q.kind === 'res' && q.res === 'iron'));
+});
+
+test('справочные расчёты (facts): где добыть, на что идёт, таблица уровней, что устаревает', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  // до «Финикийцев» товары делают мастерские; после — серебро, а товары уходят
+  let U = G.resourceUses('goods');
+  assert.ok(U.from.some(x => x.type === 'workshop') && U.goats && U.gone && !U.gone.done);
+  s.techs.push('phoenicians', 'viticulture');
+  U = G.resourceUses('goods');
+  assert.deepEqual([U.from.length, U.goats, U.gone.done, U.gone.into], [0, false, true, 'silver']);
+  const S = G.resourceUses('silver');
+  assert.ok(['workshop', 'port'].every(t => S.from.some(x => x.type === t && x.via === 'prod')));
+  assert.ok(S.from.some(x => x.type === 'port' && x.via === 'trade' && x.tech === 'viticulture'), 'гавань продаёт амфоры за серебро');
+  assert.ok(S.to.some(x => x.kind === 'building' && x.type === 'sp_aphrodite'), 'цена Афродиты в товарах — теперь в серебре');
+  assert.ok(!S.to.some(x => x.kind === 'building' && x.type === 'sp_palace'), 'чудо прошлой эпохи уже не строят');
+  assert.ok(S.to.some(x => x.kind === 'epoch' && x.epoch === 2));
+  assert.equal(G.refProd('workshop').silver, 0.02);
+  // таблица уровней: поле, склад, писцы
+  const F = G.levelTable('field');
+  assert.equal(F.kind, 'prod'); assert.equal(F.res, 'food'); assert.equal(F.rows.length, G.topLevel());
+  assert.ok(Math.abs(F.rows[4].value - 0.5 * G.levelMult(5)) < 1e-9 && F.rows[4].step === G.levelStep(5) && F.rows[2].logos > 0);
+  assert.equal(G.levelTable('storehouse').rows[9].value, G.storageOf({ type: 'storehouse', level: 10 }));
+  assert.equal(G.levelTable('scribe').kind, 'logos');
+  // устаревание
+  assert.deepEqual([...G.obsoleteAfter('goatpen').into].sort(), ['olivegrove', 'vineyard']);
+  assert.equal(G.obsoleteAfter('house'), null);
+  assert.deepEqual([...G.techLinks('iron').opens].sort(), ['forge', 'sp_salamis']);
+  assert.ok(G.logosPrices('techs').includes(320) && G.advanceWonders().includes('sp_salamis'));
 });

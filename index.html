@@ -7,7 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="ui/desktop/styles.css?v=46">
+  <!-- Версия файлов для сброса кэша браузера: после любого изменения кода поднимите ОДНО число — ASSET_V ниже.
+       Скрипты и стили подключаются с ?v=ASSET_V; список скриптов — ASSETS в конце страницы (порядок важен). -->
+  <script>var ASSET_V = 48;</script>
+  <script>document.write('<link rel="stylesheet" href="ui/desktop/styles.css?v=' + ASSET_V + '">');</script>
   <!-- Yandex.Metrika counter: считаем только опубликованный сайт (https), а не запуск файла с диска и не тесты -->
   <script type="text/javascript">
     if (location.protocol === 'https:') {
@@ -96,41 +99,48 @@
     </div>
   </div>
 
-  <!-- Ядро: чистая логика, без страницы и без текстов -->
-  <script src="core/util.js?v=46"></script>
-  <script src="core/defs.js?v=46"></script>
-  <script src="core/learning/greek.js?v=46"></script>
-  <script src="core/learning/decks.js?v=46"></script>
-  <script src="core/learning/srs.js?v=46"></script>
-  <script src="core/learning/lesson.js?v=46"></script>
-  <script src="core/learning/journal.js?v=46"></script>
-  <script src="core/learning/learn.js?v=46"></script>
-  <script src="core/city/state.js?v=46"></script>
-  <script src="core/city/economy.js?v=46"></script>
-  <script src="core/city/build.js?v=46"></script>
-  <script src="core/city/research.js?v=46"></script>
-  <script src="core/city/rituals.js?v=46"></script>
-  <script src="core/city/epochs.js?v=46"></script>
-  <script src="core/city/world.js?v=46"></script>
-  <script src="core/city/changes.js?v=46"></script>
-  <script src="core/session.js?v=46"></script>
-  <!-- Тексты (русский): названия, сообщения, справка, встроенные колоды -->
-  <script src="content/ru/words.js?v=46"></script>
-  <script src="content/ru/lexicon.js?v=46"></script>
-  <script src="content/ru/messages.js?v=46"></script>
-  <!-- Графика и платформа -->
-  <script src="assets/art.js?v=46"></script>
-  <script src="platform/browser.js?v=46"></script>
-  <!-- Общее для HTML-интерфейсов -->
-  <script src="ui/common/format.js?v=46"></script>
-  <script src="ui/common/looks.js?v=46"></script>
-  <script src="ui/common/catalog.js?v=46"></script>
-  <script src="content/ru/pedia.js?v=46"></script>
-  <!-- Интерфейс для компьютера -->
-  <script src="ui/desktop/ui.js?v=46"></script>
-  <script src="ui/desktop/study.js?v=46"></script>
-  <script src="ui/desktop/pedia.js?v=46"></script>
-  <script src="ui/desktop/school.js?v=46"></script>
-  <script src="ui/desktop/main.js?v=46"></script>
+  <!-- Скрипты по порядку. Обычные скрипты (не модули), чтобы игра открывалась с диска; tests/load-core.js берёт отсюда список ядра. -->
+  <script>
+    var ASSETS = [
+      // Ядро: чистая логика, без страницы и без текстов
+      'core/util.js',
+      'core/defs.js',
+      'core/learning/greek.js',
+      'core/learning/decks.js',
+      'core/learning/srs.js',
+      'core/learning/lesson.js',
+      'core/learning/journal.js',
+      'core/learning/learn.js',
+      'core/city/state.js',
+      'core/city/economy.js',
+      'core/city/build.js',
+      'core/city/research.js',
+      'core/city/rituals.js',
+      'core/city/epochs.js',
+      'core/city/world.js',
+      'core/city/changes.js',
+      'core/city/facts.js',
+      'core/session.js',
+      // Тексты (русский): названия, сообщения, справка, встроенные колоды
+      'content/ru/words.js',
+      'content/ru/lexicon.js',
+      'content/ru/messages.js',
+      // Графика и платформа
+      'assets/art.js',
+      'platform/browser.js',
+      // Общее для HTML-интерфейсов
+      'ui/common/format.js',
+      'ui/common/looks.js',
+      'ui/common/catalog.js',
+      'content/ru/pedia.js',
+      // Интерфейс для компьютера
+      'ui/desktop/ui.js',
+      'ui/desktop/study.js',
+      'ui/desktop/pedia.js',
+      'ui/desktop/school.js',
+      'ui/desktop/main.js',
+    ];
+    for (var i = 0; i < ASSETS.length; i++) document.write('<script src="' + ASSETS[i] + '?v=' + ASSET_V + '"><\/script>');
+  </script>
 </body>
 </html>

@@ -82,17 +82,19 @@ const Msg = {
   /** Что стало с чудом эпохи: «Большой круглый дом Лембы» → дом из сырцового кирпича 5-го уровня. */
   retiredLine(from, into, level, epoch) { return `«${Lex.bld[from].name}» теперь — ${this.formName(into, epoch).toLowerCase()} ${level}-го уровня`; },
 
-  /** Запись летописи. ctx.newLook(type, level, epoch) — интерфейс подсказывает, сменился ли облик. */
+  /** Запись летописи. ctx.newLook(type, level, epoch) — интерфейс подсказывает, сменился ли облик;
+   *  ctx.name(type, level, epoch) — название облика на этом уровне (без него — по эпохе). */
   log(e, ctx = {}) {
     if (e.msg != null) return e.msg;   // записи из старых сохранений — готовым текстом
     const p = e.p || {};
+    const nm = (type, level, epoch) => ctx.name && level ? ctx.name(type, level, epoch) : this.formName(type, epoch);
     switch (e.k) {
-      case 'built': return `Построено: ${this.formName(p.type, p.epoch)}`;
+      case 'built': return `Построено: ${nm(p.type, 1, p.epoch)}`;
       case 'wonderBuilt': return `✨ Возведено чудо Кипра: ${Lex.bld[p.type].name}!`;
       case 'stashBack': return `✨ ${Lex.bld[p.type].name}: снова в городе`;
       case 'stashed': return `📦 ${Lex.bld[p.type].name}: убрано на склад`;
-      case 'upgraded': return `${ctx.newLook && ctx.newLook(p.type, p.level, p.epoch) ? '✨ Новый облик! ' : ''}Улучшено: ${this.formName(p.type, p.epoch)} → ур. ${p.level}`;
-      case 'demolished': return `Снесено: ${this.formName(p.type, p.epoch)}`;
+      case 'upgraded': return `${ctx.newLook && ctx.newLook(p.type, p.level, p.epoch) ? '✨ Новый облик! ' : ''}Улучшено: ${nm(p.type, p.level - 1, p.epoch)} → ур. ${p.level}`;
+      case 'demolished': return `Снесено: ${nm(p.type, p.level, p.epoch)}`;
       case 'tech': { const T = Lex.tech[p.id]; return `📜 Новое знание: ${T.name}${T.paths ? ' — ' + T.paths[p.mode][0] : ''}`; }
       case 'rite': { const R = Lex.rite[p.id]; return `${R.icon} ${R.name}: ${this.riteResult(p.result)}`; }
       case 'epoch': return `⏳ Наступает новая эпоха: ${Lex.epochs[p.epoch].name}`;
@@ -105,8 +107,8 @@ const Msg = {
       case 'tribute': return this.tributeLine(p);
       case 'resRetired': return p.amount ? `🔄 ${Lex.res[p.from].name} → ${Lex.res[p.into].name.toLowerCase()}: ${Lex.res[p.from].icon} ${p.have} → ${Lex.res[p.into].icon} ${p.amount}`
         : `🔄 ${Lex.res[p.from].name}: запасы ${Lex.res[p.from].icon} ${p.have} пропали — ресурс ушёл из хозяйства`;
-      case 'rebuilt': return `🔄 Перестроено: ${this.formName(p.from, p.epoch)} → ${this.formName(p.into, p.epoch)} ${p.level}-го уровня`;
-      case 'sold': return `💰 Продано: ${this.formName(p.type, p.epoch)} ${p.level}-го уровня${p.logos ? ` — вернулось λ ${p.logos}` : ''}`;
+      case 'rebuilt': return `🔄 Перестроено: ${nm(p.from, p.level, p.epoch)} → ${nm(p.into, p.level, p.epoch)} ${p.level}-го уровня`;
+      case 'sold': return `💰 Продано: ${nm(p.type, p.level, p.epoch)} ${p.level}-го уровня${p.logos ? ` — вернулось λ ${p.logos}` : ''}`;
       case 'raid': return `⚔️ Набег «народов моря»! ${p.pct ? `Унесли ${Math.round(p.pct * 100)}% запасов: ` : 'Потеряно: '}${this.resList(p.lost, '−')}`;
       case 'decksAdded': return `📚 Добавлены встроенные колоды: ${p.n}. Включить их можно в «📚 Обучении» → «Колоды»`;
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;

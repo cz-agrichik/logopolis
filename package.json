@@ -5,7 +5,9 @@
   "scripts": {
     "test": "node --test tests/core.test.js tests/boundary.test.js",
     "golden": "node tests/golden.js golden-out",
-    "compare": "python3 tests/compare.py golden-base golden-out"
+    "compare": "python3 tests/compare.py golden-base golden-out",
+    "audit:pedia": "node tools/pedia/audit.js",
+    "prices": "node tools/balance/prices.js"
   },
   "devDependencies": {
     "playwright": "^1.45.0"

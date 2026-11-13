@@ -5,7 +5,7 @@
 
 /** Подборки колод для вопроса «Что будем учить?»: decks — id колод, groups — целые группы ('start', 'A1', 'A2', 'B1', 'own'). */
 const LEARN_PLANS = {
-  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-adv', 'a1-omega1', 'a1-omega2'] },
+  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-adv', 'a1-conn', 'a1-adj', 'a1-omega1', 'a1-omega2'] },
   a1:      { groups: ['start', 'A1'] },
   a2:      { groups: ['A2'] },
   b1:      { groups: ['B1'] },
@@ -113,9 +113,14 @@ const Decks = {
       }
       old.cards = nd.cards; old.ver = nd.ver; old.name = nd.name;
     }
-    // встроенная колода, которой больше нет (например, «Фразы для письма»), уходит вместе со своим прогрессом
+    // встроенная колода, которой больше нет (например, «Фразы для письма»), уходит вместе со своим прогрессом;
+    // если её слово живёт теперь в другой встроенной колоде — прогресс идёт за ним
     const ids = new Set(fresh.map(d => d.id));
-    for (const d of state.decks) if (d.builtin && !ids.has(d.id)) for (const c of d.cards) delete state.progress[c.id];
+    for (const d of state.decks) if (d.builtin && !ids.has(d.id)) for (const c of d.cards) {
+      const n = anywhere.get(c.front), p = state.progress[c.id];
+      if (p && n && !state.progress[n.id]) state.progress[n.id] = p;
+      delete state.progress[c.id];
+    }
     state.decks = state.decks.filter(d => !d.builtin || ids.has(d.id));
     let added = 0;
     for (const nd of fresh) if (!state.decks.some(d => d.id === nd.id)) { state.decks.push(nd); added++; }
