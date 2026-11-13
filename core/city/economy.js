@@ -78,20 +78,41 @@ Object.assign(Game, {
     if (!B.workers || this.obsoleteType(b.type)) return 0;   // устаревшее здание стоит — работники свободны
     return B.workers + Math.floor((b.level - 1) / 2);
   },
-  /** Производство здания в секунду при полной занятости. */
-  prodOf(b, fx = this.fx || this.effects(), level = b.level) {
-    const B = BUILDINGS[b.type], out = {};
-    if (!B.prod) return out;
-    const lm = this.levelMult(level);
+  /** Выпуск здания на 1-м уровне без бонусов — с учётом знаний и ушедших ресурсов. Устаревшее здание не работает. */
+  baseProd(type) {
+    const B = BUILDINGS[type], out = {};
+    if (!B.prod || this.obsoleteType(type)) return out;
     for (const [k0, v0] of Object.entries(B.prod)) {
       if (B.prodTech && B.prodTech[k0] && !this.hasTech(B.prodTech[k0])) continue;
       let k = k0, v = v0;
       const r = this.retiredRes(k0);
       if (r) { if (v0 < 0 || !r.prodToo) continue; k = r.into; v = v0 * r.rate; }   // ушедший ресурс: либо не делается, либо делается новый
-      out[k] = (out[k] || 0) + (v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm);
+      out[k] = (out[k] || 0) + v;
     }
     // переработчик, у которого не осталось выхода (литейня без бронзы), стоит и сырьё не тратит
-    if (!Object.values(out).some(v => v > 0)) return {};
+    return Object.values(out).some(v => v > 0) ? out : {};
+  },
+  /** Производство здания в секунду при полной занятости. */
+  prodOf(b, fx = this.fx || this.effects(), level = b.level) {
+    const out = {}, lm = this.levelMult(level);
+    for (const [k, v] of Object.entries(this.baseProd(b.type))) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
+    return out;
+  },
+  /** Торговая линия здания (гавань продаёт амфоры за серебро) на 1-м уровне без бонусов или null. */
+  baseTrade(type) {
+    const T = BUILDINGS[type].trade;
+    if (!T || this.obsoleteType(type) || (T.tech && !this.hasTech(T.tech))) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(T.in)) out[k] = -v;
+    for (const [k, v] of Object.entries(T.out)) out[k] = v;
+    return out;
+  },
+  /** Торговая линия здания в секунду: тратит сырьё, только если оно есть — основная работа здания от неё не зависит. */
+  tradeOf(b, fx = this.fx || this.effects(), level = b.level) {
+    const base = this.baseTrade(b.type);
+    if (!base) return null;
+    const out = {}, lm = this.levelMult(level);
+    for (const [k, v] of Object.entries(base)) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
     return out;
   },
   houseCapOf(b, fx = this.fx || this.effects(), level = b.level) {
@@ -186,6 +207,16 @@ Object.assign(Game, {
         rates[k] += x;
         if (log) log.push({ b, k, v: x, e, share: v < 0 ? share : 1 });
       }
+      // торговая линия: есть сырьё и место — работает, нет — просто молчит
+      const t = this.tradeOf(b, fx);
+      if (t) {
+        const tin = Object.keys(t).filter(k => t[k] < 0), tout = Object.keys(t).filter(k => t[k] > 0);
+        const room = tout.some(k => s.res[k] < storage - 0.01), enough = tin.every(k => s.res[k] >= -t[k] * e * dt);
+        if (room && enough) for (const [k, v] of Object.entries(t)) {
+          rates[k] += v * e;
+          if (log) log.push({ b, k, v: v * e, e, share: 1, trade: true });
+        }
+      }
     }
     rates.food -= s.pop * BALANCE.foodPerPop;
     return { rates, need, eff, effFood, effOther, storage };
@@ -221,14 +252,15 @@ Object.assign(Game, {
     for (const x of log) {
       const t = x.b.type, L = x.b.level;
       if (x.skip) {
-        for (const k of Object.keys(BUILDINGS[t].prod || {})) {
+        for (const k of Object.keys(this.baseProd(t))) {
           const key = k + '|' + t + '|' + L + '|' + x.skip;
           (rows[key] = rows[key] || { k, type: t, level: L, skip: x.skip, n: 0 }).n++;
         }
         continue;
       }
-      const key = x.k + '|' + t + '|' + L + '|' + x.e + '|' + x.share;
-      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base: BUILDINGS[t].prod[x.k], lm: this.levelMult(L), eff: x.e, share: x.share };
+      const key = x.k + '|' + t + '|' + L + '|' + x.e + '|' + x.share + '|' + !!x.trade;
+      const base = (x.trade ? this.baseTrade(t) : this.baseProd(t))[x.k];
+      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base, lm: this.levelMult(L), eff: x.e, share: x.share, trade: !!x.trade };
       r.n++; r.total += x.v;
     }
     for (const r of Object.values(rows)) {

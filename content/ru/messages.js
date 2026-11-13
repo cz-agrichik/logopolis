@@ -66,6 +66,7 @@ const Msg = {
     return '';
   },
   goatLine(roll) { return Lex.goatLines[Math.floor(roll * Lex.goatLines.length)]; },
+  maenadLine(roll) { return Lex.maenadLines[Math.floor(roll * Lex.maenadLines.length)]; },
   /** Предупреждение о чуде эпохи: во что оно превратится. r — BUILDINGS[тип].retire. */
   retireNote(r) {
     return `Чудо эпохи: в эпоху «${Lex.epochs[r.epoch].name}» оно станет обычным зданием — «${this.formName(r.into, r.epoch)}» ${r.level}-го уровня. Бонус чуда тогда пропадёт.`;
@@ -89,11 +90,13 @@ const Msg = {
       case 'epoch': return `⏳ Наступает новая эпоха: ${Lex.epochs[p.epoch].name}`;
       case 'retired': return `🏛️ ${this.retiredLine(p.from, p.into, p.level, p.epoch)}`;
       case 'starve': return '⚠️ Голод: житель покинул поселение';
-      case 'goatGone': return '🐐 Коза ушла в горы Троодоса…';
-      case 'goat': return `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
+      case 'goatGone': return p.kind === 'maenad' ? '🍇 Вакханки ушли с песнями в холмы…' : '🐐 Коза ушла в горы Троодоса…';
+      case 'goat': return p.kind === 'maenad' ? `🍇 ${this.maenadLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}` : `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
+      case 'wonderUpgraded': return `✨ «${Lex.bld[p.from].name}» теперь — ${Lex.bld[p.into].name}!`;
       case 'raidShield': return '🧱 Циклопические стены отразили набег «народов моря»!';
       case 'tribute': return `👑 Сборщики дани Ассирии забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}: ${this.resList(p.lost, '−')}`;
-      case 'resRetired': return `🔄 ${Lex.res[p.from].name} уходит: ${Lex.res[p.from].icon} ${p.have} → ${Lex.res[p.into].icon} ${p.amount}`;
+      case 'resRetired': return p.amount ? `🔄 ${Lex.res[p.from].name} → ${Lex.res[p.into].name.toLowerCase()}: ${Lex.res[p.from].icon} ${p.have} → ${Lex.res[p.into].icon} ${p.amount}`
+        : `🔄 ${Lex.res[p.from].name}: запасы ${Lex.res[p.from].icon} ${p.have} пропали — ресурс ушёл из хозяйства`;
       case 'rebuilt': return `🔄 Перестроено: ${this.formName(p.from, p.epoch)} → ${this.formName(p.into, p.epoch)} ${p.level}-го уровня`;
       case 'sold': return `💰 Продано: ${this.formName(p.type, p.epoch)} ${p.level}-го уровня${p.logos ? ` — вернулось λ ${p.logos}` : ''}`;
       case 'raid': return `⚔️ Набег «народов моря»! ${p.pct ? `Унесли ${Math.round(p.pct * 100)}% запасов: ` : 'Потеряно: '}${this.resList(p.lost, '−')}`;

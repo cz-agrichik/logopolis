@@ -9,6 +9,7 @@ const Looks = {
   ART: {
     house: 'house', field: 'field', goatpen: 'goatpen', lumber: 'lumber', quarry: 'quarry',
     workshop: 'workshop', storehouse: 'store', mine: 'mine', port: 'port', foundry: 'foundry', scribe: 'scribe',
+    vineyard: 'vineyard', olivegrove: 'olivegrove',
     forge: 'foundry',   // кузница пока в облике литейни — свои рисунки железного века впереди
   },
 

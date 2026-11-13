@@ -172,7 +172,7 @@ test('железный век: предел 11; 10-й уровень проси�
   assert.ok(Math.abs(G.levelMult(11) / G.levelMult(10) - 1.4) < 1e-9);
 });
 
-test('железный век: «Железо» — бронза уходит в железо, литейня устаревает; перестроить или продать', () => {
+test('железный век: «Железо» — бронза пропадает совсем, литейня устаревает; перестроить или продать', () => {
   const C = fresh(), G = ironAge(C), s = G.state;
   const foundry = { id: 880, type: 'foundry', level: 9, x: 8, y: 8 }, other = { id: 881, type: 'foundry', level: 4, x: 9, y: 8 };
   s.buildings.push(foundry, other);
@@ -180,14 +180,14 @@ test('железный век: «Железо» — бронза уходит в
   const bronzeCost = G.ritualStatus(C.get('RITUAL_BY_ID').bullmask).cost;   // цены без бронзы — не меняются
   assert.ok(G.research('iron'));
   assert.equal(s.res.bronze, 0);
-  assert.equal(s.res.iron, 700, 'бронза перешла в железо 1:1');
+  assert.equal(s.res.iron, 0, 'запасы бронзы пропали, в железо не перешли');
   assert.equal(G.resVisible('bronze'), false, 'бронза пропала из шапки');
   assert.deepEqual({ ...G.liveCost({ bronze: 100, stone: 5 }) }, { iron: 100, stone: 5 }, 'цены с бронзой — теперь в железе');
   assert.deepEqual({ ...G.ritualStatus(C.get('RITUAL_BY_ID').bullmask).cost }, { ...bronzeCost });
   assert.deepEqual(Object.keys(G.prodOf(foundry)).length, 0, 'литейня встала и медь не ест');
   assert.equal(G.buildStatus('foundry').hidden, true, 'новые литейни не строят');
   assert.equal(G.buildStatus('forge').ok, true);
-  assert.equal(G.upgradeInfo(foundry).target, 10);
+  assert.equal(G.upgradeInfo(foundry), null, 'устаревшее не улучшают');
   // перестроить: тот же уровень, теперь кузница
   const rb = G.rebuildInfo(foundry);
   assert.equal(rb.into, 'forge');
@@ -215,6 +215,106 @@ test('железный век: дань Ассирии вместо набего
   assert.ok(r2.tribute && r2.halved && !r2.shielded);
   assert.ok(r2.pct >= 0.05 - 1e-9 && r2.pct <= 0.25 + 1e-9, 'вдвое меньше');
   assert.ok(s.res.wood < 1000, 'стены больше не спасают полностью');
+});
+
+test('железный век: «Финикийцы» — ремёсла уходят в серебро 5:1; мастерские и гавани дают серебро; серебро +50%', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  const ws = { id: 900, type: 'workshop', level: 1, x: 8, y: 9 }; s.buildings.push(ws);
+  const goodsBefore = G.prodOf(ws).goods;
+  s.res.goods = 1000; s.res.silver = 0;
+  assert.ok(G.research('phoenicians'));
+  assert.equal(s.res.goods, 0); assert.equal(s.res.silver, 200, '1000 ремёсел → 200 серебра');
+  assert.equal(G.resVisible('goods'), false);
+  const bb = G.effects().bbonus.workshop || 0;
+  assert.ok(Math.abs(G.prodOf(ws).silver - 0.1 / 5 * (1 + 0.5 + bb)) < 1e-9, 'мастерская: серебро = ремёсла / 5, и +50% от финикийцев');
+  assert.ok(G.prodOf(ws).silver > goodsBefore / 5);
+  assert.equal(G.buildCost('scribe').silver, Math.ceil(BUILDING_GOODS(C) / 5), 'цены в ремёслах — теперь в серебре');
+  assert.ok(G.techStatus(C.get('TECH_BY_ID').viticulture).ok !== undefined, '«Виноградарство» открылось после финикийцев');
+});
+const BUILDING_GOODS = C => C.get('BUILDINGS').scribe.cost.goods * Math.pow(C.get('BALANCE').buildCostGrowth, 0);
+
+test('железный век: «Виноградарство» — сыр в амфоры, загоны в виноградники и рощи, вакханки вместо коз', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  const T = C.get('TECH_BY_ID');
+  assert.equal(G.techStatus(T.viticulture).locked, true, 'сначала финикийцы');
+  s.techs.push('phoenicians');
+  const hill = G.map.find(t => t.t === 'hill' && !G.buildingAt(t.x, t.y)), forest = G.map.find(t => t.t === 'forest' && !G.buildingAt(t.x, t.y));
+  const penH = { id: 910, type: 'goatpen', level: 7, x: hill.x, y: hill.y }, penF = { id: 911, type: 'goatpen', level: 3, x: forest.x, y: forest.y };
+  s.buildings.push(penH, penF);
+  const R = C.get('RITUAL_BY_ID');
+  assert.equal(G.ritualStatus(R.herds).hidden, undefined); assert.equal(G.ritualStatus(R.vintage).hidden, true);
+  s.res.cheese = 900; s.res.amphora = 0; s.res.food = 4500; s.res.wood = 4500;
+  assert.ok(G.research('viticulture'));
+  assert.equal(s.res.amphora, 450, '2 сыра = 1 амфора');
+  assert.equal(Object.keys(G.prodOf(penH)).length, 0, 'старый загон стоит');
+  assert.equal(G.ritualStatus(R.herds).hidden, true); assert.notEqual(G.ritualStatus(R.vintage).hidden, true);
+  assert.equal(G.rebuildInfo(penH).into, 'vineyard'); assert.equal(G.rebuildInfo(penF).into, 'olivegrove');
+  assert.ok(G.rebuild(penH) && G.rebuild(penF));
+  assert.equal(penH.type, 'vineyard'); assert.equal(penH.level, 7);
+  assert.ok(G.prodOf(penH).amphora > 0 && G.prodOf(penF).amphora > 0);
+  // обряды платят амфорами вместо сыра
+  const fest = G.liveCost(R.festival.cost);
+  assert.ok(fest.amphora > 0 && !fest.cheese && fest.silver > 0 && !fest.goods);
+  // вакханки
+  s.timers.goat = 0; G.goat = null; G.events(0.1);
+  assert.equal(G.goat.kind, 'maenad');
+});
+
+test('железный век: гавань продаёт амфоры за серебро сверх обычной работы', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  s.techs.push('phoenicians', 'viticulture');
+  const coast = G.map.find(t => t.coast && t.t === 'plain' && !G.buildingAt(t.x, t.y));
+  const port = { id: 920, type: 'port', level: 1, x: coast.x, y: coast.y }; s.buildings.push(port);
+  for (const k of Object.keys(s.res)) s.res[k] = 500;
+  s.res.amphora = 0; G.tick(1);
+  const fx = G.effects(), noAmph = G.production(fx, 100, 1).rates;
+  s.res.amphora = 500;
+  const withAmph = G.production(fx, 100, 1).rates;
+  assert.ok(withAmph.silver > noAmph.silver, 'серебра больше');
+  assert.ok(withAmph.amphora < noAmph.amphora, 'амфоры уходят');
+  assert.ok(noAmph.silver > 0 && noAmph.copper < 0, 'без амфор гавань работает как обычно');
+});
+
+test('железный век: святилища улучшаются на своём месте, «золотые часы» сменяются', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, R = C.get('RITUAL_BY_ID');
+  const sh1 = { id: 930, type: 'shrine1', level: 1, x: 9, y: 9 }, sh2 = { id: 931, type: 'shrine2', level: 1, x: 10, y: 9 };
+  s.buildings.push(sh1, sh2);
+  assert.notEqual(G.ritualStatus(R.vigil).hidden, true); assert.equal(G.ritualStatus(R.morningstar).locked, true);
+  assert.equal(G.buildStatus('sp_aphrodite').reason.code, 'needTech', 'Афродита — после финикийцев');
+  assert.equal(G.buildStatus('sp_apollo').reason.code, 'needTech', 'Аполлон — после слогового письма');
+  s.techs.push('phoenicians', 'syllabary'); s.res.iron = 3000;
+  for (const k of ['stone', 'copper']) s.res[k] = 4500;
+  s.buildings.push({ id: 932, type: 'storehouse', level: 11, x: 11, y: 9 }, { id: 933, type: 'storehouse', level: 11, x: 12, y: 9 }); G.tick(0.001);
+  s.res.stone = 15000; s.res.copper = 5000; s.res.silver = 500;
+  assert.ok(G.upgradeWonder('sp_aphrodite'));
+  assert.equal(sh1.type, 'sp_aphrodite'); assert.deepEqual([sh1.x, sh1.y], [9, 9]);
+  assert.equal(G.buildStatus('shrine1').hidden, true, 'старое святилище заново не строится');
+  assert.equal(G.ritualStatus(R.vigil).hidden, true);
+  assert.equal(G.ritualStatus(R.morningstar).locked, undefined);
+  assert.equal(R.morningstar.buff.logos, 1); assert.equal(R.morningstar.cooldown, 8 * 3600);
+  assert.notEqual(G.ritualStatus(R.festival).locked, true, 'праздник плодородия работает и при Афродите');
+  s.res.stone = 15000; s.res.copper = 5000;
+  assert.ok(G.upgradeWonder('sp_apollo'));
+  assert.equal(G.ritualStatus(R.hornedfeast).hidden, true);
+  assert.equal(R.gnomon.buff.logos, 0.75); assert.equal(R.gnomon.cooldown, 4 * 3600);
+  assert.equal(G.buildStatus('sp_troodos2').locked, true, 'Троодос — после «Виноградарства» и только если есть старый');
+  // λ святилищ: улучшение сохраняет λ-бонус старого чуда; Аполлон без λ, но очень дорог
+  const B = C.get('BUILDINGS');
+  for (const W of Object.values(B).filter(W => W.upgradeOf))
+    assert.ok(((W.effect || {}).logos || 0) >= ((B[W.upgradeOf].effect || {}).logos || 0), 'улучшение чуда не отнимает λ');
+  assert.equal(B.sp_aphrodite.effect.logos, 0.1); assert.equal(B.sp_apollo.effect.logos, 0.2);
+  assert.equal(B.sp_apollo.logos, 0); assert.ok(B.sp_salamis.logos > 0, 'новое λ-чудо — гробницы Саламина');
+});
+
+test('железный век: писцам 10-й уровень — только после «Кипрского слогового письма»; цены уровней — по общим правилам', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  const sc = { id: 940, type: 'scribe', level: 9, x: 12, y: 10 }; s.buildings.push(sc);
+  assert.equal(G.upgradeInfo(sc).reason.code, 'needTech');
+  s.techs.push('syllabary');
+  assert.notEqual((G.upgradeInfo(sc).reason || {}).code, 'needTech');
+  const k8 = G.upgradeCost('house', 8).cost.wood, k10 = G.upgradeCost('house', 10).cost.wood;
+  assert.ok(Math.abs(k10 / k8 - 1.5 * 1.5) < 0.01, '×1.5 за уровень, без особой наценки на 10-м');
+  assert.equal(G.upgradeCost('house', 10).cost.iron, 30);
 });
 
 test('переход в железный век: Хала-Султан-Текке — гавань 9-го уровня, Бог на слитке — бронзолитейня 9-го', () => {

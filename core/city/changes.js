@@ -59,6 +59,7 @@ Object.assign(Game, {
     const from = b.type;
     b.type = r.into; b.idle = false; b.rest = null;
     this.log('rebuilt', { from, into: r.into, level: b.level, epoch: this.state.epoch });
+    this.fx = this.effects();
     this.save();
     return true;
   },
@@ -83,13 +84,13 @@ Object.assign(Game, {
     return true;
   },
 
-  /** Знание изучено: запасы уходящих ресурсов переходят в новые. */
+  /** Знание изучено: запасы уходящих ресурсов переходят в новые по курсу stock (0 — просто пропадают). */
   applyRetire(T) {
     const r = T.retire && T.retire.res;
     if (!r) return;
     const s = this.state, cap = this.storageCap();
-    for (const [from, { into, rate }] of Object.entries(r)) {
-      const have = Math.floor(s.res[from] || 0), amount = Math.floor(have * rate);
+    for (const [from, { into, rate, stock = rate }] of Object.entries(r)) {
+      const have = Math.floor(s.res[from] || 0), amount = Math.floor(have * stock);
       s.res[into] = Math.min(cap, (s.res[into] || 0) + amount);
       s.res[from] = 0;
       this.log('resRetired', { from, into, have, amount });

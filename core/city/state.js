@@ -121,6 +121,15 @@ const Game = {
   hasTech(id) { return this.state.techs.includes(id); },
   buildingAt(x, y) { return this.state.buildings.find(b => b.x === x && b.y === y); },
   count(type) { return this.state.buildings.filter(b => b.type === type).length; },
+  /** Чудо type улучшено до другого (Святилище богини → Святилище Афродиты): улучшение стоит в городе или на складе. */
+  upgradedFrom(type) {
+    const up = t => { for (let B = BUILDINGS[t], g = 0; B && B.upgradeOf && g < 5; B = BUILDINGS[B.upgradeOf], g++) if (B.upgradeOf === type) return true; return false; };
+    return this.state.buildings.some(b => up(b.type)) || (this.state.stash || []).some(up);
+  },
+  /** Чудо есть в городе — само или в улучшенном виде (для обрядов, которые его требуют). */
+  hasWonder(type) {
+    return this.built(type) || this.state.buildings.some(b => { for (let B = BUILDINGS[b.type], g = 0; B && B.upgradeOf && g < 5; B = BUILDINGS[B.upgradeOf], g++) if (B.upgradeOf === type) return true; return false; });
+  },
   /** Чудо эпохи, чья эпоха прошла: оно уже стало обычным зданием (BUILDINGS[type].retire). */
   retired(type) { const r = BUILDINGS[type].retire; return !!r && this.state.epoch >= r.epoch; },
   /** Превратить прошедшие чудеса эпохи в обычные здания. Возвращает [[чудо, здание, уровень]]. */

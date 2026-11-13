@@ -20,13 +20,14 @@ Object.assign(Game, {
     let changed = false;
     if (this.goat) {
       this.goat.ttl -= dt;
-      if (this.goat.ttl <= 0) { this.goat = null; changed = true; this.log('goatGone'); }
+      if (this.goat.ttl <= 0) { this.log('goatGone', { kind: this.goat.kind }); this.goat = null; changed = true; }
     } else {
       s.timers.goat -= dt;
       if (s.timers.goat <= 0) {
         const free = this.map.filter(t => t.t !== 'sea' && !this.buildingAt(t.x, t.y));
         const t = free[Math.floor(Math.random() * free.length)];
-        if (t) { this.goat = { x: t.x, y: t.y, ttl: 14 }; changed = true; }
+        // после «Виноградарства» вместо беглой козы по городу проходит шествие вакханок
+        if (t) { this.goat = { x: t.x, y: t.y, ttl: 14, kind: this.hasTech('viticulture') ? 'maenad' : 'goat' }; changed = true; }
         s.timers.goat = fx.goats ? rand(35, 80) : rand(60, 140);
       }
     }
@@ -49,8 +50,9 @@ Object.assign(Game, {
       const g = Math.floor(Math.min(cap - s.res[k], Math.max(min, Math.max(0, this.rates[k] || 0) * sec) * mult));
       if (g > 0) { s.res[k] += g; gains.push([k, g]); }
     };
+    const maenad = this.goat.kind === 'maenad';
     if (Math.random() < 0.5) {
-      const k = avail[Math.floor(Math.random() * avail.length)];
+      const k = maenad && avail.includes('amphora') ? 'amphora' : avail[Math.floor(Math.random() * avail.length)];   // вакханки несут амфоры
       give(k, 240, minBase * 3);
     } else {
       avail.forEach(k => give(k, 60, ['food', 'wood', 'stone'].includes(k) ? minBase : 0));
@@ -59,8 +61,8 @@ Object.assign(Game, {
     const pos = this.goat;
     this.goat = null;
     const roll = Math.random();   // какую реплику козы показать — решает интерфейс
-    this.log('goat', { roll, gains });
-    return { x: pos.x, y: pos.y, gains, roll };
+    this.log('goat', { roll, gains, kind: maenad ? 'maenad' : 'goat' });
+    return { x: pos.x, y: pos.y, gains, roll, kind: maenad ? 'maenad' : 'goat' };
   },
 
   /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery). */

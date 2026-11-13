@@ -15,7 +15,11 @@ Object.assign(Game, {
   ritualStatus(R) {
     const s = this.state;
     if (R.epoch > s.epoch) return { hidden: true };
-    if (R.req && !this.built(R.req)) return { locked: true, reason: { code: 'needBuilding', type: R.req } };
+    if (R.tech && !this.hasTech(R.tech)) return { hidden: true };            // обряд нового знания (праздник сбора винограда)
+    if (R.untilTech && this.hasTech(R.untilTech)) return { hidden: true };   // уступил место новому
+    if (R.until && this.hasWonder(R.until)) return { hidden: true };         // святилище улучшено — обряд сменился
+    if (R.req && this.retired(R.req)) return { hidden: true };               // чудо прошлой эпохи стало обычным зданием
+    if (R.req && !this.hasWonder(R.req)) return { locked: true, reason: { code: 'needBuilding', type: R.req } };
     const cost = this.liveCost(R.cost), logos = this.ritualLogos(R);
     const cd = this.ritualWait(R);
     if (cd > 0) return { cost, logos, cd, reason: { code: 'cooldown', sec: Math.ceil(cd) } };

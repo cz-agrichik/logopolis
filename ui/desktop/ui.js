@@ -171,17 +171,18 @@ const UI = {
         cls.push('has-b');
         if (B.special) cls.push('special');
         if (b.idle) cls.push('idle');
+        if (!B.special && Game.obsoleteType(b.type)) cls.push('obsolete');   // устарело: перестроить или продать
         if (B.special) inner = `<span class="b">${Art.svg(b.type)}</span>`;
         else {
           cls.push('stage-' + Looks.stage(b.level), 'n' + ic.length, 'bt-' + b.type);
           inner = `<span class="bw">${ic[2] ? `<span class="b b3">${Art.svg(ic[2])}</span>` : ''}${ic[1] ? `<span class="b b2">${Art.svg(ic[1])}</span>` : ''}<span class="b b1">${Art.svg(ic[0])}</span></span><span class="lvl">${b.level}</span>`;
         }
-        title = B.special ? F.name : `${F.name} · ур. ${b.level} (Shift+клик — улучшить)`;
+        title = B.special ? F.name : Game.obsoleteType(b.type) ? `${F.name} · ур. ${b.level} — устарело: перестройте или продайте` : `${F.name} · ур. ${b.level} (Shift+клик — улучшить)`;
       } else if (t.t === 'forest') inner = `<span class="deco">${Art.svg('tree')}</span>`;
       else if (t.t === 'hill') inner = `<span class="deco">${Art.svg('hill')}</span>`;
       if (Game.goat && Game.goat.x === t.x && Game.goat.y === t.y) {
         cls.push('goat');
-        inner = `<span class="goat-ic">${Art.svg('goat')}</span>`;
+        inner = `<span class="goat-ic">${Art.svg(Game.goat.kind === 'maenad' ? 'maenad' : 'goat')}</span>`;
         title = 'Беглая коза! Поймайте её';
       }
       if (this.placing && t.t !== 'sea') cls.push(Game.canPlaceOn(this.placing, t) ? 'valid' : 'invalid');
@@ -196,9 +197,9 @@ const UI = {
     if (this.compact() && this.drawerOpen()) return this.drawer(false);
     const tile = Game.tile(+el.dataset.x, +el.dataset.y);
     if (Game.goat && Game.goat.x === tile.x && Game.goat.y === tile.y) {
-      const g = Game.catchGoat();
-      this.floatText(el, '🐐!', 'gold');
-      this.toast(`🐐 ${esc(Msg.goatLine(g.roll))} <b>${Msg.resList(g.gains) || 'склады полны'}</b>`);
+      const g = Game.catchGoat(), m = g.kind === 'maenad';
+      this.floatText(el, m ? '🍇!' : '🐐!', 'gold');
+      this.toast(`${m ? '🍇' : '🐐'} ${esc(m ? Msg.maenadLine(g.roll) : Msg.goatLine(g.roll))} <b>${Msg.resList(g.gains) || 'склады полны'}</b>`);
       this.renderMap(); this.renderTop();
       return;
     }
@@ -325,10 +326,12 @@ const UI = {
     const B = Cat.bld[b.type];
     const fx = Game.fx || Game.effects();
     let h = this.prodChips(Game.prodOf(b, fx, level));
+    const tr = Game.tradeOf(b, fx, level);
+    if (tr) h += `<span class="chip trade" title="Если есть амфоры, гавань продаёт их финикийцам за серебро — сверх обычной работы">⇄ ${Object.entries(tr).map(([k, v]) => `<i>${Art.res(k)}</i>${v > 0 ? '+' : ''}${num(v)}`).join(' ')}/с</span>`;
     if (B.cap) h += `<span class="chip good" title="Места для жителей"><i>👥</i>${Game.houseCapOf(b, fx, level)} мест</span>`;
     if (B.storage) h += `<span class="chip good" title="Прибавка к вместимости складов"><i>${Art.svg('store0')}</i>+${Game.storageOf(b, level)}</span>`;
     if (B.logosBonus) h += `<span class="chip good" title="Бонус к Логосу за карточки"><i>λ</i>+${Math.round((B.logosBonus + (B.logosBonusPerLevel || 0) * (level - 1)) * 100)}% за карточки</span>`;
-    if (B.workers) { const w = Game.workersOf({ type: b.type, level }); h += `<span class="chip muted" title="Сколько жителей нужно, чтобы здание работало в полную силу"><i>⚒</i>${w} ${plural(w, 'работник', 'работника', 'работников')}</span>`; }
+    if (B.workers && Game.workersOf({ type: b.type, level })) { const w = Game.workersOf({ type: b.type, level }); h += `<span class="chip muted" title="Сколько жителей нужно, чтобы здание работало в полную силу"><i>⚒</i>${w} ${plural(w, 'работник', 'работника', 'работников')}</span>`; }
     return h;
   },
   riteIcon(R) { return Looks.riteIcon(R); },
@@ -367,6 +370,11 @@ const UI = {
         else if (st.done) body = `<div class="item-done">✓ Построено</div>`;
         else if (st.stashed && st.into) body = `<div class="item-stash">📦 На складе. Эпоха чуда прошла — поставить можно бесплатно, но уже как «${esc(Cat.form(st.into).name)}» ${st.level}-го уровня.</div>`;
         else if (st.stashed) body = `<div class="item-stash">📦 На складе — бонус не действует, пока чудо не стоит в городе. Поставить можно бесплатно.</div>`;
+        else if (st.upgrade) {
+          body = `<div class="item-effect">${esc(B.desc)}</div>
+            <div class="chips">${this.costHtml(st.cost, st.logos)}${st.logos ? '' : '<span class="chip muted">без λ</span>'}</div>
+            ${this.reasonHtml(st)}`;
+        }
         else {
           // эффект чуда иконками не передать — здесь текст нужен
           body = `<div class="item-effect">${esc(B.desc)}</div>
@@ -375,7 +383,7 @@ const UI = {
         }
         if (B.retire && !st.locked && !st.into) body += `<div class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</div>`;
         specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div>
-          ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">${st.stashed ? 'Поставить' : 'Строить'}</button>`}</div>`;
+          ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">${st.stashed ? 'Поставить' : st.upgrade ? 'Улучшить' : 'Строить'}</button>`}</div>`;
       } else {
         normal += `<div class="item ${st.ok ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}
           ${B.note ? `<div class="item-note">${esc(B.note)}</div>` : ''}
@@ -458,7 +466,8 @@ const UI = {
     let h = `<div class="supply">${this.riteCard(Cat.rite.elders)}</div>`;
     h += `<h3>Обряды <small>благословения на время</small> ${this.pediaBtn('a:religion')}</h3>`;
     for (let e = s.epoch; e >= 0; e--) {
-      const list = Cat.rites.filter(r => r.epoch === e && !r.instant);
+      // обряды, которые сменились новыми (стада → сбор винограда, звёзды → Утренняя звезда), прячем — если только они не идут прямо сейчас
+      const list = Cat.rites.filter(r => r.epoch === e && !r.instant && (!Game.ritualStatus(r).hidden || s.buffs[r.id]));
       if (!list.length) continue;
       if (s.epoch > 0) h += `<div class="sub-h">${esc(Cat.epochs[e].name)}</div>`;
       h += list.map(R => this.riteCard(R)).join('');
@@ -490,7 +499,7 @@ const UI = {
     });
     h += `<li class="future"><b>Эллинизм, Рим, Византия…</b><small>дальше по истории Кипра</small></li></ol>`;
     const st = s.stats;
-    h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
+    h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз и вакханок: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
       <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
       <h3>Игра</h3><button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
       <div class="hint dim">Город начнётся заново, а колоды и выученные слова сохранятся.</div>`;
@@ -506,6 +515,10 @@ const UI = {
       const type = t.dataset.build, mode = t.dataset.mode || 'logos';
       const st = Game.buildStatus(type, mode);
       if (!st.ok) return this.toast(esc(Msg.reason(st.reason) || 'Нельзя построить'));
+      if (st.upgrade) {   // улучшение чуда встаёт на место старого — клетку выбирать не нужно
+        if (Game.upgradeWonder(type)) { this.toast(`✨ ${esc(Cat.bld[type].name)}!`); this.renderMap(); this.renderAll(); }
+        return;
+      }
       if (this.placing === type && this.placingMode === mode) this.cancelPlacing(); else this.startPlacing(type, mode);
       return this.renderPanel();
     }
@@ -563,7 +576,14 @@ const UI = {
     let h = `<div class="mb-head"><div class="mb-ic">${Art.svg(icon)}</div><div><h2>${esc(F.name)} ${this.pediaBtn('b:' + b.type)}</h2>
       <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
-      h += `<p>${esc(B.desc)}</p>${B.retire ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}<p class="lore">${B.lore}</p>
+      const upT = Object.keys(BUILDINGS).find(t => BUILDINGS[t].upgradeOf === b.type), upSt = upT && Game.buildStatus(upT);
+      h += `<p>${esc(B.desc)}</p>${B.retire ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}`;
+      if (upSt && !upSt.hidden) h += `<div class="upgrade lv-logos"><div class="up-head"><b>✨ Улучшить до «${esc(Cat.bld[upT].name)}»</b></div>
+          <div class="small">${esc(Cat.bld[upT].desc)}</div>
+          ${upSt.locked ? `<div class="item-lock">🔒 ${esc(Msg.reason(upSt.reason))}</div>` : `<div class="up-cost"><span class="dim">Цена</span> <span class="chips">${this.costHtml(upSt.cost, upSt.logos)}</span></div>
+          ${upSt.reason ? `<div class="item-lock">${esc(Msg.reason(upSt.reason))}</div>` : ''}
+          <button class="btn gold" data-action="wonder-up" data-type="${upT}" ${upSt.ok ? '' : 'disabled'}>Улучшить</button>`}</div>`;
+      h += `<p class="lore">${B.lore}</p>
         <p class="dim small">Чудо можно убрать на склад и поставить в другое место бесплатно. Пока оно на складе, его бонус не действует.</p>`;
     } else {
       const rb = Game.rebuildInfo(b), sl = Game.sellInfo(b);
@@ -708,6 +728,7 @@ const UI = {
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
+    if (act === 'wonder-up') { if (Game.upgradeWonder(a.dataset.type)) { this.closeModal(); this.renderMap(); this.renderAll(); this.toast(`✨ ${esc(Cat.bld[a.dataset.type].name)}!`); } return; }
     if (act === 'rebuild' && b) { if (Game.rebuild(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } return; }
     if (act === 'sell' && b) { if (Game.sell(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } return; }
     if (act === 'demolish' && b) { if (Game.demolish(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } }

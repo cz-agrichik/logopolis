@@ -29,6 +29,7 @@ Object.assign(Game, {
     this.state.techPath[id] = mode;
     this.log('tech', { id, mode });
     this.applyRetire(T);   // перемены: уходящие ресурсы переходят в новые
+    this.fx = this.effects();   // бонусы знания действуют сразу, а не со следующего такта
     this.save();
     return true;
   },

@@ -114,6 +114,33 @@ const Art = (() => {
       <rect x="44" y="40" width="5" height="5" fill="${C.dark}" ${st(1.2)}/>
       <path d="M10 49 L40 49" stroke="${C.stoneD}" stroke-width="2"/>`;
 
+  // ---------- железный век: лоза, амфора, вакханка ----------
+  const GR = '#7b3f73', GRD = '#4f2448', GRL = '#a8679c';
+  const grapes = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M0 -9 Q2 -13 5 -14" stroke="${C.woodD}" stroke-width="1.4" fill="none"/>
+      <path d="M2 -12 Q8 -16 11 -11 Q6 -8 2 -12Z" fill="${C.green}" stroke="${C.greenD}" stroke-width="1"/>
+      ${[[-3, -6], [3, -6], [0, -2], [-5, -1], [5, -1], [-2, 3], [3, 3], [0, 7]].map(([a, b]) => `<circle cx="${a}" cy="${b}" r="3" fill="${GR}" stroke="${GRD}" stroke-width="1"/>`).join('')}
+      <circle cx="-4" cy="-7" r="1" fill="${GRL}"/><circle cx="2" cy="-3" r="1" fill="${GRL}"/></g>`;
+  const vine = (x, y, s = 1, fruit = true) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M0 10 L0 -16" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M0 4 Q-6 -2 -2 -10 Q4 -6 0 4Z M0 -2 Q8 -6 6 -14 Q-1 -11 0 -2Z" fill="${C.green}" ${st(1.2)}/>
+      <path d="M-3 -12 Q-10 -14 -9 -6 Q-4 -7 -3 -12Z" fill="${C.greenD}" ${st(1.1)}/>
+      ${fruit ? `<g transform="translate(4 -2) scale(.55)">${[[-3, -2], [3, -2], [0, 2], [-2, 6], [2, 6], [0, 10]].map(([a, b]) => `<circle cx="${a}" cy="${b}" r="3" fill="${GR}" stroke="${GRD}" stroke-width="1.2"/>`).join('')}</g>` : ''}</g>`;
+  const terrace = (y, x1 = 4, x2 = 60) => `<path d="M${x1} ${y} L${x2} ${y - 2} L${x2} ${y + 4} L${x1} ${y + 6}Z" fill="${C.stone}" ${st(1.4)}/>
+      <path d="M${x1 + 8} ${y + 1} l0 4 M${x1 + 20} ${y + 0.5} l0 4 M${x1 + 32} ${y} l0 4 M${x1 + 44} ${y - 0.5} l0 4" stroke="${C.stoneD}" stroke-width="1.1"/>`;
+  const amphoraShape = (x, y, s = 1, col = '#c9693a') => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M-3 -16 L3 -16 L3 -12 Q10 -8 9 2 Q8 10 0 18 Q-8 10 -9 2 Q-10 -8 -3 -12Z" fill="${col}" ${st(1.5)}/>
+      <path d="M-3 -13 Q-9 -14 -8 -6 M3 -13 Q9 -14 8 -6" fill="none" ${st(1.6)}/>
+      <path d="M-8 -1 Q0 2 8 -1" fill="none" stroke="${C.dark}" stroke-width="1.4"/></g>`;
+  const maenad = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M-8 18 Q-6 2 0 -2 Q6 2 8 18Z" fill="${GR}" ${st(1.5)}/>
+      <path d="M-4 4 Q0 8 4 4" fill="none" stroke="${GRL}" stroke-width="1.2"/>
+      <circle cx="0" cy="-7" r="5" fill="${C.mud}" ${st(1.4)}/>
+      <path d="M-5 -10 Q0 -15 5 -10" fill="none" stroke="${C.greenD}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="-5" cy="-10" r="1.6" fill="${C.green}"/><circle cx="5" cy="-10" r="1.6" fill="${C.green}"/><circle cx="0" cy="-13" r="1.6" fill="${C.green}"/>
+      <path d="M4 0 L12 -10" ${st(1.6)}/><circle cx="13" cy="-12" r="5" fill="${C.thatch}" ${st(1.4)}/><circle cx="13" cy="-12" r="2.4" fill="none" stroke="${C.thatchD}" stroke-width="1"/>
+      <path d="M-4 0 L-11 -4 L-11 -20" ${st(1.5)} fill="none"/><path d="M-14 -24 Q-11 -28 -8 -24 Q-11 -20 -14 -24Z" fill="${C.green}" ${st(1.1)}/></g>`;
+
   // ---------- здания: облик меняется с эпохой и на 4-м уровне — и заметно ----------
   const B = {
     house0: shadow(20) + roundHut(32, 36, 1),
@@ -273,6 +300,23 @@ const Art = (() => {
       <path d="M44 22 L56 18 Q60 26 56 34 L44 30Z" fill="${C.bronze}" ${st(1.5)}/>
       <path d="M44 26 L36 26" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>`,
 
+    // виноградник: лоза на террасе → две террасы → давильня с амфорами
+    vineyard0: shadow(26) + terrace(44) + vine(20, 36, 1.1) + vine(42, 34, 1.15),
+    vineyard1: shadow(28) + terrace(50) + terrace(32, 10, 58) + vine(16, 42, .9) + vine(34, 41, .95) + vine(52, 40, .9) + vine(26, 24, .85) + vine(44, 23, .85) +
+      `<path d="M4 58 L14 52 L20 58Z" fill="${C.thatch}" ${st(1.3)}/>` + grapes(11, 51, .45),
+    vineyard2: shadow(30) + terrace(52) + vine(10, 44, .85) + vine(24, 43, .9) + `
+      <rect x="34" y="22" width="24" height="20" fill="${C.plaster}" ${st()}/><path d="M32 23 L46 14 L60 23Z" fill="${C.terra}" ${st(1.5)}/>
+      <rect x="41" y="30" width="9" height="12" fill="${C.dark}" ${st(1.3)}/>` + amphoraShape(54, 50, .55) + amphoraShape(44, 52, .5, '#b85d33') + grapes(30, 26, .55),
+    // оливковая роща: две оливы → три и корзина → и маслодавильня
+    olivegrove0: shadow(24) + olive(22, 40, 1.15) + olive(42, 42, 1.25),
+    olivegrove1: shadow(28) + olive(14, 36, 1) + olive(34, 32, 1.15) + olive(50, 42, 1.05) + `
+      <path d="M20 52 L36 52 L34 58 L22 58Z" fill="${C.thatch}" ${st(1.3)}/>
+      ${[23, 27, 31].map(x => `<circle cx="${x}" cy="51" r="1.8" fill="#3c4a2a"/>`).join('')}`,
+    olivegrove2: shadow(30) + olive(14, 34, 1) + olive(30, 28, 1.05) + `
+      <circle cx="44" cy="46" r="11" fill="${C.stone}" ${st()}/><circle cx="44" cy="46" r="4" fill="${C.stoneD}" ${st(1.2)}/>
+      <path d="M44 46 L62 36" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <rect x="38" y="30" width="12" height="7" rx="2" fill="${C.stoneD}" ${st(1.3)}/>` + amphoraShape(20, 50, .5, '#b85d33') + amphoraShape(28, 52, .48),
+
     scribe0: shadow(18) + tablet(32, 36, 1.2) + `<path d="M44 52 L56 26" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>`,
     // ур. 4+: навес писцов — скамья с табличками, печать, кувшин-архив
     scribe1: shadow(28) + `
@@ -318,6 +362,29 @@ const Art = (() => {
 
   // ---------- спецстроения ----------
   const S = {
+    // Палеопафос: двор с колоннами, конический камень богини, голуби
+    sp_aphrodite: shadow(28) + `
+      <rect x="6" y="46" width="52" height="9" fill="${C.stone}" ${st()}/>
+      <rect x="10" y="20" width="44" height="6" fill="${C.plaster}" ${st(1.5)}/>
+      ${[12, 46].map(x => `<rect x="${x}" y="26" width="6" height="20" fill="${C.plaster}" ${st(1.4)}/>`).join('')}
+      <path d="M22 46 Q24 22 32 18 Q40 22 42 46Z" fill="#5d5a66" ${st(1.8)}/><path d="M28 30 Q31 24 34 26" stroke="#8f8b99" stroke-width="1.6" fill="none"/>
+      <path d="M8 20 L32 8 L56 20Z" fill="${C.terra}" ${st(1.5)}/>
+      <path d="M48 12 q3 -3 6 0 q-3 1 -6 0Z M50 10 l3 -1" fill="${C.white}" ${st(1)}/><path d="M10 14 q3 -3 6 0 q-3 1 -6 0Z" fill="${C.white}" ${st(1)}/>
+      <circle cx="14" cy="52" r="2.4" fill="#d9536e"/><circle cx="50" cy="52" r="2.4" fill="#d9536e"/>`,
+    // Курион: храм с колоннами, солнце, роща
+    sp_apollo: shadow(28) + `
+      ${[0, 30, 60, 90, 120, 150].map(a => { const r = (a + 195) * Math.PI / 180; return `<path d="M${46 + Math.cos(r) * 9} ${14 + Math.sin(r) * 9} L${46 + Math.cos(r) * 14} ${14 + Math.sin(r) * 14}" stroke="${C.fire}" stroke-width="2" stroke-linecap="round"/>`; }).join('')}
+      <circle cx="46" cy="14" r="7" fill="${C.fireL}" ${st(1.4)}/>` + pine(10, 44, .7) + `
+      <rect x="14" y="48" width="44" height="7" fill="${C.stone}" ${st()}/>
+      ${[18, 28, 38, 48].map(x => `<rect x="${x}" y="30" width="5" height="18" fill="${C.plaster}" ${st(1.3)}/>`).join('')}
+      <rect x="15" y="26" width="40" height="5" fill="${C.plaster}" ${st(1.4)}/><path d="M14 26 L35 16 L56 26Z" fill="${C.plaster}" ${st(1.5)}/>
+      <circle cx="35" cy="22" r="2" fill="${C.bronze}" ${st(1)}/>`,
+    // Троодос в лозах: склоны с террасами и гроздья
+    sp_troodos2: `
+      <path d="M2 54 L20 16 L30 30 L40 10 L62 54Z" fill="${C.stoneD}" ${st()}/>
+      <path d="M20 16 L26 24 L22 26 L18 22Z M40 10 L47 22 L42 24 L36 18Z" fill="${C.white}" ${st(1.2)}/>
+      <path d="M10 46 L54 46 M14 38 L50 38 M20 30 L44 30" stroke="${C.stone}" stroke-width="2.4"/>` +
+      vine(14, 44, .55) + vine(26, 44, .55) + vine(38, 44, .55) + vine(50, 44, .55) + vine(22, 36, .5) + vine(34, 36, .5) + vine(44, 36, .5) + grapes(52, 52, .6),
     sp_lemba: shadow(28) + smoke(44, 6) + roundHut(32, 34, 1.3, { base: true, wall: C.plaster, knob: true }),
     sp_troodos: `
       <path d="M2 54 L20 16 L30 30 L40 10 L62 54Z" fill="${C.stoneD}" ${st()}/>
@@ -360,6 +427,13 @@ const Art = (() => {
       <path d="M2 54 L2 20 L62 20 L62 54Z" fill="${C.stone}" ${st()}/>
       <path d="M2 30 L18 28 L30 31 L46 28 L62 30 M2 42 L12 40 L26 43 L40 41 L52 43 L62 41 M18 20 L16 28 M34 20 L30 31 M50 20 L46 28 M12 30 L10 40 M40 30 L40 41 M24 43 L22 54 M52 43 L54 54" fill="none" stroke="${C.stoneD}" stroke-width="1.6"/>
       <path d="M26 54 L26 38 Q32 32 38 38 L38 54Z" fill="${C.dark}" ${st()}/>`,
+    // царская гробница Саламина: каменный фасад, дромос и колесничное колесо у входа
+    sp_salamis: shadow(30) + `
+      <path d="M6 54 L22 34 L42 34 L58 54Z" fill="${C.mud}" ${st(1.6)}/><path d="M14 54 L26 38 L38 38 L50 54" fill="none" stroke="${C.mudD}" stroke-width="1.4"/>
+      <rect x="18" y="12" width="28" height="24" fill="${C.stone}" ${st()}/><path d="M18 20 L46 20 M18 28 L46 28 M26 12 L26 20 M38 20 L38 28 M30 28 L30 36" stroke="${C.stoneD}" stroke-width="1.2"/>
+      <path d="M27 36 L27 26 Q32 22 37 26 L37 36Z" fill="${C.dark}" ${st(1.5)}/>
+      <circle cx="16" cy="46" r="8" fill="none" stroke="${C.woodD}" stroke-width="2.4"/>${[0, 45, 90, 135].map(a => { const r = a * Math.PI / 180; return `<path d="M${16 - Math.cos(r) * 8} ${46 - Math.sin(r) * 8} L${16 + Math.cos(r) * 8} ${46 + Math.sin(r) * 8}" stroke="${C.woodD}" stroke-width="1.4"/>`; }).join('')}
+      <circle cx="16" cy="46" r="2" fill="${C.bronze}" ${st(1)}/>` + amphoraShape(50, 46, .5),
     sp_palace: shadow(30) + `
       <rect x="4" y="22" width="56" height="32" fill="${C.plaster}" ${st()}/>
       <rect x="2" y="16" width="60" height="7" fill="${C.stoneD}" ${st()}/>
@@ -410,6 +484,15 @@ const Art = (() => {
       <path d="M24 42 L50 18" stroke="#d6dde2" stroke-width="2" stroke-linecap="round"/>
       <path d="M20 40 L26 46 L12 60 Q6 60 6 54Z" fill="${C.wood}" ${st(2)}/>
       <circle cx="14" cy="52" r="2.2" fill="${C.bronze}" ${st(1)}/><circle cx="19" cy="47" r="2.2" fill="${C.bronze}" ${st(1)}/>`,
+    // серебро: рубленые куски на весах — монет ещё нет
+    silver: `<path d="M8 50 L20 40 L32 46 L26 58 L12 58Z" fill="#cfd5da" ${st(1.8)}/>
+      <path d="M30 34 L46 28 L56 38 L48 50 L34 46Z" fill="#b9c1c8" ${st(1.8)}/>
+      <path d="M36 54 Q44 50 52 56 Q46 62 38 60Z" fill="#dfe4e8" ${st(1.6)}/>
+      <path d="M12 52 L22 46 M34 38 L46 33" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M14 22 L50 18" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/><path d="M32 20 L32 10" stroke="${C.woodD}" stroke-width="2.4"/>
+      <path d="M10 22 Q14 30 18 22Z M46 18 Q50 26 54 18Z" fill="${C.bronze}" ${st(1.2)}/>`,
+    // амфоры: вино и масло
+    amphora: amphoraShape(28, 34, 1.55) + grapes(48, 46, .7) + `<path d="M44 14 Q54 10 58 18 Q50 20 44 14Z" fill="#8d9b5c" ${st(1.3)}/><circle cx="52" cy="22" r="2.4" fill="#3c4a2a"/>`,
   };
 
   // ---------- местность и звери ----------
@@ -418,6 +501,7 @@ const Art = (() => {
     hill: `<path d="M4 54 Q18 20 34 24 Q48 26 60 54Z" fill="#9f7b4d" ${st(1.6)} opacity=".75"/>
       <path d="M20 32 L26 40 M38 30 L44 40" stroke="#6f532f" stroke-width="1.6" opacity=".6"/>`,
     goat: goat(30, 40, 1.6, C.white),
+    maenad: maenad(32, 34, 1.5),
   };
 
   // ---------- медальоны знаний (светлые) и обрядов (тёмные, «ночные») ----------
@@ -469,6 +553,19 @@ const Art = (() => {
       <path d="M30 12 L46 28" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
       <path d="M40 10 L52 22 L46 26 L34 14Z" fill="#a3aab0" ${st(1.6)}/>
       <path d="M50 30 l4 -2 M52 34 l5 0 M48 26 l3 -4" stroke="${C.fireL}" stroke-width="1.6" stroke-linecap="round"/>`,
+    // слоговое письмо: бронзовая табличка из Идалиона с кипрскими знаками
+    t_syllabary: tdisc + `<rect x="14" y="16" width="36" height="32" rx="2" fill="${C.bronze}" ${st(1.8)}/>
+      <circle cx="32" cy="12" r="4" fill="none" ${st(1.6)}/>
+      <path d="M18 22 l4 4 l4 -4 M30 21 l0 6 M28 24 l4 0 M38 22 l3 5 l3 -5 M18 32 l0 6 M18 35 l5 0 M28 31 l4 7 M32 31 l-4 7 M38 31 q4 3 0 7 M18 42 l8 0 M30 42 l3 -3 l3 3 M40 40 l4 4" fill="none" stroke="${C.bronzeD}" stroke-width="1.5" stroke-linecap="round"/>`,
+    // финикийцы: корабль с конской головой на носу и рубленое серебро
+    t_phoenicians: tdisc + `<path d="M12 38 L52 38 Q48 48 32 48 Q16 48 12 38Z" fill="${C.wood}" ${st(1.8)}/>
+      <path d="M52 38 Q56 32 54 26 Q50 26 50 30 L48 38" fill="${C.wood}" ${st(1.4)}/><circle cx="53" cy="28" r="1" fill="${O}"/>
+      <path d="M30 38 L30 16" stroke="${C.dark}" stroke-width="2"/><path d="M20 18 L40 18 L38 32 L22 32Z" fill="#8a3a5c" ${st(1.4)}/>
+      <path d="M22 25 L38 25" stroke="${C.white}" stroke-width="1.6"/>
+      <path d="M14 52 L20 48 L24 52 L20 56Z M26 54 L32 50 L36 55 L30 57Z" fill="#cfd5da" ${st(1.2)}/>`,
+    // виноградарство: лоза с гроздью и садовый нож
+    t_viticulture: tdisc + vine(24, 34, 1.3, false) + grapes(36, 30, .95) +
+      `<path d="M16 50 Q28 46 34 52" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M34 52 Q44 50 44 42 Q38 46 34 48Z" fill="#a3aab0" ${st(1.3)}/>`,
     t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
       <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
 
@@ -504,6 +601,17 @@ const Art = (() => {
       `<path d="M24 30 Q24 20 32 20 Q40 20 40 30 L40 40 Q32 46 24 40Z" fill="${C.bronze}" ${st(1.6)}/>
       <path d="M24 26 Q12 24 12 12 Q18 20 26 22 M40 26 Q52 24 52 12 Q46 20 38 22" fill="${C.white}" ${st(1.4)}/>
       <path d="M28 32 l3 0 M33 32 l3 0" stroke="${O}" stroke-width="1.6"/>`,
+    r_vintage: rdisc + grapes(32, 30, 1.25) + `<circle cx="16" cy="44" r="7" fill="${C.thatch}" ${st(1.4)}/><circle cx="16" cy="44" r="3.4" fill="none" stroke="${C.thatchD}" stroke-width="1.2"/>
+      ${[0, 90, 180, 270].map(a => { const r = a * Math.PI / 180; return `<circle cx="${16 + Math.cos(r) * 7}" cy="${44 + Math.sin(r) * 7}" r="1.3" fill="${C.bronze}"/>`; }).join('')}` + amphoraShape(48, 44, .55),
+    // Утренняя звезда — Венера, звезда Афродиты, над морем перед рассветом
+    r_morningstar: rdisc + `<path d="M6 44 Q32 38 58 44 L58 50 Q32 46 6 50Z" fill="#e9a06b" opacity=".75"/>
+      <path d="M8 50 Q32 46 56 50 L52 56 Q32 58 12 56Z" fill="${C.water}"/>` + star(40, 22, 3.2) + star(22, 16, 1) + star(30, 30, .8) +
+      `<circle cx="40" cy="22" r="9" fill="#fff6c2" opacity=".25"/>` + tablet(18, 34, .55),
+    // гномон и полос: тень солнечных часов в каменной чаше
+    r_gnomon: rdisc + `<circle cx="18" cy="18" r="6" fill="${C.fireL}" ${st(1.2)}/>
+      <path d="M12 38 Q32 58 52 38Z" fill="${C.stone}" ${st(1.8)}/><path d="M12 38 L52 38" stroke="${C.stoneD}" stroke-width="1.6"/>
+      ${[0, 1, 2, 3, 4, 5, 6].map(i => { const a = Math.PI * (i / 6); return `<path d="M${32 - Math.cos(a) * 14} ${38 + Math.sin(a) * 10} L${32 - Math.cos(a) * 18} ${38 + Math.sin(a) * 13}" stroke="${C.stoneD}" stroke-width="1.2"/>`; }).join('')}
+      <path d="M32 38 L32 20" stroke="${C.dark}" stroke-width="2.4" stroke-linecap="round"/><path d="M32 38 L44 46" stroke="#2a2840" stroke-width="3" stroke-linecap="round" opacity=".7"/>`,
   };
 
   const ALL = Object.assign({}, B, S, T, M);

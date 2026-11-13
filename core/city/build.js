@@ -49,16 +49,32 @@ Object.assign(Game, {
     if (s.epoch < B.epoch) return { ok: false, hidden: true };
     if (this.obsoleteType(type)) return { ok: false, hidden: true };   // устарело: новые такие не строят
     if (B.tech && !this.hasTech(B.tech)) return { ok: false, locked: true, reason: { code: 'needTech', tech: B.tech } };
+    if (B.special && this.upgradedFrom(type)) return { ok: false, hidden: true };   // чудо уже улучшено до другого
     if (B.special && this.retired(type)) {   // чудо прошлой эпохи: строить нельзя; со склада ставится уже обычным зданием
       return this.stashed(type) ? { ok: true, stashed: true, into: B.retire.into, level: B.retire.level, cost: {}, logos: 0 } : { ok: false, hidden: true };
     }
     if (B.special && this.stashed(type)) return { ok: true, stashed: true, cost: {}, logos: 0 };
     if (B.special && this.built(type)) return { ok: false, done: true, reason: { code: 'builtAlready' } };
-    const { cost, logos } = this.priceOf(type, mode);
+    if (B.upgradeOf && !this.owned(B.upgradeOf)) return { ok: false, locked: true, reason: { code: 'needBuilding', type: B.upgradeOf } };
+    const { cost, logos } = this.priceOf(type, mode), upgrade = !!B.upgradeOf;
     if (B.max && this.count(type) >= B.max) return { ok: false, cost, logos, reason: { code: 'maxCount', max: B.max } };
     const reason = this.lackReason(cost, logos);
-    if (reason) return { ok: false, cost, logos, poor: true, reason };
-    return { ok: true, cost, logos };
+    if (reason) return { ok: false, cost, logos, poor: true, reason, upgrade };
+    return { ok: true, cost, logos, upgrade };
+  },
+
+  /** Улучшить чудо (upgradeOf): новое встаёт на место старого — в городе или на складе. */
+  upgradeWonder(type) {
+    const B = BUILDINGS[type], st = this.buildStatus(type);
+    if (!B.upgradeOf || !st.ok) return false;
+    const s = this.state, b = s.buildings.find(x => x.type === B.upgradeOf);
+    this.pay(st.cost, st.logos);
+    if (b) b.type = type;
+    else s.stash = s.stash.map(t => t === B.upgradeOf ? type : t);
+    this.log('wonderUpgraded', { from: B.upgradeOf, into: type });
+    this.fx = this.effects();
+    this.save();
+    return true;
   },
 
   canPlaceOn(type, tile) {
@@ -115,13 +131,15 @@ Object.assign(Game, {
   /** Сведения об улучшении до следующего уровня: цена, хватает ли, причина «нельзя» (кодом). */
   upgradeInfo(b) {
     const B = BUILDINGS[b.type];
-    if (B.special) return null;
+    if (B.special || this.obsoleteType(b.type)) return null;   // устаревшее не улучшают — перестраивают или продают
     const target = b.level + 1, maxL = this.maxLevel();
     if (target > maxL) {
       const nextE = EPOCHS.findIndex(e => e.maxLevel > maxL);
       return { capped: true, target, reason: { code: 'levelCap', max: maxL, next: nextE > 0 ? nextE : null, nextMax: nextE > 0 ? EPOCHS[nextE].maxLevel : null } };
     }
     const { cost, logos } = this.upgradeCost(b.type, target);
+    const need = Object.entries(B.levelTech || {}).find(([L, t]) => target >= +L && !this.hasTech(t));   // уровню нужно знание
+    if (need) return { target, cost, logos, ok: false, reason: { code: 'needTech', tech: need[1] } };
     const reason = this.lackReason(cost, logos);
     return { target, cost, logos, ok: !reason, reason };
   },
