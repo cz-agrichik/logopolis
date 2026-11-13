@@ -260,7 +260,7 @@ test('железный век: «Виноградарство» — сыр в а
   assert.equal(G.goat.kind, 'maenad');
 });
 
-test('железный век: гавань продаёт амфоры за серебро сверх обычной работы', () => {
+test('железный век: гавань продаёт амфоры за серебро сверх обычной работы — только то, что сверх половины склада', () => {
   const C = fresh(), G = ironAge(C), s = G.state;
   s.techs.push('phoenicians', 'viticulture');
   const coast = G.map.find(t => t.coast && t.t === 'plain' && !G.buildingAt(t.x, t.y));
@@ -268,9 +268,13 @@ test('железный век: гавань продаёт амфоры за с�
   for (const k of Object.keys(s.res)) s.res[k] = 500;
   s.res.amphora = 0; G.tick(1);
   const fx = G.effects(), noAmph = G.production(fx, 100, 1).rates;
-  s.res.amphora = 500;
+  const cap = G.storageCap(fx);
+  s.res.amphora = Math.floor(cap * 0.5) - 1;
+  const half = G.production(fx, 100, 1).rates;
+  assert.equal(half.silver, noAmph.silver, 'до половины склада амфоры копятся, а не продаются');
+  s.res.amphora = Math.floor(cap * 0.5) + 50;
   const withAmph = G.production(fx, 100, 1).rates;
-  assert.ok(withAmph.silver > noAmph.silver, 'серебра больше');
+  assert.ok(withAmph.silver > noAmph.silver, 'сверх половины — серебра больше');
   assert.ok(withAmph.amphora < noAmph.amphora, 'амфоры уходят');
   assert.ok(noAmph.silver > 0 && noAmph.copper < 0, 'без амфор гавань работает как обычно');
 });

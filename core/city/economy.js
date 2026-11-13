@@ -211,7 +211,8 @@ Object.assign(Game, {
       const t = this.tradeOf(b, fx);
       if (t) {
         const tin = Object.keys(t).filter(k => t[k] < 0), tout = Object.keys(t).filter(k => t[k] > 0);
-        const room = tout.some(k => s.res[k] < storage - 0.01), enough = tin.every(k => s.res[k] >= -t[k] * e * dt);
+        const keep = (BUILDINGS[b.type].trade.keep || 0) * storage;   // гавань продаёт только то, что сверх половины склада
+        const room = tout.some(k => s.res[k] < storage - 0.01), enough = tin.every(k => s.res[k] >= -t[k] * e * dt && s.res[k] > keep);
         if (room && enough) for (const [k, v] of Object.entries(t)) {
           rates[k] += v * e;
           if (log) log.push({ b, k, v: v * e, e, share: 1, trade: true });
