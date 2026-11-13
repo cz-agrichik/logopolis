@@ -69,30 +69,64 @@ Object.assign(Game, {
   nextRaidIn() { const [a, b] = BALANCE.raidEvery; return rand(a, b); },
   /** Что грозит: 'sea' — набеги «народов моря» (бронзовый век), 'tribute' — дань империям (железный век). */
   raidKind() { return this.state.epoch >= 2 ? 'tribute' : 'sea'; },
+  /** Кто берёт дань: 'assyria' — грабит, 'egypt' — серебро с каждого жителя, 'persia' — твёрдая сумма; null — не железный век. */
+  overlord() {
+    if (this.raidKind() !== 'tribute') return null;
+    return this.hasTech('gifts') ? 'persia' : this.hasTech('pharaoh') ? 'egypt' : 'assyria';
+  },
+  /** Дань серебром без скидок: по нынешнему числу жителей (BALANCE.tribute). */
+  tributeBase(lord) { return Math.ceil(this.state.pop * BALANCE.tribute[lord]); },
+  /** Сколько серебра потребуют: Египет — с каждого жителя, Персия — сумма с присяги; «Флот царей» −25%. null — Ассирия: она грабит. */
+  tributeDue(fx = this.fx || this.effects()) {
+    const lord = this.overlord();
+    if (lord !== 'egypt' && lord !== 'persia') return null;
+    const base = lord === 'persia' ? (this.state.tributeFixed || this.tributeBase('persia')) : this.tributeBase('egypt');
+    return Math.ceil(base * (1 - Math.min(0.9, fx.tributeCut || 0)));
+  },
   /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век или игра окончена). */
   raidIn() {
     const s = this.state;
     return s.epoch >= 1 && !s.finished && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
   },
-  /** Набег (бронзовый век) или дань (железный век): уносят случайную долю (BALANCE.raidLoot) всех запасов.
-   *  Циклопические стены от «народов моря» защищают полностью, а дань только уменьшают вдвое.
+  /** Набег (бронзовый век) или дань (железный век).
+   *  «Народы моря» и Ассирия уносят случайную долю (BALANCE.raidLoot) всех запасов: стены от «народов моря» защищают полностью,
+   *  от Ассирии — вдвое. Египет и Персия берут серебро (tributeDue); не хватает — Египет добирает недостающую долю грабежом
+   *  (стены — вдвое), Персия — ровно по ценнику (BALANCE.worth) из остальных запасов.
    *  quiet — случилось, пока игрока не было: расскажет окно «С возвращением!», а не всплывашка. */
   raid(quiet = false) {
-    const s = this.state, fx = this.fx || this.effects(), tribute = this.raidKind() === 'tribute';
+    const s = this.state, fx = this.fx || this.effects(), tribute = this.raidKind() === 'tribute', lord = this.overlord();
     if (fx.raidShield && !tribute) {
       this.log('raidShield');
       if (!quiet) Bus.emit('raid', { shielded: true });
       return { shielded: true };
     }
-    const [a, b] = BALANCE.raidLoot, halved = !!(tribute && fx.raidShield);
-    const pct = Math.round(rand(a, b) * 100) / 100 / (halved ? 2 : 1);
-    const lost = [];
-    for (const k of RES_KEYS) {
-      const d = Math.floor(s.res[k] * pct);
-      if (d > 0) { s.res[k] -= d; lost.push([k, d]); }
+    const [a, b] = BALANCE.raidLoot, lost = [];
+    const take = (k, d) => { d = Math.floor(Math.min(d, s.res[k])); if (d > 0) { s.res[k] -= d; const x = lost.find(l => l[0] === k); if (x) x[1] += d; else lost.push([k, d]); } };
+    const grab = share => {   // случайная доля всех запасов; share — какая часть дани не уплачена
+      const p = Math.round(rand(a, b) * 100) / 100 * share / (fx.raidShield ? 2 : 1);
+      for (const k of RES_KEYS) take(k, s.res[k] * p);
+      return p;
+    };
+    let out;
+    const due = this.tributeDue(fx);
+    if (due == null) {   // «народы моря» или Ассирия: грабят
+      const halved = !!(tribute && fx.raidShield), pct = grab(1);
+      out = { shielded: false, lost, pct, tribute, halved, lord };
+    } else {
+      const paid = Math.min(due, Math.floor(s.res.silver));
+      take('silver', paid);
+      const short = due - paid;
+      let pct = 0, halved = false;
+      if (short > 0 && lord === 'egypt') { halved = !!fx.raidShield; pct = grab(short / due); }
+      else if (short > 0) {   // Персия: недоимку — ровно по ценнику, одной и той же долей из всех запасов
+        const W = BALANCE.worth, need = short * W.silver, keys = RES_KEYS.filter(k => this.resVisible(k));
+        const total = keys.reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
+        pct = total > 0 ? Math.min(1, need / total) : 0;
+        for (const k of keys) take(k, s.res[k] * pct);
+      }
+      out = { shielded: false, lost, pct, tribute, halved, lord, due, paid, short };
     }
-    const out = { shielded: false, lost, pct, tribute, halved };
-    this.log(tribute ? 'tribute' : 'raid', { lost, pct, halved });
+    this.log(tribute ? 'tribute' : 'raid', { lost, pct: out.pct, halved: out.halved, lord, due: out.due, paid: out.paid, short: out.short });
     if (!quiet) Bus.emit('raid', out);
     return out;
   },

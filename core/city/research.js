@@ -5,9 +5,9 @@
 
 Object.assign(Game, {
   // ---------- знания ----------
-  /** Цена знания: 'logos' — λ + немного ресурсов; 'labor' — без λ, но ресурсов втрое больше. */
+  /** Цена знания: 'logos' — λ + немного ресурсов; 'labor' — без λ, но ресурсов втрое больше (buy — λ-часть серебром: «купить у чужеземцев»). */
   techPrice(T, mode = 'logos') {
-    if (mode === 'labor') return { cost: this.liveCost(this.laborCost(T.cost, T.logos, T.epoch, BALANCE.laborTechMult)), logos: 0 };
+    if (mode === 'labor') return { cost: this.liveCost(this.laborCost(T.cost, T.logos, T.epoch, BALANCE.laborTechMult, T.buy)), logos: 0 };
     return { cost: this.liveCost(T.cost), logos: T.logos };
   },
   techStatus(T, mode = 'logos') {
@@ -29,6 +29,7 @@ Object.assign(Game, {
     this.state.techPath[id] = mode;
     this.log('tech', { id, mode });
     this.applyRetire(T);   // перемены: уходящие ресурсы переходят в новые
+    if (T.fixTribute) this.state.tributeFixed = this.tributeBase('persia');   // присяга Персии: сумма дани считается один раз
     this.fx = this.effects();   // бонусы знания действуют сразу, а не со следующего такта
     this.save();
     return true;

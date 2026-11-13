@@ -35,6 +35,14 @@ const Msg = {
     for (let e = Math.min(epoch, f.length - 1); e >= 0; e--) if (f[e]) return f[e].name;
     return f.find(Boolean).name;
   },
+  /** Дань железного века одной строкой: итог Game.raid или запись летописи. list = false — без списка потерь (его покажут фишками). */
+  tributeLine(p, list = true) {
+    const L = Lex.lords[p.lord || 'assyria'], tail = list && p.lost && p.lost.length ? ': ' + this.resList(p.lost, '−') : '';
+    if (p.due == null) return `${L.icon} Сборщики дани ${L.of} забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}${tail}`;
+    if (!p.short) return `${L.icon} Дань ${L.to} уплачена: ${Lex.res.silver.icon} −${p.paid}`;
+    if (p.lord === 'egypt') return `${L.icon} Дань ${L.to}: серебра не хватило (${p.paid} из ${p.due}) — недостающее добрали грабежом, ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены — вдвое)' : ''}${tail}`;
+    return `${L.icon} Дань ${L.to}: не хватило ${p.short} серебра — недоимку взяли запасами по ценнику${tail}`;
+  },
   /** [[ресурс, сколько]] → «🌾 +30 🪵 +12». */
   resList(list, sign = '+') { return (list || []).map(([k, v]) => `${Lex.res[k].icon} ${sign}${v}`).join(' '); },
 
@@ -94,7 +102,7 @@ const Msg = {
       case 'goat': return p.kind === 'maenad' ? `🍇 ${this.maenadLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}` : `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
       case 'wonderUpgraded': return `✨ «${Lex.bld[p.from].name}» теперь — ${Lex.bld[p.into].name}!`;
       case 'raidShield': return '🧱 Циклопические стены отразили набег «народов моря»!';
-      case 'tribute': return `👑 Сборщики дани Ассирии забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}: ${this.resList(p.lost, '−')}`;
+      case 'tribute': return this.tributeLine(p);
       case 'resRetired': return p.amount ? `🔄 ${Lex.res[p.from].name} → ${Lex.res[p.into].name.toLowerCase()}: ${Lex.res[p.from].icon} ${p.have} → ${Lex.res[p.into].icon} ${p.amount}`
         : `🔄 ${Lex.res[p.from].name}: запасы ${Lex.res[p.from].icon} ${p.have} пропали — ресурс ушёл из хозяйства`;
       case 'rebuilt': return `🔄 Перестроено: ${this.formName(p.from, p.epoch)} → ${this.formName(p.into, p.epoch)} ${p.level}-го уровня`;

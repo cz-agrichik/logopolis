@@ -56,7 +56,7 @@ const UI = {
     // события ядра
     Bus.on('log', () => this.renderLog());
     Bus.on('raid', r => this.toast(r.shielded ? '🧱 Циклопические стены отразили набег «народов моря»!'
-      : r.tribute ? `👑 Сборщики дани Ассирии забрали ${Math.round(r.pct * 100)}% всех запасов${r.halved ? ' — стены уменьшили дань вдвое' : ''}.`
+      : r.tribute ? Msg.tributeLine(r) + '.'
       : `⚔️ Набег «народов моря»! Унесли ${Math.round(r.pct * 100)}% всех запасов. Защитят только Циклопические стены.`));
     this.renderMap();
     this.renderAll();
@@ -125,10 +125,18 @@ const UI = {
     if (raidIn != null) {
       const shield = (Game.fx || Game.effects()).raidShield, mm = `${Math.floor(raidIn / 60)}:${String(Math.floor(raidIn % 60)).padStart(2, '0')}`;
       const [a, b] = BALANCE.raidLoot;
-      if (Game.raidKind() === 'tribute') {
+      const lord = Game.overlord(), due = Game.tributeDue();
+      if (lord && due != null) {   // Египет и Персия: дань серебром — сумма видна заранее
+        const L = Cat.lords[lord], have = Math.floor(Game.state.res.silver), cut = (Game.fx || Game.effects()).tributeCut;
+        const how = lord === 'egypt' ? `по ${BALANCE.tribute.egypt} с каждого жителя` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
+        const miss = lord === 'egypt' ? `недостающее доберут грабежом${shield ? ' (Циклопические стены — вдвое)' : ''}` : 'недоимку возьмут другими запасами ровно по ценнику';
+        raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Дань ${L.to} через ${mm}: ${due} серебра (${how}${cut ? `; «Флот царей» −${Math.round(cut * 100)}%` : ''}).
+          ${have >= due ? 'Серебра хватает.' : `Серебра пока ${have} — не хватит: ${miss}.`}">
+          <i class="bf-ic">${L.icon}</i><b>Дань ${L.to}</b><small>${Art.res('silver', 'inl')} ${due} · ${mm}</small></span>`;
+      } else if (lord) {
         raid = `<span class="bf raid ${raidIn < 60 ? 'soon' : ''}" title="Сборщики дани Ассирии придут через ${mm}: заберут от ${a * 100}% до ${b * 100}% всех запасов${shield
-          ? ' — Циклопические стены уменьшат дань вдвое' : '. Циклопические стены уменьшили бы дань вдвое'}. Успейте потратить!">
-          <i class="bf-ic">👑</i><b>Дань Ассирии</b><small>${mm}</small></span>`;
+          ? ' — Циклопические стены уменьшат дань вдвое' : '. Циклопические стены уменьшили бы дань вдвое'}. Успейте потратить! Знание «Дань фараону» сменит грабёж данью серебром.">
+          <i class="bf-ic">🏹</i><b>Дань Ассирии</b><small>${mm}</small></span>`;
       } else {
         raid = `<span class="bf raid ${shield ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="${shield
           ? `Набег «народов моря» через ${mm}. Циклопические стены его отразят.`
@@ -327,7 +335,7 @@ const UI = {
     const fx = Game.fx || Game.effects();
     let h = this.prodChips(Game.prodOf(b, fx, level));
     const tr = Game.tradeOf(b, fx, level);
-    if (tr) h += `<span class="chip trade" title="Если есть амфоры, гавань продаёт их финикийцам за серебро — сверх обычной работы">⇄ ${Object.entries(tr).map(([k, v]) => `<i>${Art.res(k)}</i>${v > 0 ? '+' : ''}${num(v)}`).join(' ')}/с</span>`;
+    if (tr) h += `<span class="chip trade" title="${esc(Cat.bld[b.type].tradeNote || '')}">⇄ ${Object.entries(tr).map(([k, v]) => `<i>${Art.res(k)}</i>${v > 0 ? '+' : ''}${num(v)}`).join(' ')}/с</span>`;
     if (B.cap) h += `<span class="chip good" title="Места для жителей"><i>👥</i>${Game.houseCapOf(b, fx, level)} мест</span>`;
     if (B.storage) h += `<span class="chip good" title="Прибавка к вместимости складов"><i>${Art.svg('store0')}</i>+${Game.storageOf(b, level)}</span>`;
     if (B.logosBonus) h += `<span class="chip good" title="Бонус к Логосу за карточки"><i>λ</i>+${Math.round((B.logosBonus + (B.logosBonusPerLevel || 0) * (level - 1)) * 100)}% за карточки</span>`;
@@ -640,7 +648,7 @@ const UI = {
       ${a.pop > 0 ? `<p>👥 Пришло жителей: ${a.pop}</p>` : ''}
       ${a.ended && a.ended.length ? `<p class="dim">✨ Закончились благословения: ${a.ended.map(id => esc(Cat.rite[id] ? Cat.rite[id].name : id)).join(', ')}.</p>` : ''}
       ${a.raid ? (a.raid.shielded ? '<p class="how">🧱 Пока вас не было, налетели «народы моря», но Циклопические стены их отбили.</p>'
-        : `<p class="how">${a.raid.tribute ? `👑 Под конец пришли сборщики дани Ассирии и забрали ${Math.round(a.raid.pct * 100)}% запасов${a.raid.halved ? ' (стены уменьшили дань вдвое)' : ''}:`
+        : `<p class="how">${a.raid.tribute ? `Под конец: ${Msg.tributeLine(a.raid, false)}${a.raid.lost.length ? ':' : '.'}`
           : `⚔️ Под конец налетели «народы моря» и унесли ${Math.round(a.raid.pct * 100)}% запасов:`}</p>
           <div class="chips away">${a.raid.lost.map(([k, v]) => `<span class="chip bad"><i>${Art.res(k)}</i>−${fmt(v)}</span>`).join(' ')}</div>`) : ''}
       <div class="em-actions"><button class="btn gold" data-action="close">Продолжить</button></div></div>`);

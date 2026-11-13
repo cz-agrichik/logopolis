@@ -427,6 +427,16 @@ const Art = (() => {
       <path d="M2 54 L2 20 L62 20 L62 54Z" fill="${C.stone}" ${st()}/>
       <path d="M2 30 L18 28 L30 31 L46 28 L62 30 M2 42 L12 40 L26 43 L40 41 L52 43 L62 41 M18 20 L16 28 M34 20 L30 31 M50 20 L46 28 M12 30 L10 40 M40 30 L40 41 M24 43 L22 54 M52 43 L54 54" fill="none" stroke="${C.stoneD}" stroke-width="1.6"/>
       <path d="M26 54 L26 38 Q32 32 38 38 L38 54Z" fill="${C.dark}" ${st()}/>`,
+    // каменная ваза Амафунта: огромная чаша из одного камня с четырьмя ручками-быками на акрополе
+    sp_amathus: shadow(28) + `
+      <path d="M4 56 L14 44 L50 44 L60 56Z" fill="${C.stoneD}" ${st(1.4)}/>
+      <path d="M24 44 L26 38 L38 38 L40 44Z" fill="${C.stone}" ${st(1.5)}/>
+      <path d="M8 18 L56 18 Q56 30 44 36 Q38 39 32 39 Q26 39 20 36 Q8 30 8 18Z" fill="#cbc3b2" ${st(1.8)}/>
+      <ellipse cx="32" cy="18" rx="24" ry="5" fill="#b0a897" ${st(1.6)}/><ellipse cx="32" cy="18" rx="19" ry="3" fill="#8f877a"/>
+      <path d="M12 26 Q20 33 32 33 Q44 33 52 26" fill="none" stroke="${C.stoneD}" stroke-width="1.2"/>
+      ${[[14, 24], [50, 24]].map(([x, y]) => `<path d="M${x} ${y} q${x < 32 ? -6 : 6} 0 ${x < 32 ? -6 : 6} 6 q0 4 ${x < 32 ? 4 : -4} 4" fill="none" ${st(2.2)}/>
+        <path d="M${x + (x < 32 ? -8 : 8)} ${y - 3} l${x < 32 ? -2 : 2} -3 M${x + (x < 32 ? -4 : 4)} ${y - 3} l${x < 32 ? 2 : -2} -3" stroke="${O}" stroke-width="1.4" stroke-linecap="round"/>`).join('')}
+      <path d="M26 27 q3 -3 6 0 q3 -3 6 0" fill="none" stroke="${C.stoneD}" stroke-width="1.2"/>`,
     // царская гробница Саламина: каменный фасад, дромос и колесничное колесо у входа
     sp_salamis: shadow(30) + `
       <path d="M6 54 L22 34 L42 34 L58 54Z" fill="${C.mud}" ${st(1.6)}/><path d="M14 54 L26 38 L38 38 L50 54" fill="none" stroke="${C.mudD}" stroke-width="1.4"/>
@@ -566,6 +576,36 @@ const Art = (() => {
     // виноградарство: лоза с гроздью и садовый нож
     t_viticulture: tdisc + vine(24, 34, 1.3, false) + grapes(36, 30, .95) +
       `<path d="M16 50 Q28 46 34 52" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M34 52 Q44 50 44 42 Q38 46 34 48Z" fill="#a3aab0" ${st(1.3)}/>`,
+    // дань фараону: анх и рубленое серебро на весах-чаше
+    t_pharaoh: tdisc + `<circle cx="24" cy="18" r="7" fill="none" stroke="${C.bronze}" stroke-width="4"/><circle cx="24" cy="18" r="7" fill="none" ${st(1)}/>
+      <path d="M24 25 L24 50 M13 30 L35 30" stroke="${C.bronze}" stroke-width="5" stroke-linecap="round"/>
+      <path d="M24 25 L24 50 M13 30 L35 30" stroke="${C.bronzeD}" stroke-width="1" stroke-linecap="round" opacity=".7"/>
+      <path d="M36 44 Q44 52 54 44Z" fill="${C.bronze}" ${st(1.4)}/>
+      <path d="M38 42 L43 38 L47 42 L42 45Z M45 41 L50 37 L53 41 L48 44Z" fill="#cfd5da" ${st(1.1)}/>`,
+    // железные топоры и кирки: топор и кирка крест-накрест, искры
+    t_irontools: tdisc + `<path d="M16 50 L44 18" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M38 12 Q50 10 52 22 L44 26 L36 18Z" fill="#8e979e" ${st(1.5)}/><path d="M40 16 L48 22" stroke="#c9d1d6" stroke-width="1.4"/>
+      <path d="M48 50 L22 20" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M12 26 Q20 14 34 16 Q24 18 20 30Z" fill="#7d858b" ${st(1.4)}/>
+      <path d="M50 30 l5 -2 M52 35 l5 1 M28 46 l-3 4" stroke="${C.fireL}" stroke-width="1.6" stroke-linecap="round"/>`,
+    // врачи Идалиона: флакон-арибалл с маслом, повязка и веточка
+    t_doctors: tdisc + `<path d="M26 20 L38 20 L36 26 Q46 32 44 42 Q42 52 32 52 Q22 52 20 42 Q18 32 28 26Z" fill="#c9693a" ${st(1.6)}/>
+      <path d="M24 16 L40 16 L38 20 L26 20Z" fill="#c9693a" ${st(1.4)}/><path d="M22 40 Q32 44 42 40" fill="none" stroke="${C.dark}" stroke-width="1.4"/>
+      <path d="M26 34 L38 34 M32 28 L32 40" stroke="${C.white}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M48 52 Q50 40 56 32" fill="none" stroke="${C.greenD}" stroke-width="1.6"/>
+      <path d="M50 44 q-6 -2 -6 -6 q6 0 6 6Z M53 38 q6 -2 6 -6 q-6 0 -6 6Z" fill="${C.green}" ${st(1)}/>`,
+    // флот царей: боевой корабль с тараном, глазом и рядом вёсел
+    t_fleet: tdisc + `<path d="M8 38 L52 38 Q50 46 40 48 L16 48 Q10 46 8 38Z" fill="${C.wood}" ${st(1.8)}/>
+      <path d="M8 38 L4 42 L10 44" fill="#8e979e" ${st(1.2)}/><circle cx="14" cy="42" r="1.6" fill="${C.white}" ${st(.8)}/>
+      <path d="M52 38 Q58 34 56 26" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
+      ${[18, 24, 30, 36, 42].map(x => `<path d="M${x} 46 L${x - 4} 56" stroke="${C.woodD}" stroke-width="1.6"/>`).join('')}
+      <path d="M30 38 L30 12" stroke="${C.dark}" stroke-width="2"/><path d="M20 14 L40 14 L38 30 L22 30Z" fill="${C.white}" ${st(1.4)}/>
+      <path d="M22 22 L38 22" stroke="${C.red}" stroke-width="2"/>`,
+    // дары царю царей: зубчатая корона над чашей с серебром и амфорой
+    t_gifts: tdisc + `<path d="M18 26 L18 12 L24 18 L28 10 L32 16 L36 10 L40 18 L46 12 L46 26Z" fill="${C.wheat}" ${st(1.6)}/>
+      <path d="M18 22 L46 22" stroke="${C.wheatD}" stroke-width="1.4"/><circle cx="32" cy="24" r="1.6" fill="${C.red}"/>
+      <path d="M12 42 Q32 56 52 42Z" fill="${C.bronze}" ${st(1.6)}/>
+      <path d="M18 42 L24 36 L30 40 L24 44Z M30 40 L36 34 L42 39 L36 43Z" fill="#cfd5da" ${st(1.1)}/>` + amphoraShape(46, 38, .45),
     t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
       <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
 

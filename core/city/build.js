@@ -27,14 +27,20 @@ Object.assign(Game, {
   },
 
   /** Цена «трудом» — без λ, но с горой обычных ресурсов. */
-  laborCost(cost, logos, epoch, mult) {
+  laborCost(cost, logos, epoch, mult, buy = false) {
     const out = {};
     for (const [k, v] of Object.entries(cost || {})) out[k] = v * mult;
-    const extra = logos * BALANCE.laborPerLogos;
-    // без меди: путь трудом должен быть доступен и до первого рудника
-    const split = epoch >= 1 ? { stone: 0.4, wood: 0.4, goods: 0.2 } : { wood: 0.5, stone: 0.5 };
-    for (const [k, f] of Object.entries(split)) out[k] = (out[k] || 0) + extra * f;
-    for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] / 10) * 10;
+    if (buy) {
+      // «купить у чужеземцев»: вместо λ — серебро (по ценнику столько же, сколько обычная замена λ ресурсами)
+      out.silver = (out.silver || 0) + logos * BALANCE.laborSilverPerLogos;
+    } else {
+      const extra = logos * BALANCE.laborPerLogos;
+      // без меди: путь трудом должен быть доступен и до первого рудника
+      const split = epoch >= 1 ? { stone: 0.4, wood: 0.4, goods: 0.2 } : { wood: 0.5, stone: 0.5 };
+      for (const [k, f] of Object.entries(split)) out[k] = (out[k] || 0) + extra * f;
+    }
+    const em = BALANCE.laborEpochMult[epoch] || BALANCE.laborEpochMult[BALANCE.laborEpochMult.length - 1];   // с каждой эпохой жёстче
+    for (const k of Object.keys(out)) out[k] = Math.ceil(out[k] * em / 10) * 10;
     return out;
   },
   /** Цена постройки: mode 'logos' (обычный путь) или 'labor' (больше не используется). */

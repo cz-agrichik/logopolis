@@ -30,14 +30,14 @@ Object.assign(Game, {
    * хранится прибавка; на постоянные бонусы они умножаются. withBuffs = false — сводка без благословений.
    */
   effects(withBuffs = true) {
-    const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false };
+    const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false, tributeCut: 0 };
     for (const k of RES_KEYS) { fx.bonus[k] = 0; fx.buff[k] = 0; }
     const apply = e => {
       if (!e) return;
       if (e.all) for (const k of RES_KEYS) fx.bonus[k] += e.all;
       if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.bonus[this.liveKey(k)] += v;   // бонус к ушедшему ресурсу — преемнику
       if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbonus[k] = (fx.bbonus[k] || 0) + v;
-      for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth']) if (e[k]) fx[k] += e[k];
+      for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth', 'tributeCut']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
       if (e.raidShield) fx.raidShield = true;
     };

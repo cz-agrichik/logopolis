@@ -588,3 +588,66 @@ test('сохранение: новая игра не трогает обучен
   assert.equal(C2.get('Game').state.logos, 0);
   assert.ok(C2.get('Learn').state.progress.a);
 });
+
+test('дань: Ассирия грабит, Египет берёт серебро с жителя, Персия — твёрдую сумму с присяги; флот −25%', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, BAL = C.get('BALANCE');
+  assert.equal(G.overlord(), 'assyria'); assert.equal(G.tributeDue(), null);
+  s.techs.push('phoenicians', 'pharaoh'); G.tick(0.001); s.pop = 100;   // такт сам подрежет жителей под дома — число ставим после
+  assert.equal(G.overlord(), 'egypt'); assert.equal(G.tributeDue(), 100 * BAL.tribute.egypt);
+  // серебра хватает — берут только серебро
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  let r = G.raid(true);
+  assert.equal(r.lord, 'egypt'); assert.equal(r.paid, 200); assert.equal(r.short, 0);
+  assert.equal(s.res.silver, 800); assert.equal(s.res.stone, 1000, 'остальное не тронули');
+  // серебра не хватает — недостающую долю добирают грабежом
+  s.res.silver = 50; r = G.raid(true);
+  assert.equal(r.paid, 50); assert.equal(r.short, 150); assert.equal(s.res.silver, 0);
+  assert.ok(r.pct > 0 && r.pct <= 0.5 * 150 / 200 + 1e-9, 'грабят только недоплаченную долю');
+  // флот: −25%
+  s.techs.push('fleet'); G.tick(0.001); s.pop = 100;
+  assert.equal(G.tributeDue(), 150);
+  // присяга Персии: сумма считается один раз и не растёт с городом
+  s.res.silver = 3000; s.res.stone = 3000; s.res.amphora = 3000; s.logos = 5000;
+  assert.ok(G.research('gifts'));
+  assert.equal(G.overlord(), 'persia'); assert.equal(s.tributeFixed, 100 * BAL.tribute.persia);
+  s.pop = 400; assert.equal(G.tributeDue(), Math.ceil(300 * 0.75), 'твёрдая подать: рост города её не меняет');
+  // Персия: недоимку берут ровно по ценнику, без случайности
+  for (const k of Object.keys(s.res)) s.res[k] = 2000;
+  s.res.silver = 25;
+  const W = BAL.worth, before = Object.fromEntries(Object.entries(s.res));
+  r = G.raid(true);
+  assert.equal(r.lord, 'persia'); assert.equal(r.paid, 25); assert.equal(r.short, 225 - 25);
+  const value = Object.keys(before).filter(k => k !== 'silver').reduce((t, k) => t + (before[k] - s.res[k]) * (W[k] || 1), 0);
+  assert.ok(Math.abs(value - r.short * W.silver) < 100, `взяли по ценнику: ${value} ≈ ${r.short * W.silver}`);
+});
+
+test('вторая половина железного века: «через силу» — купить у чужеземцев за серебро; топоры и кирки; врачи; ваза Амафунта; переход', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, BAL = C.get('BALANCE'), T = C.get('TECH_BY_ID'), B = C.get('BUILDINGS');
+  // путь «через силу»: λ-часть — серебром, без дерева и камня за λ
+  const lab = G.techPrice(T.doctors, 'labor').cost;
+  assert.equal(lab.silver, Math.ceil((140 * 3 + 280 * BAL.laborSilverPerLogos) * BAL.laborEpochMult[2] / 10) * 10, 'в железном веке путь «через силу» ×1.5');
+  assert.equal(lab.wood, undefined); assert.equal(lab.stone, undefined);
+  for (const id of ['pharaoh', 'irontools', 'doctors', 'fleet', 'gifts']) assert.ok(T[id].buy && T[id].epoch === 2, id);
+  // топоры и кирки: пока есть железо, лесорубы и каменоломни дают +30% и тратят железо
+  const lj = { id: 950, type: 'lumber', level: 9, x: 1, y: 1 }; s.buildings.push(lj);
+  assert.equal(G.tradeOf(lj), null);
+  s.techs.push('phoenicians', 'irontools'); G.tick(0.001);
+  const t = G.tradeOf(lj), p = G.prodOf(lj);
+  assert.ok(Math.abs(t.wood / p.wood - 0.3) < 1e-9 && t.iron < 0);
+  s.res.iron = 0; const r0 = G.production(G.effects(), 999).rates.wood;
+  s.res.iron = 500; const r1 = G.production(G.effects(), 999).rates;
+  assert.ok(r1.wood > r0 && r1.iron < 0, 'с железом дерева больше, железо уходит');
+  // врачи: +2 места в жилище
+  const h = { id: 951, type: 'house', level: 5, x: 2, y: 1 }; s.buildings.push(h); G.tick(0.001);
+  const cap0 = G.houseCapOf(h); s.techs.push('doctors'); G.tick(0.001);
+  assert.equal(G.houseCapOf(h), cap0 + 2);
+  // ваза Амафунта: после топоров и кирок, склады +25%
+  assert.equal(B.sp_amathus.tech, 'irontools'); assert.equal(B.sp_amathus.logos, 0);
+  const cap = G.storageCap(); s.buildings.push({ id: 952, type: 'sp_amathus', level: 1, x: 3, y: 1 }); G.tick(0.001);
+  assert.ok(G.storageCap() > cap);
+  // переход: нужны гробницы Саламина и все знания эпохи
+  const reqs = G.epochReqs();
+  assert.ok(reqs.some(q => q.kind === 'special' && q.type === 'sp_salamis' && !q.ok));
+  assert.ok(reqs.some(q => q.kind === 'techs' && q.need === C.get('TECHS').filter(x => x.epoch === 2).length));
+  assert.ok(reqs.some(q => q.kind === 'res' && q.res === 'silver') && reqs.some(q => q.kind === 'res' && q.res === 'iron'));
+});

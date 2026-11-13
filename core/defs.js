@@ -36,6 +36,13 @@ const BALANCE = {
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
+  laborEpochMult: [1, 1, 1.5],   // путь «через силу» с каждой эпохой жёстче: вся его цена ×1.5 в железном веке (дальше — ещё больше)
+  laborSilverPerLogos: 0.75,   // «купить у чужеземцев» (buy у знания): λ-часть пути «через силу» — серебром; по ценнику столько же, сколько 8 ед. камня/дерева/товаров
+  // Дань в железном веке: Ассирия грабит (raidLoot), Египет берёт серебро с каждого жителя, Персия — твёрдую сумму, посчитанную при присяге.
+  tribute: { egypt: 2, persia: 3 },
+  // Ценник труда (README, «Ценник ресурсов»): сколько стоит единица ресурса в секундах работы, в пересчёте на зерно.
+  // Персия берёт недоимку ровно по нему.
+  worth: { food: 1, wood: 1.4, stone: 2, cheese: 1, goods: 5, copper: 5, bronze: 29, iron: 24, silver: 25, amphora: 3.3 },
 };
 
 const RES = {
@@ -82,7 +89,7 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 const EPOCHS = [
   { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
   { maxLevel: 9, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
-  { maxLevel: 11, advance: null },   // «Царства-города»: вторая половина эпохи и переход — в следующей версии
+  { maxLevel: 11, advance: { pop: 150, specials: ['sp_salamis'], allTechs: true, logos: 400, res: { silver: 2500, iron: 1500, stone: 10000 } } },
   { locked: true },
 ];
 
@@ -97,8 +104,9 @@ const BUILDINGS = {
   house: { terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 10, forms: [{}, { capBonus: 2 }] },
   field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 12, forms: [{}, {}] },
   goatpen: { terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1, prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 12, forms: [{}, {}] },
-  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, lp: 12, forms: [{}, {}] },
-  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, lp: 12, forms: [{}, {}] },
+  // trade — линия «Железных топоров и кирок»: пока есть железо, +30% выпуска; орудия тупятся — железо понемногу уходит
+  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { wood: 0.105 } }, lp: 12, forms: [{}, {}] },
+  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { stone: 0.075 } }, lp: 12, forms: [{}, {}] },
   workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}] },
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}] },
@@ -124,11 +132,13 @@ const BUILDINGS = {
   // Царства-города: upgradeOf — чудо не строится заново, а улучшает старое на том же месте
   // Ум или сила: Афродита и гробницы — за λ, Аполлон и Троодос — без λ, но очень дорого. tech — после какого знания можно.
   // Улучшение сохраняет λ-бонус старого чуда (богиня +10%, Рогатый бог +20%) и добавляет своё.
-  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 3000, goods: 600 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
-  sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 12000, copper: 4000, iron: 250 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
+  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 2000, goods: 1000 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
+  sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 12000, copper: 2000, iron: 650 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
   sp_troodos2: { special: true, epoch: 2, upgradeOf: 'sp_troodos', tech: 'viticulture', terrain: ['hill'], cost: { food: 8000, wood: 4000 }, logos: 0, effect: { bmult: { vineyard: 0.6, olivegrove: 0.6 }, goats: true } },
   // новое чудо за λ — обязательное для перехода в следующую эпоху
-  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 3000, goods: 600 }, logos: 650, effect: { all: 0.1, mult: { silver: 0.2 } } },
+  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 1500, goods: 600, iron: 120 }, logos: 650, effect: { all: 0.1, mult: { silver: 0.2 } } },
+  // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
+  sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
 };
 
 // Знания: λ + ресурсы (путь «с умом») или только ресурсы (путь «через силу»). effect — постоянный бонус.
@@ -155,6 +165,13 @@ const TECHS = [
   { id: 'phoenicians', epoch: 2, logos: 260, cost: { copper: 1500 }, effect: { mult: { silver: 0.5 } }, retire: { res: { goods: { into: 'silver', rate: 0.2, prodToo: true } } } },
   // виноградарство: сыр уходит в амфоры, загоны на холмах — в виноградники, в лесу — в оливковые рощи
   { id: 'viticulture', epoch: 2, logos: 240, cost: { food: 4000, wood: 2000 }, req: ['phoenicians'], retire: { res: { cheese: { into: 'amphora', rate: 0.5 } }, buildings: { goatpen: { hill: 'vineyard', forest: 'olivegrove' } } } },
+  // Вторая половина: серебро и железо. buy — путь «через силу» покупает знание у чужеземцев: λ-часть — серебром.
+  // Дань: «Дань фараону» — Египет вместо Ассирии (серебро с жителя), «Дары царю царей» — Персия (твёрдая сумма с присяги, fixTribute).
+  { id: 'pharaoh', epoch: 2, logos: 260, cost: { amphora: 600, stone: 1200, silver: 40 }, req: ['phoenicians'], buy: true },
+  { id: 'irontools', epoch: 2, logos: 240, cost: { iron: 160, wood: 1000 }, req: ['iron', 'phoenicians'], buy: true },   // лесорубы и каменоломни: линия железо → +30%
+  { id: 'doctors', epoch: 2, logos: 280, cost: { silver: 140, amphora: 500 }, req: ['phoenicians'], buy: true, effect: { houseCap: 2, growth: 0.5 } },
+  { id: 'fleet', epoch: 2, logos: 280, cost: { wood: 2500, iron: 100 }, req: ['pharaoh'], buy: true, effect: { tributeCut: 0.25 } },
+  { id: 'gifts', epoch: 2, logos: 320, cost: { silver: 160, amphora: 800 }, req: ['pharaoh', 'fleet'], buy: true, fixTribute: true },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
@@ -176,7 +193,7 @@ const RITUALS = [
   // Царства-города. untilTech / until — обряд уходит после знания / улучшения святилища; tech — появляется после знания.
   { id: 'vintage', epoch: 2, logos: 12, cost: { food: 60 }, tech: 'viticulture', buff: { bmult: { vineyard: 1, olivegrove: 1 } }, dur: 600, goat: true, cooldown: 60 },
   // «золотые часы» святилищ: подношения заданы в старых ресурсах и сами пересчитываются, когда те уходят (сыр → амфоры, товары → серебро)
-  { id: 'morningstar', epoch: 2, logos: 0, cost: { cheese: 300, goods: 250, food: 500 }, req: 'sp_aphrodite', buff: { logos: 1 }, dur: 900, cooldown: 8 * 3600, realTime: true },
-  { id: 'gnomon', epoch: 2, logos: 0, cost: { copper: 300, goods: 600, cheese: 450 }, req: 'sp_apollo', buff: { logos: 0.75 }, dur: 900, cooldown: 4 * 3600, realTime: true },
+  { id: 'morningstar', epoch: 2, logos: 0, cost: { cheese: 300, goods: 350 }, req: 'sp_aphrodite', buff: { logos: 1 }, dur: 900, cooldown: 8 * 3600, realTime: true },
+  { id: 'gnomon', epoch: 2, logos: 0, cost: { goods: 900, cheese: 450 }, req: 'sp_apollo', buff: { logos: 0.75 }, dur: 900, cooldown: 4 * 3600, realTime: true },
 ];
 const RITUAL_BY_ID = Object.fromEntries(RITUALS.map(r => [r.id, r]));

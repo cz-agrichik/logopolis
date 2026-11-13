@@ -27,6 +27,7 @@ const Cat = (() => {
     appetites: merge(APPETITES, Lex.appetite),
     tasks: merge(TASK_REWARDS, Lex.task),
     plans: merge(LEARN_PLANS, Lex.plan),
+    lords: Lex.lords,
     /** Облик здания в эпохе: { name, icon, capBonus }. */
     form(type, epoch = Game.state.epoch) {
       const B = bld[type];
