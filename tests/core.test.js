@@ -102,6 +102,49 @@ test('события: набег через 5–30 минут, срок виде
   assert.equal(s.res.wood, 1000, 'стены отразили');
 });
 
+test('офлайн: благословения истекают по настоящему времени', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state;
+  s.buffs = { harvest: 600, hearth: 9000 }; s.cooldowns = { elders: 100 };
+  s.lastSave = C.clock.now - 400e3;                 // 400 секунд: 300 в полную силу + 100 вполовину
+  const r = G.catchUp();
+  assert.ok(Math.abs(s.buffs.harvest - 200) < 1e-6, 'прошло ровно 400 секунд благословения');
+  assert.equal(s.cooldowns.elders, undefined, 'перерыв «Сбора припасов» тоже прошёл');
+  s.lastSave = C.clock.now - 3 * 3600e3;
+  const r2 = G.catchUp();
+  assert.deepEqual([...r2.ended].sort(), ['harvest', 'hearth']);
+  assert.deepEqual(s.buffs, {});
+  assert.equal(r.raid, null, 'в медно-каменном веке набегов нет');
+});
+
+test('офлайн: набег, срок которого подошёл, — ровно один, в конце, по накопленному; потом отсчёт заново', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state;
+  s.epoch = 1; G.events(0.01);
+  s.timers.raid = 600;
+  for (const k of Object.keys(s.res)) s.res[k] = 100;
+  s.buildings.push({ id: 881, type: 'lumber', level: 3, x: 2, y: 2 }); s.pop = 20;
+  const raidsBefore = s.log.filter(e => e.k === 'raid').length;
+  s.lastSave = C.clock.now - 3 * 3600e3;            // за 3 часа срок прошёл бы много раз
+  const r = G.catchUp();
+  assert.equal(s.log.filter(e => e.k === 'raid').length, raidsBefore + 1, 'набег один');
+  assert.ok(r.raid && !r.raid.shielded && r.raid.pct >= 0.1 - 1e-9 && r.raid.pct <= 0.5 + 1e-9);
+  const lostWood = (r.raid.lost.find(([k]) => k === 'wood') || [])[1] || 0;
+  assert.ok(r.gained.wood > 0 && lostWood > 0, 'сначала прибавка, потом потери');
+  assert.ok(Math.abs(lostWood - Math.floor((s.res.wood + lostWood) * r.raid.pct)) <= 1, 'уносят долю от накопленного к концу');
+  assert.ok(G.raidIn() >= 300 - 1 && G.raidIn() <= 1800, 'после возвращения — новый отсчёт');
+  // срок ещё не подошёл — набега нет, отсчёт уменьшился на время отсутствия
+  s.timers.raid = 3000; s.lastSave = C.clock.now - 1000e3;
+  const r2 = G.catchUp();
+  assert.equal(r2.raid, null);
+  assert.ok(Math.abs(G.raidIn() - 2000) < 1e-6);
+  // стены отбивают и офлайн
+  s.buildings.push({ id: 882, type: 'sp_walls', level: 1, x: 3, y: 3 }); G.fx = G.effects();
+  s.timers.raid = 10; s.lastSave = C.clock.now - 600e3;
+  const before = s.res.wood;
+  const r3 = G.catchUp();
+  assert.ok(r3.raid && r3.raid.shielded);
+  assert.ok(s.res.wood >= before, 'ничего не унесли');
+});
+
 test('город: каждая следующая постройка дороже в 1.25 раза', () => {
   const G = fresh().get('Game');
   const c1 = G.buildCost('field').wood;

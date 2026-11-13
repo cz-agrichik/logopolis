@@ -261,6 +261,14 @@ Object.assign(Game, {
   /** Выпуск без благословений (и без «Всей семьёй») — для «Сбора припасов». */
   plainRates() { return this.production(this.effects(false), this.state.pop, 0.001).rates; },
 
+  /** Идёт время: благословения и перерывы обрядов истекают (без выпуска). */
+  passTime(dt) {
+    const s = this.state;
+    if (dt <= 0) return;
+    for (const id of Object.keys(s.buffs)) { s.buffs[id] -= dt; if (s.buffs[id] <= 0) delete s.buffs[id]; }
+    for (const id of Object.keys(s.cooldowns || {})) { s.cooldowns[id] -= dt; if (s.cooldowns[id] <= 0) delete s.cooldowns[id]; }
+  },
+
   // ---------- игровой такт ----------
   tick(dt) {
     const s = this.state;
@@ -283,8 +291,7 @@ Object.assign(Game, {
       if (s.starveAcc >= 8 && s.pop > 1) { s.starveAcc = 0; s.pop--; this.log('starve'); }
     } else s.starveAcc = 0;
 
-    for (const id of Object.keys(s.buffs)) { s.buffs[id] -= dt; if (s.buffs[id] <= 0) delete s.buffs[id]; }
-    for (const id of Object.keys(s.cooldowns || {})) { s.cooldowns[id] -= dt; if (s.cooldowns[id] <= 0) delete s.cooldowns[id]; }
+    this.passTime(dt);
 
     this.rates = rates; this.eff = eff; this.effFood = effFood; this.effOther = effOther; this.hands = hands;
     this.cap = cap; this.need = need; this.storage = storage;

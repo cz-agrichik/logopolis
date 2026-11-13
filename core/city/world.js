@@ -70,13 +70,14 @@ Object.assign(Game, {
     const s = this.state;
     return s.epoch >= 1 && !s.finished && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
   },
-  /** Набег: без Циклопических стен уносят случайную долю (BALANCE.raidLoot) всех запасов. */
-  raid() {
+  /** Набег: без Циклопических стен уносят случайную долю (BALANCE.raidLoot) всех запасов.
+   *  quiet — набег случился, пока игрока не было: о нём расскажет окно «С возвращением!», а не всплывашка. */
+  raid(quiet = false) {
     const s = this.state, fx = this.fx || this.effects();
     if (fx.raidShield) {
       this.log('raidShield');
-      Bus.emit('raid', { shielded: true });
-      return;
+      if (!quiet) Bus.emit('raid', { shielded: true });
+      return { shielded: true };
     }
     const [a, b] = BALANCE.raidLoot, pct = Math.round(rand(a, b) * 100) / 100;
     const lost = [];
@@ -85,25 +86,43 @@ Object.assign(Game, {
       if (d > 0) { s.res[k] -= d; lost.push([k, d]); }
     }
     this.log('raid', { lost, pct });
-    Bus.emit('raid', { shielded: false, lost, pct });
+    if (!quiet) Bus.emit('raid', { shielded: false, lost, pct });
+    return { shielded: false, lost, pct };
   },
 
   /**
-   * Прогресс за время отсутствия: первые 5 минут — в полную силу,
-   * дальше — вполовину (до 8 часов). Всё упирается в склады.
+   * Прогресс за время отсутствия (не дольше BALANCE.offlineMaxHours).
+   * Время идёт по-настоящему: благословения и перерывы обрядов истекают, как при игроке.
+   * Выпуск и рост — первые BALANCE.offlineFullSec в полную силу, дальше вполовину; всё упирается в склады.
+   * Набег: если его срок наступил, пока игрока не было, он случается ровно один раз — в конце, по накопленному;
+   * после возвращения отсчёт до следующего набега начинается заново.
    */
   catchUp() {
-    const away = (Date.now() - (this.state.lastSave || Date.now())) / 1000;
+    const s = this.state;
+    const away = (Date.now() - (s.lastSave || Date.now())) / 1000;
     if (away < 20) return null;
-    const capped = Math.min(BALANCE.offlineMaxHours * 3600, away);
-    const full = Math.min(BALANCE.offlineFullSec, capped);
-    const half = Math.max(0, capped - full) * 0.5;
-    const before = { ...this.state.res }, popBefore = this.state.pop;
-    const sim = full + half, step = 5;
-    for (let t = 0; t < sim; t += step) this.tick(Math.min(step, sim - t));
+    const real = Math.min(BALANCE.offlineMaxHours * 3600, away);
+    const before = { ...s.res }, popBefore = s.pop, buffsBefore = Object.keys(s.buffs);
+    // такт — 5 секунд выпуска: в первые минуты это 5 секунд настоящего времени, потом 10
+    for (let t = 0, dt; t < real; t += dt) {
+      dt = Math.min(t < BALANCE.offlineFullSec ? 5 : 10, real - t);
+      const fullPart = Math.max(0, Math.min(dt, BALANCE.offlineFullSec - t));   // сколько из этих секунд — в полную силу
+      const work = fullPart + (dt - fullPart) * 0.5;
+      this.tick(work);               // выпуск, рост, и часть времени благословений
+      this.passTime(dt - work);      // остальное время благословений и перерывов
+    }
     const gained = {};
-    for (const k of RES_KEYS) { const d = Math.floor(this.state.res[k] - before[k]); if (d > 0) gained[k] = d; }
-    this.state.lastSave = Date.now();
-    return { seconds: away, gained, pop: this.state.pop - popBefore, halved: away > BALANCE.offlineFullSec };
+    for (const k of RES_KEYS) { const d = Math.floor(s.res[k] - before[k]); if (d > 0) gained[k] = d; }
+    let raid = null;
+    if (s.epoch >= 1 && !s.finished) {
+      const left = s.timers.raid ?? this.nextRaidIn();
+      if (left <= away) { raid = this.raid(true); s.timers.raid = this.nextRaidIn(); }
+      else s.timers.raid = left - away;
+    }
+    s.lastSave = Date.now();
+    return {
+      seconds: away, gained, pop: s.pop - popBefore, halved: away > BALANCE.offlineFullSec,
+      ended: buffsBefore.filter(id => !s.buffs[id]), raid,
+    };
   },
 });
