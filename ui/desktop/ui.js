@@ -128,7 +128,7 @@ const UI = {
       const lord = Game.overlord(), due = Game.tributeDue();
       if (lord && due != null) {   // Египет и Персия: дань серебром — сумма видна заранее
         const L = Cat.lords[lord], have = Math.floor(Game.state.res.silver), cut = (Game.fx || Game.effects()).tributeCut;
-        const how = lord === 'egypt' ? `по ${BALANCE.tribute.egypt} с каждого жителя` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
+        const how = lord === 'egypt' ? `как средний ассирийский грабёж, но серебром: ${(BALANCE.raidLoot[0] + BALANCE.raidLoot[1]) / 2 * 100 / (shield ? 2 : 1)}% остальных запасов по ценнику — сумма растёт вместе с запасами` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
         const miss = lord === 'egypt' ? `недостающее доберут грабежом${shield ? ' (Циклопические стены — вдвое)' : ''}` : 'недоимку возьмут другими запасами ровно по ценнику';
         raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Дань ${L.to} через ${mm}: ${due} серебра (${how}${cut ? `; «Флот царей» −${Math.round(cut * 100)}%` : ''}).
           ${have >= due ? 'Серебра хватает.' : `Серебра пока ${have} — не хватит: ${miss}.`}">

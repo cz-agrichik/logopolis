@@ -74,13 +74,21 @@ Object.assign(Game, {
     if (this.raidKind() !== 'tribute') return null;
     return this.hasTech('gifts') ? 'persia' : this.hasTech('pharaoh') ? 'egypt' : 'assyria';
   },
-  /** Дань серебром без скидок: по нынешнему числу жителей (BALANCE.tribute). */
-  tributeBase(lord) { return Math.ceil(this.state.pop * BALANCE.tribute[lord]); },
-  /** Сколько серебра потребуют: Египет — с каждого жителя, Персия — сумма с присяги; «Флот царей» −25%. null — Ассирия: она грабит. */
+  /** Дань серебром без скидок флота.
+   *  Египет: столько, сколько в среднем унесли бы ассирийцы — середина BALANCE.raidLoot (стены — вдвое) от ценности
+   *  остальных запасов по ценнику, в пересчёте на серебро. Персия: BALANCE.tribute.persia с каждого жителя (считается при присяге). */
+  tributeBase(lord, fx = this.fx || this.effects()) {
+    const s = this.state;
+    if (lord === 'persia') return Math.ceil(s.pop * BALANCE.tribute.persia);
+    const W = BALANCE.worth, [a, b] = BALANCE.raidLoot, share = (a + b) / 2 / (fx.raidShield ? 2 : 1);
+    const value = RES_KEYS.filter(k => k !== 'silver' && this.resVisible(k)).reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
+    return Math.ceil(value * share / W.silver);
+  },
+  /** Сколько серебра потребуют: Египет — как средний ассирийский грабёж, Персия — сумма с присяги; «Флот царей» −25%. null — Ассирия: она грабит. */
   tributeDue(fx = this.fx || this.effects()) {
     const lord = this.overlord();
     if (lord !== 'egypt' && lord !== 'persia') return null;
-    const base = lord === 'persia' ? (this.state.tributeFixed || this.tributeBase('persia')) : this.tributeBase('egypt');
+    const base = lord === 'persia' ? (this.state.tributeFixed || this.tributeBase('persia', fx)) : this.tributeBase('egypt', fx);
     return Math.ceil(base * (1 - Math.min(0.9, fx.tributeCut || 0)));
   },
   /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век или игра окончена). */

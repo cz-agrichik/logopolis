@@ -593,34 +593,43 @@ test('сохранение: новая игра не трогает обучен
   assert.ok(C2.get('Learn').state.progress.a);
 });
 
-test('дань: Ассирия грабит, Египет берёт серебро с жителя, Персия — твёрдую сумму с присяги; флот −25%', () => {
+test('дань: Ассирия грабит, Египет — как средний грабёж, но серебром, Персия — твёрдую сумму с присяги; стены и флот', () => {
   const C = fresh(), G = ironAge(C), s = G.state, BAL = C.get('BALANCE');
   assert.equal(G.overlord(), 'assyria'); assert.equal(G.tributeDue(), null);
-  s.techs.push('phoenicians', 'pharaoh'); G.tick(0.001); s.pop = 100;   // такт сам подрежет жителей под дома — число ставим после
-  assert.equal(G.overlord(), 'egypt'); assert.equal(G.tributeDue(), 100 * BAL.tribute.egypt);
-  // серебра хватает — берут только серебро
+  s.techs.push('iron', 'phoenicians', 'viticulture', 'pharaoh'); G.tick(0.001); s.pop = 100;   // такт сам подрежет жителей под дома — число ставим после
+  assert.equal(G.overlord(), 'egypt');
+  // Египет: столько, сколько в среднем унесли бы ассирийцы (30% ценности остальных запасов), — но серебром
   for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  const W = BAL.worth, other = ['food', 'wood', 'stone', 'copper', 'iron', 'amphora'].reduce((t, k) => t + 1000 * W[k], 0);
+  const due = Math.ceil(other * 0.3 / W.silver);
+  assert.equal(G.tributeDue(), due);
+  s.res.silver = 5000;
   let r = G.raid(true);
-  assert.equal(r.lord, 'egypt'); assert.equal(r.paid, 200); assert.equal(r.short, 0);
-  assert.equal(s.res.silver, 800); assert.equal(s.res.stone, 1000, 'остальное не тронули');
+  assert.equal(r.lord, 'egypt'); assert.equal(r.paid, due); assert.equal(r.short, 0);
+  assert.equal(s.res.silver, 5000 - due); assert.equal(s.res.stone, 1000, 'остальное не тронули');
   // серебра не хватает — недостающую долю добирают грабежом
-  s.res.silver = 50; r = G.raid(true);
-  assert.equal(r.paid, 50); assert.equal(r.short, 150); assert.equal(s.res.silver, 0);
-  assert.ok(r.pct > 0 && r.pct <= 0.5 * 150 / 200 + 1e-9, 'грабят только недоплаченную долю');
-  // флот: −25%
+  s.res.silver = 50; const due2 = G.tributeDue(); r = G.raid(true);
+  assert.equal(r.paid, 50); assert.equal(r.short, due2 - 50); assert.equal(s.res.silver, 0);
+  assert.ok(r.pct > 0 && r.pct <= 0.5 * (due2 - 50) / due2 + 1e-9, 'грабят только недоплаченную долю');
+  // стены: вдвое меньше; флот: ещё −25%
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  s.buildings.push({ id: 960, type: 'sp_walls', level: 1, x: 4, y: 1 }); G.tick(0.001); s.pop = 100;
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  assert.equal(G.tributeDue(), Math.ceil(other * 0.15 / W.silver));
   s.techs.push('fleet'); G.tick(0.001); s.pop = 100;
-  assert.equal(G.tributeDue(), 150);
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  assert.equal(G.tributeDue(), Math.ceil(Math.ceil(other * 0.15 / W.silver) * 0.75));
   // присяга Персии: сумма считается один раз и не растёт с городом
   s.res.silver = 3000; s.res.stone = 3000; s.res.amphora = 3000; s.logos = 5000;
   assert.ok(G.research('gifts'));
   assert.equal(G.overlord(), 'persia'); assert.equal(s.tributeFixed, 100 * BAL.tribute.persia);
-  s.pop = 400; assert.equal(G.tributeDue(), Math.ceil(300 * 0.75), 'твёрдая подать: рост города её не меняет');
+  s.pop = 400; assert.equal(G.tributeDue(), Math.ceil(400 * 0.75), 'твёрдая подать: рост города её не меняет');
   // Персия: недоимку берут ровно по ценнику, без случайности
   for (const k of Object.keys(s.res)) s.res[k] = 2000;
   s.res.silver = 25;
-  const W = BAL.worth, before = Object.fromEntries(Object.entries(s.res));
+  const before = Object.fromEntries(Object.entries(s.res));
   r = G.raid(true);
-  assert.equal(r.lord, 'persia'); assert.equal(r.paid, 25); assert.equal(r.short, 225 - 25);
+  assert.equal(r.lord, 'persia'); assert.equal(r.paid, 25); assert.equal(r.short, 300 - 25);
   const value = Object.keys(before).filter(k => k !== 'silver').reduce((t, k) => t + (before[k] - s.res[k]) * (W[k] || 1), 0);
   assert.ok(Math.abs(value - r.short * W.silver) < 100, `взяли по ценнику: ${value} ≈ ${r.short * W.silver}`);
 });
