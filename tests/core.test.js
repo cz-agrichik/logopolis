@@ -217,13 +217,13 @@ test('железный век: дань Ассирии вместо набего
   assert.ok(s.res.wood < 1000, 'стены больше не спасают полностью');
 });
 
-test('переход в железный век: Хала-Султан-Текке — гавань 9-го уровня, Бог на слитке — мастерская 9-го', () => {
+test('переход в железный век: Хала-Султан-Текке — гавань 9-го уровня, Бог на слитке — бронзолитейня 9-го', () => {
   const C = fresh(), G = C.get('Game'), s = G.state;
   s.epoch = 1;
   s.buildings.push({ id: 895, type: 'sp_halasultan', level: 1, x: 2, y: 2 }, { id: 896, type: 'sp_ingot', level: 1, x: 3, y: 2 });
   s.epoch = 2;
   const out = G.retireWonders();
-  assert.deepEqual([...out.map(x => [...x])], [['sp_halasultan', 'port', 9], ['sp_ingot', 'workshop', 9]]);
+  assert.deepEqual([...out.map(x => [...x])], [['sp_halasultan', 'port', 9], ['sp_ingot', 'foundry', 9]]);
   assert.equal(s.buildings.find(b => b.id === 895).type, 'port');
   assert.equal(s.buildings.find(b => b.id === 896).level, 9);
 });
