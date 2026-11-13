@@ -7,8 +7,8 @@ Object.assign(Game, {
   // ---------- знания ----------
   /** Цена знания: 'logos' — λ + немного ресурсов; 'labor' — без λ, но ресурсов втрое больше. */
   techPrice(T, mode = 'logos') {
-    if (mode === 'labor') return { cost: this.laborCost(T.cost, T.logos, T.epoch, BALANCE.laborTechMult), logos: 0 };
-    return { cost: T.cost, logos: T.logos };
+    if (mode === 'labor') return { cost: this.liveCost(this.laborCost(T.cost, T.logos, T.epoch, BALANCE.laborTechMult)), logos: 0 };
+    return { cost: this.liveCost(T.cost), logos: T.logos };
   },
   techStatus(T, mode = 'logos') {
     if (this.hasTech(T.id)) return { learned: true };
@@ -28,6 +28,7 @@ Object.assign(Game, {
     this.state.techPath = this.state.techPath || {};
     this.state.techPath[id] = mode;
     this.log('tech', { id, mode });
+    this.applyRetire(T);   // перемены: уходящие ресурсы переходят в новые
     this.save();
     return true;
   },

@@ -16,7 +16,7 @@ Object.assign(Game, {
     const s = this.state;
     if (R.epoch > s.epoch) return { hidden: true };
     if (R.req && !this.built(R.req)) return { locked: true, reason: { code: 'needBuilding', type: R.req } };
-    const cost = R.cost || {}, logos = this.ritualLogos(R);
+    const cost = this.liveCost(R.cost), logos = this.ritualLogos(R);
     const cd = this.ritualWait(R);
     if (cd > 0) return { cost, logos, cd, reason: { code: 'cooldown', sec: Math.ceil(cd) } };
     const active = Object.keys(s.buffs).filter(id => RITUAL_BY_ID[id]).length;

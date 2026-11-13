@@ -22,7 +22,7 @@ Object.assign(Game, {
       const all = TECHS.filter(t => t.epoch === s.epoch), have = all.filter(t => this.hasTech(t.id)).length;
       list.push({ kind: 'techs', need: all.length, have, ok: have === all.length });
     }
-    for (const [k, v] of Object.entries(a.res)) list.push({ kind: 'res', res: k, need: v, have: Math.floor(s.res[k]), ok: s.res[k] >= v });
+    for (const [k, v] of Object.entries(this.liveCost(a.res))) list.push({ kind: 'res', res: k, need: v, have: Math.floor(s.res[k]), ok: s.res[k] >= v });
     list.push({ kind: 'logos', need: a.logos, have: Math.floor(s.logos), ok: s.logos >= a.logos });
     return list;
   },
@@ -31,10 +31,10 @@ Object.assign(Game, {
     const reqs = this.epochReqs();
     if (!reqs || !reqs.every(r => r.ok)) return false;
     const a = EPOCHS[this.state.epoch].advance;
-    this.pay(a.res, a.logos);
+    this.pay(this.liveCost(a.res), a.logos);
     this.state.epoch++;
     this.log('epoch', { epoch: this.state.epoch });
-    // чудеса прошлой эпохи становятся обычными зданиями 5-го уровня
+    // чудеса прошлой эпохи становятся обычными зданиями (Лемба — домом 5-го уровня, Хала-Султан-Текке — гаванью 9-го…)
     for (const [from, into, level] of this.retireWonders()) this.log('retired', { from, into, level, epoch: this.state.epoch });
     if (EPOCHS[this.state.epoch].locked) this.state.finished = true;
     this.save();

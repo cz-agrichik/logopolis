@@ -9,6 +9,7 @@ const Looks = {
   ART: {
     house: 'house', field: 'field', goatpen: 'goatpen', lumber: 'lumber', quarry: 'quarry',
     workshop: 'workshop', storehouse: 'store', mine: 'mine', port: 'port', foundry: 'foundry', scribe: 'scribe',
+    forge: 'foundry',   // кузница пока в облике литейни — свои рисунки железного века впереди
   },
 
   /** Стадия облика: меняется на уровнях мудрости 3, 5, 7, 9. */
@@ -18,7 +19,7 @@ const Looks = {
   arts(type, epoch = Game.state.epoch) {
     const B = BUILDINGS[type], p = this.ART[type];
     if (B.epoch === 0) return epoch >= 1 ? [p + '2', p + '3', p + '3'] : [p + '0', p + '1', p + '1'];
-    return [p + '0', p + '1', p + '2'];
+    return [p + '0', p + '1', p + '2'];   // здания бронзового и железного века (железный век пока в облике бронзового)
   },
 
   /**

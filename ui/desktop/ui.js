@@ -56,6 +56,7 @@ const UI = {
     // события ядра
     Bus.on('log', () => this.renderLog());
     Bus.on('raid', r => this.toast(r.shielded ? '🧱 Циклопические стены отразили набег «народов моря»!'
+      : r.tribute ? `👑 Сборщики дани Ассирии забрали ${Math.round(r.pct * 100)}% всех запасов${r.halved ? ' — стены уменьшили дань вдвое' : ''}.`
       : `⚔️ Набег «народов моря»! Унесли ${Math.round(r.pct * 100)}% всех запасов. Защитят только Циклопические стены.`));
     this.renderMap();
     this.renderAll();
@@ -118,16 +119,22 @@ const UI = {
     }).join('');
     const free = Math.max(0, BALANCE.maxBuffs - buffs.length);
     const slots = Array.from({ length: free }, () => `<span class="bf-slot" title="Свободное место для благословения (одновременно — до ${BALANCE.maxBuffs})"></span>`).join('');
-    // набег «народов моря»: срок известен заранее — обратный отсчёт справа
+    // набег «народов моря» (бронзовый век) или дань империи (железный): срок известен заранее — обратный отсчёт справа
     const raidIn = Game.raidIn();
     let raid = '';
     if (raidIn != null) {
       const shield = (Game.fx || Game.effects()).raidShield, mm = `${Math.floor(raidIn / 60)}:${String(Math.floor(raidIn % 60)).padStart(2, '0')}`;
       const [a, b] = BALANCE.raidLoot;
-      raid = `<span class="bf raid ${shield ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="${shield
-        ? `Набег «народов моря» через ${mm}. Циклопические стены его отразят.`
-        : `Набег «народов моря» через ${mm}: унесут от ${a * 100}% до ${b * 100}% всех запасов. Успейте потратить! Защитят только Циклопические стены.`}">
-        <i class="bf-ic">${shield ? '🧱' : '⚔️'}</i><b>Народы моря</b><small>${mm}</small></span>`;
+      if (Game.raidKind() === 'tribute') {
+        raid = `<span class="bf raid ${raidIn < 60 ? 'soon' : ''}" title="Сборщики дани Ассирии придут через ${mm}: заберут от ${a * 100}% до ${b * 100}% всех запасов${shield
+          ? ' — Циклопические стены уменьшат дань вдвое' : '. Циклопические стены уменьшили бы дань вдвое'}. Успейте потратить!">
+          <i class="bf-ic">👑</i><b>Дань Ассирии</b><small>${mm}</small></span>`;
+      } else {
+        raid = `<span class="bf raid ${shield ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="${shield
+          ? `Набег «народов моря» через ${mm}. Циклопические стены его отразят.`
+          : `Набег «народов моря» через ${mm}: унесут от ${a * 100}% до ${b * 100}% всех запасов. Успейте потратить! Защитят только Циклопические стены.`}">
+          <i class="bf-ic">${shield ? '🧱' : '⚔️'}</i><b>Народы моря</b><small>${mm}</small></span>`;
+      }
     }
     const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + raid;
     if (bhtml !== this.lastBuffs) {
@@ -328,6 +335,11 @@ const UI = {
   techIcon(T) { return Looks.techIcon(T); },
   reasonHtml(st) { return st && st.reason && !st.ok ? `<div class="item-lock">${esc(Msg.reason(st.reason))}</div>` : ''; },
   pediaBtn(id) { return `<button class="q" data-pedia="${id}" title="Кипропедия">?</button>`; },
+  /** Какое изученное знание сделало здание этого типа устаревшим. */
+  retiringTechName(type) {
+    const T = TECHS.find(t => Game.hasTech(t.id) && t.retire && t.retire.buildings && t.retire.buildings[type]);
+    return T ? Cat.tech[T.id].name : '';
+  },
 
   // ---------------- боковая панель ----------------
   renderPanel() {
@@ -459,6 +471,7 @@ const UI = {
     let h = `<div class="epoch-card"><div class="epoch-title">${esc(E.name)}</div><div class="epoch-years">${esc(E.sub)}</div>
       <p>${E.intro}</p>${E.maxLevel ? `<div class="dim">Предел улучшения зданий в эту эпоху: ${E.maxLevel}-й уровень.</div>` : ''}</div>`;
     const reqs = Game.epochReqs();
+    if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Вторая половина эпохи и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
     if (reqs) {
       const next = Cat.epochs[s.epoch + 1];
       const done = reqs.filter(r => r.ok).length;
@@ -475,7 +488,7 @@ const UI = {
     Cat.epochs.forEach((ep, i) => {
       h += `<li class="${i < s.epoch ? 'past' : i === s.epoch ? 'now' : ''} ${ep.locked ? 'future' : ''}"><b>${esc(ep.name)}${ep.locked ? ' · скоро' : ''}</b><small>${esc(ep.sub)}</small></li>`;
     });
-    h += `<li class="future"><b>Классика, эллинизм, Рим, Византия…</b><small>дальше по истории Кипра</small></li></ol>`;
+    h += `<li class="future"><b>Эллинизм, Рим, Византия…</b><small>дальше по истории Кипра</small></li></ol>`;
     const st = s.stats;
     h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
       <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
@@ -553,11 +566,21 @@ const UI = {
       h += `<p>${esc(B.desc)}</p>${B.retire ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}<p class="lore">${B.lore}</p>
         <p class="dim small">Чудо можно убрать на склад и поставить в другое место бесплатно. Пока оно на складе, его бонус не действует.</p>`;
     } else {
+      const rb = Game.rebuildInfo(b), sl = Game.sellInfo(b);
+      if (rb) {
+        h += `<div class="upgrade obsolete"><div class="up-head"><b>🔄 Устарело</b></div>
+          <p class="small">После знания «${esc(this.retiringTechName(b.type))}» это здание больше не работает. Перестройте его — уровень сохранится — или продайте.
+          <a href="#" data-pedia="a:changes">Как устроены перемены</a></p>
+          <div class="up-cost"><span class="dim">Перестроить в «${esc(Msg.formName(rb.into, Game.state.epoch))}» ${b.level}-го уровня</span> <span class="chips">${this.costHtml(rb.cost, 0)}</span></div>
+          ${rb.reason ? `<div class="item-lock">${esc(Msg.reason(rb.reason))}</div>` : ''}
+          <div class="mb-actions"><button class="btn gold" data-action="rebuild" ${rb.ok ? '' : 'disabled'}>Перестроить</button>
+          <button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
+      }
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
       if (b.rest === 'full') h += `<p class="rest">Отдыхает: всё, что здание даёт, уже не помещается в склады — сырьё не тратится.</p>`;
       if (b.rest === 'part') h += `<p class="rest">Часть того, что здание даёт, уже не помещается в склады — сырья уходит меньше.</p>`;
-      const up = Game.upgradeInfo(b);
+      const up = rb ? null : Game.upgradeInfo(b);
       if (up) {
         h += `<div class="upgrade ${up.logos ? 'lv-logos' : ''}">`;
         if (up.capped) h += `<div class="dim">${esc(Msg.reason(up.reason))}</div>`;
@@ -597,7 +620,8 @@ const UI = {
       ${a.pop > 0 ? `<p>👥 Пришло жителей: ${a.pop}</p>` : ''}
       ${a.ended && a.ended.length ? `<p class="dim">✨ Закончились благословения: ${a.ended.map(id => esc(Cat.rite[id] ? Cat.rite[id].name : id)).join(', ')}.</p>` : ''}
       ${a.raid ? (a.raid.shielded ? '<p class="how">🧱 Пока вас не было, налетели «народы моря», но Циклопические стены их отбили.</p>'
-        : `<p class="how">⚔️ Под конец налетели «народы моря» и унесли ${Math.round(a.raid.pct * 100)}% запасов:</p>
+        : `<p class="how">${a.raid.tribute ? `👑 Под конец пришли сборщики дани Ассирии и забрали ${Math.round(a.raid.pct * 100)}% запасов${a.raid.halved ? ' (стены уменьшили дань вдвое)' : ''}:`
+          : `⚔️ Под конец налетели «народы моря» и унесли ${Math.round(a.raid.pct * 100)}% запасов:`}</p>
           <div class="chips away">${a.raid.lost.map(([k, v]) => `<span class="chip bad"><i>${Art.res(k)}</i>−${fmt(v)}</span>`).join(' ')}</div>`) : ''}
       <div class="em-actions"><button class="btn gold" data-action="close">Продолжить</button></div></div>`);
   },
@@ -615,8 +639,11 @@ const UI = {
       Подробности — в <b>📖 Кипропедии</b>.</p>`;
     const retired = first ? [] : (s.log || []).filter(e => e.k === 'retired' && e.p.epoch === s.epoch);
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
-    if (!first && !E.locked) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
-      ${s.epoch === 1 ? 'Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.' : ''}</p>`;
+    if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Все здания сменили облик, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
+      Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.</p>`;
+    if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо.
+      Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:changes">как это устроено</a>'}).
+      «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до заката бронзового. Спасибо!</p>`;
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
       <button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'Дальше →' : 'Дальше'}</button></div></div>`;
@@ -681,6 +708,8 @@ const UI = {
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
+    if (act === 'rebuild' && b) { if (Game.rebuild(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } return; }
+    if (act === 'sell' && b) { if (Game.sell(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } return; }
     if (act === 'demolish' && b) { if (Game.demolish(b)) { this.closeModal(); this.renderMap(); this.renderAll(); } }
     if (act === 'stash' && b) {
       if (Game.stashWonder(b)) { this.closeModal(); this.renderMap(); this.renderAll(); this.toast(`📦 ${esc(Cat.bld[b.type].name)} — на складе. Поставить снова: вкладка «Строить» → «Чудеса».`); }

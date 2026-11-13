@@ -11,7 +11,7 @@ Object.assign(Game, {
     const mult = B.special ? 1 : Math.pow(BALANCE.buildCostGrowth, own);
     const cost = {};
     for (const [k, v] of Object.entries(B.cost || {})) cost[k] = Math.ceil(v * mult);
-    return cost;
+    return this.liveCost(cost);
   },
   canAfford(cost, logos = 0) {
     for (const [k, v] of Object.entries(cost)) if ((this.state.res[k] || 0) < v) return false;
@@ -47,6 +47,7 @@ Object.assign(Game, {
   buildStatus(type, mode = 'logos') {
     const B = BUILDINGS[type], s = this.state;
     if (s.epoch < B.epoch) return { ok: false, hidden: true };
+    if (this.obsoleteType(type)) return { ok: false, hidden: true };   // устарело: новые такие не строят
     if (B.tech && !this.hasTech(B.tech)) return { ok: false, locked: true, reason: { code: 'needTech', tech: B.tech } };
     if (B.special && this.retired(type)) {   // чудо прошлой эпохи: строить нельзя; со склада ставится уже обычным зданием
       return this.stashed(type) ? { ok: true, stashed: true, into: B.retire.into, level: B.retire.level, cost: {}, logos: 0 } : { ok: false, hidden: true };
@@ -97,10 +98,11 @@ Object.assign(Game, {
     const cost = {};
     for (const [r, v] of Object.entries(B.cost)) cost[r] = Math.ceil(v * k);
     if (target >= BALANCE.copperFromLevel) cost.copper = (cost.copper || 0) + Math.ceil(15 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.copperFromLevel));
-    if (target >= BALANCE.bronzeFromLevel) cost.bronze = (cost.bronze || 0) + Math.ceil(8 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.bronzeFromLevel));
-    return { cost, logos: this.upgradeLogos(type, target) };
+    if (target >= BALANCE.bronzeFromLevel && target < BALANCE.ironFromLevel) cost.bronze = (cost.bronze || 0) + Math.ceil(8 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.bronzeFromLevel));
+    if (target >= BALANCE.ironFromLevel) cost.iron = (cost.iron || 0) + Math.ceil(30 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.ironFromLevel));
+    return { cost: this.liveCost(cost), logos: this.upgradeLogos(type, target) };
   },
-  /** λ нужен только на «уровнях мудрости»: 3, 5, 7, 9. */
+  /** λ нужен только на «уровнях за Логос»: 3, 5, 7, 9, 11. */
   needsLogos(target) { return !!BALANCE.wisdomLevels[target]; },
   /** Символический уровень мудрости (3-й, 7-й) — одна маленькая цена для всех. */
   symbolicLevel(target) { const w = BALANCE.wisdomLevels[target]; return !!(w && w.logos); },

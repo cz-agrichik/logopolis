@@ -35,7 +35,7 @@ Object.assign(Game, {
     const apply = e => {
       if (!e) return;
       if (e.all) for (const k of RES_KEYS) fx.bonus[k] += e.all;
-      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.bonus[k] += v;
+      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.bonus[this.liveKey(k)] += v;   // бонус к ушедшему ресурсу — преемнику
       if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbonus[k] = (fx.bbonus[k] || 0) + v;
       for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
@@ -44,7 +44,7 @@ Object.assign(Game, {
     const applyBuff = e => {
       if (!e) return;
       if (e.all) for (const k of RES_KEYS) fx.buff[k] += e.all;
-      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.buff[k] += v;
+      if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.buff[this.liveKey(k)] += v;
       if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbuff[k] = (fx.bbuff[k] || 0) + v;
       if (e.logos) fx.logos += e.logos;
       if (e.growth) fx.growth += e.growth;
@@ -75,17 +75,23 @@ Object.assign(Game, {
   levelStep(L) { return (BALANCE.wisdomLevels[L] || {}).growth || BALANCE.levelGrowth; },
   workersOf(b) {
     const B = BUILDINGS[b.type];
-    return B.workers ? B.workers + Math.floor((b.level - 1) / 2) : 0;
+    if (!B.workers || this.obsoleteType(b.type)) return 0;   // устаревшее здание стоит — работники свободны
+    return B.workers + Math.floor((b.level - 1) / 2);
   },
   /** Производство здания в секунду при полной занятости. */
   prodOf(b, fx = this.fx || this.effects(), level = b.level) {
     const B = BUILDINGS[b.type], out = {};
     if (!B.prod) return out;
     const lm = this.levelMult(level);
-    for (const [k, v] of Object.entries(B.prod)) {
-      if (B.prodTech && B.prodTech[k] && !this.hasTech(B.prodTech[k])) continue;
-      out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
+    for (const [k0, v0] of Object.entries(B.prod)) {
+      if (B.prodTech && B.prodTech[k0] && !this.hasTech(B.prodTech[k0])) continue;
+      let k = k0, v = v0;
+      const r = this.retiredRes(k0);
+      if (r) { if (v0 < 0 || !r.prodToo) continue; k = r.into; v = v0 * r.rate; }   // ушедший ресурс: либо не делается, либо делается новый
+      out[k] = (out[k] || 0) + (v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm);
     }
+    // переработчик, у которого не осталось выхода (литейня без бронзы), стоит и сырьё не тратит
+    if (!Object.values(out).some(v => v > 0)) return {};
     return out;
   },
   houseCapOf(b, fx = this.fx || this.effects(), level = b.level) {
@@ -93,7 +99,13 @@ Object.assign(Game, {
     if (!B.cap) return 0;
     return Math.round(B.cap * this.levelMult(level)) + (this.form(b.type).capBonus || 0) + fx.houseCap;
   },
-  storageOf(b, level = b.level) { return BUILDINGS[b.type].storage ? Math.round(BUILDINGS[b.type].storage * this.levelMult(level)) : 0; },
+  /** Рост вместимости склада по уровням: как выпуск, но на 10-м и 11-м резче (BALANCE.storeGrowth). */
+  storeMult(L) {
+    let m = 1;
+    for (let l = 2; l <= L; l++) m *= BALANCE.storeGrowth[l] || (BALANCE.wisdomLevels[l] || {}).growth || BALANCE.levelGrowth;
+    return m;
+  },
+  storageOf(b, level = b.level) { return BUILDINGS[b.type].storage ? Math.round(BUILDINGS[b.type].storage * this.storeMult(level)) : 0; },
   storageCap(fx = this.fx || this.effects()) {
     let cap = BALANCE.baseStorage + fx.storage;
     for (const b of this.state.buildings) cap += this.storageOf(b);
@@ -108,6 +120,7 @@ Object.assign(Game, {
   /** Показывать ли ресурс: он уже есть, или его эпоха наступила и нужное знание изучено. */
   resVisible(k) {
     const s = this.state, R = RES[k];
+    if (this.retiredRes(k)) return false;   // ушедший ресурс пропадает из шапки
     if (s.res[k] >= 1) return true;
     if (R.epoch > s.epoch) return false;
     return !R.tech || this.hasTech(R.tech);
@@ -118,7 +131,7 @@ Object.assign(Game, {
     for (const id of Object.keys(this.state.buffs || {})) {
       const b = (RITUAL_BY_ID[id] || {}).buff || {};
       if (b.all) RES_KEYS.forEach(k => out.add(k));
-      Object.keys(b.mult || {}).forEach(k => out.add(k));
+      Object.keys(b.mult || {}).forEach(k => out.add(this.liveKey(k)));
       for (const t of Object.keys(b.bmult || {})) Object.entries(BUILDINGS[t].prod || {}).forEach(([k, v]) => v > 0 && out.add(k));
     }
     return out;

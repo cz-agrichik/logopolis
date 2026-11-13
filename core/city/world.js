@@ -65,29 +65,34 @@ Object.assign(Game, {
 
   /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery). */
   nextRaidIn() { const [a, b] = BALANCE.raidEvery; return rand(a, b); },
-  /** Сколько секунд до набега — его видно заранее; null — набегов нет (не бронзовый век или игра окончена). */
+  /** Что грозит: 'sea' — набеги «народов моря» (бронзовый век), 'tribute' — дань империям (железный век). */
+  raidKind() { return this.state.epoch >= 2 ? 'tribute' : 'sea'; },
+  /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век или игра окончена). */
   raidIn() {
     const s = this.state;
     return s.epoch >= 1 && !s.finished && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
   },
-  /** Набег: без Циклопических стен уносят случайную долю (BALANCE.raidLoot) всех запасов.
-   *  quiet — набег случился, пока игрока не было: о нём расскажет окно «С возвращением!», а не всплывашка. */
+  /** Набег (бронзовый век) или дань (железный век): уносят случайную долю (BALANCE.raidLoot) всех запасов.
+   *  Циклопические стены от «народов моря» защищают полностью, а дань только уменьшают вдвое.
+   *  quiet — случилось, пока игрока не было: расскажет окно «С возвращением!», а не всплывашка. */
   raid(quiet = false) {
-    const s = this.state, fx = this.fx || this.effects();
-    if (fx.raidShield) {
+    const s = this.state, fx = this.fx || this.effects(), tribute = this.raidKind() === 'tribute';
+    if (fx.raidShield && !tribute) {
       this.log('raidShield');
       if (!quiet) Bus.emit('raid', { shielded: true });
       return { shielded: true };
     }
-    const [a, b] = BALANCE.raidLoot, pct = Math.round(rand(a, b) * 100) / 100;
+    const [a, b] = BALANCE.raidLoot, halved = !!(tribute && fx.raidShield);
+    const pct = Math.round(rand(a, b) * 100) / 100 / (halved ? 2 : 1);
     const lost = [];
     for (const k of RES_KEYS) {
       const d = Math.floor(s.res[k] * pct);
       if (d > 0) { s.res[k] -= d; lost.push([k, d]); }
     }
-    this.log('raid', { lost, pct });
-    if (!quiet) Bus.emit('raid', { shielded: false, lost, pct });
-    return { shielded: false, lost, pct };
+    const out = { shielded: false, lost, pct, tribute, halved };
+    this.log(tribute ? 'tribute' : 'raid', { lost, pct, halved });
+    if (!quiet) Bus.emit('raid', out);
+    return out;
   },
 
   /**

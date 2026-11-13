@@ -88,6 +88,7 @@ const Game = {
       s.cooldowns = s.cooldowns || {};
       s.readyAt = s.readyAt || {};
       s.stash = s.stash || [];
+      if (s.finished && EPOCHS[s.epoch] && !EPOCHS[s.epoch].locked) s.finished = false;   // эпоха, бывшая концом прототипа, теперь открыта
       s.log = s.log || [];
       s.techs = s.techs.map(t => t === 'picrolite' ? 'carving' : t);   // переименование v2 → v3
       const st = this.state; this.state = s; this.retireWonders(); this.state = st;   // старые сохранения: чудеса прошлой эпохи

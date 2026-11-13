@@ -145,6 +145,89 @@ test('офлайн: набег, срок которого подошёл, — р
   assert.ok(s.res.wood >= before, 'ничего не унесли');
 });
 
+/** Город в начале железного века: бронзовый век пройден. */
+function ironAge(C) {
+  const G = C.get('Game'), s = G.state;
+  s.epoch = 2;
+  s.techs.push(...C.get('TECHS').filter(t => t.epoch < 2).map(t => t.id));
+  s.pop = 60; s.logos = 5000;
+  for (const k of Object.keys(s.res)) s.res[k] = 3000;
+  s.buildings.push({ id: 870, type: 'storehouse', level: 9, x: 5, y: 7 }, { id: 871, type: 'storehouse', level: 9, x: 6, y: 7 });
+  G.tick(0.001);
+  return G;
+}
+
+test('железный век: предел 11; 10-й уровень просит железо, 11-й — вдвое больше λ, чем 9-й', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  assert.equal(G.maxLevel(), 11);
+  const up10 = G.upgradeCost('house', 10);
+  assert.ok(up10.cost.iron > 0 && !up10.cost.bronze, '10-й — железо вместо бронзы');
+  assert.equal(G.upgradeCost('house', 11).logos, 2 * G.upgradeCost('house', 9).logos);
+  assert.ok(G.upgradeCost('house', 11).cost && !Object.keys(G.upgradeCost('house', 11).cost).length, '11-й — только λ');
+  const b = { id: 872, type: 'field', level: 9, x: 7, y: 7 }; s.buildings.push(b);
+  s.res.iron = 0;
+  assert.deepEqual([...G.upgradeInfo(b).reason.items.map(x => x[0])], ['iron'], 'без железа 10-й не взять');
+  // склады на 10-м и 11-м растут резче обычного
+  assert.ok(Math.abs(G.storeMult(10) / G.storeMult(9) - 1.3) < 1e-9 && Math.abs(G.storeMult(11) / G.storeMult(10) - 1.6) < 1e-9);
+  assert.ok(Math.abs(G.levelMult(11) / G.levelMult(10) - 1.4) < 1e-9);
+});
+
+test('железный век: «Железо» — бронза уходит в железо, литейня устаревает; перестроить или продать', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  const foundry = { id: 880, type: 'foundry', level: 9, x: 8, y: 8 }, other = { id: 881, type: 'foundry', level: 4, x: 9, y: 8 };
+  s.buildings.push(foundry, other);
+  s.res.bronze = 700; s.res.iron = 0;
+  const bronzeCost = G.ritualStatus(C.get('RITUAL_BY_ID').bullmask).cost;   // цены без бронзы — не меняются
+  assert.ok(G.research('iron'));
+  assert.equal(s.res.bronze, 0);
+  assert.equal(s.res.iron, 700, 'бронза перешла в железо 1:1');
+  assert.equal(G.resVisible('bronze'), false, 'бронза пропала из шапки');
+  assert.deepEqual({ ...G.liveCost({ bronze: 100, stone: 5 }) }, { iron: 100, stone: 5 }, 'цены с бронзой — теперь в железе');
+  assert.deepEqual({ ...G.ritualStatus(C.get('RITUAL_BY_ID').bullmask).cost }, { ...bronzeCost });
+  assert.deepEqual(Object.keys(G.prodOf(foundry)).length, 0, 'литейня встала и медь не ест');
+  assert.equal(G.buildStatus('foundry').hidden, true, 'новые литейни не строят');
+  assert.equal(G.buildStatus('forge').ok, true);
+  assert.equal(G.upgradeInfo(foundry).target, 10);
+  // перестроить: тот же уровень, теперь кузница
+  const rb = G.rebuildInfo(foundry);
+  assert.equal(rb.into, 'forge');
+  assert.ok(G.rebuild(foundry));
+  assert.equal(foundry.type, 'forge'); assert.equal(foundry.level, 9);
+  assert.ok(G.prodOf(foundry).iron > 0 && G.prodOf(foundry).wood < 0);
+  // продать: весь λ уровней (3 + 5-й) и половина цены постройки
+  const logos0 = s.logos, sell = G.sellInfo(other);
+  assert.equal(sell.logos, G.upgradeLogos('foundry', 3));
+  assert.ok(G.sell(other));
+  assert.equal(s.logos, logos0 + sell.logos);
+  assert.ok(!s.buildings.includes(other));
+  assert.equal(G.rebuildInfo(foundry), null, 'кузница не устарела');
+});
+
+test('железный век: дань Ассирии вместо набегов; стены уменьшают её вдвое', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  assert.equal(G.raidKind(), 'tribute');
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  const r = G.raid(true);
+  assert.ok(r.tribute && !r.halved && r.pct >= 0.1 - 1e-9 && r.pct <= 0.5 + 1e-9);
+  s.buildings.push({ id: 890, type: 'sp_walls', level: 1, x: 3, y: 3 }); G.fx = G.effects();
+  for (const k of Object.keys(s.res)) s.res[k] = 1000;
+  const r2 = G.raid(true);
+  assert.ok(r2.tribute && r2.halved && !r2.shielded);
+  assert.ok(r2.pct >= 0.05 - 1e-9 && r2.pct <= 0.25 + 1e-9, 'вдвое меньше');
+  assert.ok(s.res.wood < 1000, 'стены больше не спасают полностью');
+});
+
+test('переход в железный век: Хала-Султан-Текке — гавань 9-го уровня, Бог на слитке — мастерская 9-го', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state;
+  s.epoch = 1;
+  s.buildings.push({ id: 895, type: 'sp_halasultan', level: 1, x: 2, y: 2 }, { id: 896, type: 'sp_ingot', level: 1, x: 3, y: 2 });
+  s.epoch = 2;
+  const out = G.retireWonders();
+  assert.deepEqual([...out.map(x => [...x])], [['sp_halasultan', 'port', 9], ['sp_ingot', 'workshop', 9]]);
+  assert.equal(s.buildings.find(b => b.id === 895).type, 'port');
+  assert.equal(s.buildings.find(b => b.id === 896).level, 9);
+});
+
 test('город: каждая следующая постройка дороже в 1.25 раза', () => {
   const G = fresh().get('Game');
   const c1 = G.buildCost('field').wood;

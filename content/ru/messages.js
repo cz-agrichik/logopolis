@@ -92,6 +92,10 @@ const Msg = {
       case 'goatGone': return '🐐 Коза ушла в горы Троодоса…';
       case 'goat': return `🐐 ${this.goatLine(p.roll)} ${this.resList(p.gains) || 'склады полны'}`;
       case 'raidShield': return '🧱 Циклопические стены отразили набег «народов моря»!';
+      case 'tribute': return `👑 Сборщики дани Ассирии забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}: ${this.resList(p.lost, '−')}`;
+      case 'resRetired': return `🔄 ${Lex.res[p.from].name} уходит: ${Lex.res[p.from].icon} ${p.have} → ${Lex.res[p.into].icon} ${p.amount}`;
+      case 'rebuilt': return `🔄 Перестроено: ${this.formName(p.from, p.epoch)} → ${this.formName(p.into, p.epoch)} ${p.level}-го уровня`;
+      case 'sold': return `💰 Продано: ${this.formName(p.type, p.epoch)} ${p.level}-го уровня${p.logos ? ` — вернулось λ ${p.logos}` : ''}`;
       case 'raid': return `⚔️ Набег «народов моря»! ${p.pct ? `Унесли ${Math.round(p.pct * 100)}% запасов: ` : 'Потеряно: '}${this.resList(p.lost, '−')}`;
       case 'decksAdded': return `📚 Добавлены встроенные колоды: ${p.n}. Включить их можно в «📚 Обучении» → «Колоды»`;
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;

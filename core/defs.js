@@ -21,9 +21,12 @@ const BALANCE = {
     5: { lp: 1, growth: 1.4 },
     7: { logos: 9, growth: 1.25 },
     9: { lp: 3, growth: 1.4 },
+    11: { lp: 6, growth: 1.4 },   // вдвое дороже 9-го
   },
   copperFromLevel: 6,      // с 6-го уровня (первого в бронзовом веке) улучшения требуют медь
-  bronzeFromLevel: 8,      // с 8-го — бронзу
+  bronzeFromLevel: 8,      // с 8-го — бронзу…
+  ironFromLevel: 10,       // …а с 10-го (железный век) вместо бронзы — железо
+  storeGrowth: { 10: 1.3, 11: 1.6 },   // склады на 10-м и 11-м растут резче обычного (×1.15 и ×1.4) — под цены переходов
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
@@ -43,6 +46,7 @@ const RES = {
   goods: { epoch: 0, tech: 'carving' },
   copper: { epoch: 1 },
   bronze: { epoch: 1 },
+  iron: { epoch: 2, tech: 'iron' },
 };
 const RES_KEYS = Object.keys(RES);
 
@@ -76,6 +80,7 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 const EPOCHS = [
   { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
   { maxLevel: 9, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
+  { maxLevel: 11, advance: null },   // «Царства-города»: вторая половина эпохи и переход — в следующей версии
   { locked: true },
 ];
 
@@ -97,6 +102,7 @@ const BUILDINGS = {
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}] },
   port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, lp: 14, forms: [null, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
+  forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 350, copper: 150 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}] },
   scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
@@ -104,8 +110,8 @@ const BUILDINGS = {
   sp_troodos: { special: true, epoch: 0, terrain: ['hill'], cost: { food: 1500, wood: 900 }, logos: 0, effect: { bmult: { goatpen: 0.6 }, goats: true } },
   sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 60, effect: { bmult: { workshop: 1.5 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
   shrine1: { special: true, epoch: 0, terrain: ['plain'], cost: { stone: 300, goods: 80 }, logos: 180, effect: { mult: { food: 0.2 }, growth: 0.5, logos: 0.1 } },
-  sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } } },
-  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } } },
+  sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } }, retire: { epoch: 2, into: 'port', level: 9 } },
+  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } }, retire: { epoch: 2, into: 'workshop', level: 9 } },
   sp_walls: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 6000, wood: 1500 }, logos: 0, effect: { raidShield: true, storagePct: 0.5 } },
   sp_palace: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 800, wood: 500, goods: 150 }, logos: 350, effect: { all: 0.15, storage: 2000 } },
   shrine2: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 600, copper: 200, goods: 200 }, logos: 450, effect: { logos: 0.2, all: 0.1 } },
@@ -126,6 +132,9 @@ const TECHS = [
   { id: 'oxhide', epoch: 1, logos: 200, cost: { copper: 600 }, req: ['seafaring', 'smelting'], effect: { bmult: { port: 0.5 } } },
   { id: 'bronzetools', epoch: 1, logos: 200, cost: { bronze: 150 }, req: ['bronze'], effect: { mult: { food: 0.25, wood: 0.25, stone: 0.25 } } },
   { id: 'writing', epoch: 1, logos: 160, cost: { goods: 450 } },
+  // Царства-города. retire — перемены: запасы уходящего ресурса переходят в новый (rate — по ценнику труда),
+  // здания, которые его делали, устаревают — их можно перестроить в новые (уровень сохраняется) или продать (λ уровней возвращается).
+  { id: 'iron', epoch: 2, logos: 200, cost: { copper: 1500 }, retire: { res: { bronze: { into: 'iron', rate: 1 } }, buildings: { foundry: 'forge' } } },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 

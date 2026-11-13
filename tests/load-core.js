@@ -11,7 +11,7 @@ const CORE_FILES = [
   'core/learning/greek.js', 'core/learning/decks.js', 'core/learning/srs.js', 'core/learning/lesson.js',
   'core/learning/journal.js', 'core/learning/learn.js',
   'core/city/state.js', 'core/city/economy.js', 'core/city/build.js', 'core/city/research.js',
-  'core/city/rituals.js', 'core/city/epochs.js', 'core/city/world.js', 'core/session.js',
+  'core/city/rituals.js', 'core/city/epochs.js', 'core/city/world.js', 'core/city/changes.js', 'core/session.js',
 ];
 const CONTENT_FILES = ['content/ru/words.js'];
 

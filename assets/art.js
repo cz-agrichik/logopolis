@@ -405,6 +405,11 @@ const Art = (() => {
     bronze: `<path d="M10 22 Q20 10 34 18 L54 18 L54 30 L34 30 Q20 38 10 26Z" fill="${C.bronze}" ${st(2)}/>
       <path d="M34 18 L34 30" stroke="${C.bronzeD}" stroke-width="2"/>
       <path d="M44 30 L44 58" stroke="${C.woodD}" stroke-width="5" stroke-linecap="round"/>`,
+    // железо: кипрский железный нож XI в. до н. э. — рукоять ещё на бронзовых заклёпках
+    iron: `<path d="M20 40 L46 16 Q54 10 60 10 Q58 18 50 24 L26 46Z" fill="#a3aab0" ${st(2)}/>
+      <path d="M24 42 L50 18" stroke="#d6dde2" stroke-width="2" stroke-linecap="round"/>
+      <path d="M20 40 L26 46 L12 60 Q6 60 6 54Z" fill="${C.wood}" ${st(2)}/>
+      <circle cx="14" cy="52" r="2.2" fill="${C.bronze}" ${st(1)}/><circle cx="19" cy="47" r="2.2" fill="${C.bronze}" ${st(1)}/>`,
   };
 
   // ---------- местность и звери ----------
@@ -458,6 +463,12 @@ const Art = (() => {
     t_bronzetools: tdisc + `<path d="M18 46 L40 18" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
       <path d="M34 14 Q44 10 48 20 L40 24Z" fill="${C.bronze}" ${st(1.5)}/>
       <path d="M46 46 Q20 44 22 22 Q30 34 46 38Z" fill="${C.bronze}" ${st(1.5)}/><path d="M46 38 L52 50" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>`,
+    // железо: наковальня, молот и раскалённая полоса
+    t_iron: tdisc + `<path d="M14 40 L50 40 L46 46 L40 46 L42 54 L22 54 L24 46 L18 46Z" fill="#7d858b" ${st(1.8)}/>
+      <path d="M20 36 L42 36" stroke="${C.fire}" stroke-width="4" stroke-linecap="round"/><path d="M22 36 L38 36" stroke="${C.fireL}" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M30 12 L46 28" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M40 10 L52 22 L46 26 L34 14Z" fill="#a3aab0" ${st(1.6)}/>
+      <path d="M50 30 l4 -2 M52 34 l5 0 M48 26 l3 -4" stroke="${C.fireL}" stroke-width="1.6" stroke-linecap="round"/>`,
     t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
       <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
 
