@@ -119,6 +119,7 @@ Object.assign(Game, {
     const k = BALANCE.upCostBase * Math.pow(BALANCE.upCostGrowth, target - 2);   // ×1.5 за каждый уровень
     const cost = {};
     for (const [r, v] of Object.entries(B.cost)) cost[r] = Math.ceil(v * k);
+    if (target >= BALANCE.goodsFromLevel) cost.goods = (cost.goods || 0) + Math.ceil(15 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.goodsFromLevel));
     if (target >= BALANCE.copperFromLevel) cost.copper = (cost.copper || 0) + Math.ceil(15 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.copperFromLevel));
     if (target >= BALANCE.bronzeFromLevel && target < BALANCE.ironFromLevel) cost.bronze = (cost.bronze || 0) + Math.ceil(8 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.bronzeFromLevel));
     if (target >= BALANCE.ironFromLevel) cost.iron = (cost.iron || 0) + Math.ceil(30 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.ironFromLevel));

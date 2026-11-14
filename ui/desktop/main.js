@@ -9,6 +9,7 @@
   }
   // город и обучение хранятся отдельно; старое общее сохранение переносится само
   const boot = Session.start(BrowserIO);
+  Session.onLost = () => UI.showTakenOver();   // игру перезаписала другая вкладка — эту останавливаем
   const saved = boot.cityLoaded;
   if (saved && boot.decksAdded) Game.state.log.unshift({ t: Date.now(), k: 'decksAdded', p: { n: boot.decksAdded } });
   Game.tick(0);
@@ -57,9 +58,12 @@
   }, 250);
 
   window.addEventListener('beforeunload', () => Session.saveAll());
+  // другая вкладка записала сохранение — сверяем штампы (событие приходит только в чужие вкладки)
+  window.addEventListener('storage', e => { if (!e.key || e.key.endsWith(Session.STAMP)) Session.check(); });
   // во фоне игра «спит», а при возвращении досчитывает офлайн-прогресс по общим правилам
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { Session.saveAll(); Game.paused = true; return; }
+    if (Session.check()) return;   // пока нас не было, в другой вкладке игра ушла вперёд
     const a = Game.catchUp();
     Game.paused = false; last = performance.now();
     if (a) { UI.renderMap(); UI.renderAll(); UI.showAway(a); }

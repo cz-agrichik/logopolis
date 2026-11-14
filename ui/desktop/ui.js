@@ -569,10 +569,12 @@ const UI = {
 
   // ---------------- окна ----------------
   showModal(html) {
+    if (this.modalLocked) return;   // вкладка остановлена — поверх ничего не открываем
     $('#modalBox').innerHTML = html;
     $('#modal').classList.remove('hidden');
   },
   closeModal() {
+    if (this.modalLocked) return;
     $('#modal').classList.add('hidden'); this.modalBuilding = null;
     const next = this.afterModal; this.afterModal = null;
     if (next) next();
@@ -626,6 +628,18 @@ const UI = {
     h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
       <button class="btn ghost small" data-action="close">Закрыть</button></div>`;
     this.showModal(h);
+  },
+
+  /** Игру в этом браузере перезаписала другая вкладка: здесь всё остановлено, осталась одна кнопка — загрузить свежую. */
+  showTakenOver() {
+    if (Study.open) { Study.open = false; clearTimeout(Study.timer); $('#study').classList.add('hidden'); }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    this.modalBuilding = null; this.afterModal = null;
+    this.showModal(`<div class="epoch-modal"><h2>🗂️ Игра открыта в другой вкладке</h2>
+      <p>В другой вкладке этого браузера игра ушла вперёд — или там начали новую. Эта вкладка остановлена
+      и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
+      <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`);
+    this.modalLocked = true;
   },
 
   showMobileWarning(next) {
@@ -729,6 +743,7 @@ const UI = {
 
   onModalAction(a) {
     const act = a.dataset.action;
+    if (act === 'reload') return BrowserIO.restart();
     if (act === 'confirm-yes') { const f = this.pendingConfirm; this.pendingConfirm = null; this.closeModal(); if (f) f(); return; }
     if (act === 'close') return this.closeModal();
     if (act === 'plan') return this.showLearnPlan();

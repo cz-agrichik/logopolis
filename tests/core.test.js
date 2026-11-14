@@ -617,6 +617,42 @@ test('сохранение: новая игра не трогает обучен
   assert.ok(C2.get('Learn').state.progress.a);
 });
 
+test('две вкладки: старая не затирает новую игру — «отставшая» вкладка больше ничего не пишет', () => {
+  const io = memoryIO(), CITY = 'greekgame.city.v1', LEARN = 'greekgame.learn.v1';
+  const tab = seed => { const C = loadCore({ seed }); C.run('Game.genMap();'); C.get('Session').start(io); return C; };
+  // вкладка A: давняя игра в железном веке
+  const A = tab(1), SA = A.get('Session'); let lostA = 0; SA.onLost = () => lostA++;
+  A.get('Game').state.epoch = 2; SA.saveAll(); SA.saveAll();
+  assert.equal(lostA, 0, 'свои записи подряд — не помеха');
+  // вкладка B открыла ту же игру и начала новую
+  const B = tab(2);
+  assert.equal(B.get('Game').state.epoch, 2);
+  B.get('Game').newGame();
+  assert.equal(JSON.parse(io.data[CITY]).epoch, 0);
+  // A ушла в фон и вернулась (или закрывается браузер — beforeunload): ничего не пишет и останавливается
+  SA.saveAll();
+  assert.equal(JSON.parse(io.data[CITY]).epoch, 0, 'старый железный век не вернулся');
+  assert.equal(lostA, 1);
+  assert.equal(A.get('Game').paused, true);
+  assert.equal(SA.check(), true); SA.saveAll(); assert.equal(lostA, 1, 'onLost — один раз');
+  const learnBefore = io.data[LEARN];
+  A.get('Learn').state.stats.right = 999; A.get('Learn').save();
+  assert.equal(io.data[LEARN], learnBefore, 'и обучение старая вкладка не трогает');
+  // B после перезагрузки пишет как обычно
+  const B2 = tab(3), SB2 = B2.get('Session'); let lostB = 0; SB2.onLost = () => lostB++;
+  B2.get('Game').state.logos = 7; SB2.saveAll();
+  assert.equal(JSON.parse(io.data[CITY]).logos, 7); assert.equal(lostB, 0);
+  // полный сброс стирает и штампы — открытая вкладка тоже отстаёт
+  const C = tab(4); C.get('Session').wipe();
+  assert.equal(io.data[CITY + '.stamp'], undefined);
+  assert.equal(SB2.check(), true);
+  // без хранилища (приватный режим) — играем без сохранения, но и без ложной тревоги
+  const none = { load: () => null, save() {}, remove() {}, restart() {} };
+  const D = loadCore({ seed: 5 }); D.run('Game.genMap();'); const SD = D.get('Session'); SD.start(none);
+  let lostD = 0; SD.onLost = () => lostD++; SD.saveAll(); SD.saveAll();
+  assert.equal(lostD, 0); assert.equal(SD.check(), false);
+});
+
 test('дань: Ассирия грабит, Египет — как средний грабёж, но серебром, Персия — твёрдую сумму с присяги; стены и флот', () => {
   const C = fresh(), G = ironAge(C), s = G.state, BAL = C.get('BALANCE');
   assert.equal(G.overlord(), 'assyria'); assert.equal(G.tributeDue(), null);
@@ -715,4 +751,16 @@ test('справочные расчёты (facts): где добыть, на ч�
   assert.equal(G.obsoleteAfter('house'), null);
   assert.deepEqual([...G.techLinks('iron').opens].sort(), ['forge', 'sp_salamis']);
   assert.ok(G.logosPrices('techs').includes(320) && G.advanceWonders().includes('sp_salamis'));
+});
+
+test('с 4-го уровня улучшения просят товары (как медь с 6-го); после «Финикийцев» — серебром', () => {
+  const C = fresh(), G = C.get('Game'), BAL = C.get('BALANCE');
+  assert.equal(BAL.goodsFromLevel, 4);
+  assert.ok(!G.upgradeCost('house', 2).cost.goods, 'на 2-м ещё нет');
+  for (const t of ['house', 'field', 'workshop']) assert.equal(G.upgradeCost(t, 4).cost.goods, 15, t);
+  assert.equal(G.upgradeCost('house', 6).cost.goods, Math.ceil(15 * 1.5 * 1.5));
+  assert.equal(G.upgradeCost('house', 5).cost.goods, undefined, 'уровень за Логос — только λ');
+  G.state.techs.push('phoenicians');
+  const c = G.upgradeCost('house', 4).cost;
+  assert.ok(!c.goods && c.silver === 3, 'после «Финикийцев» товары — серебром 5 : 1');
 });
