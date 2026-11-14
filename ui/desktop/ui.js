@@ -24,7 +24,7 @@ const UI = {
       if (r) { this.placeRepeat = !this.placeRepeat; r.classList.toggle('on', this.placeRepeat); }
     });
     this.measureTop = () => document.documentElement.style.setProperty('--top-h', $('#topbar').offsetHeight + 'px');
-    this.measureTop(); window.addEventListener('resize', this.measureTop);
+    this.measureTop(); window.addEventListener('resize', () => { this.fitRes(true); this.measureTop(); });
     $('#map').addEventListener('click', e => this.onMapClick(e));
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
     // в новой игре сначала спрашиваем, что учить (если игрок ещё не ответил)
@@ -160,15 +160,25 @@ const UI = {
       if (bar.scrollWidth > bar.clientWidth + 1) bar.classList.add('compact');   // тесно — только значки и таймеры
     }
 
-    // кнопка «Учиться»: понятными словами, что ждёт в раунде
-    const p = Decks.roundPreview(Learn.state), newNow = p.newNow;
-    const sub = [p.due ? `повторить ${p.due}` : '', newNow ? `новых ${newNow}` : ''].filter(Boolean).join(' · ') || 'всё повторено';
-    if (sub !== this.lastStudySub) {
-      this.lastStudySub = sub;
-      $('#studySub').textContent = sub;
+    // кнопка «Учиться»: что ждёт в раунде — в подсказке; нечего повторять и учить — кнопка не мерцает
+    const p = Decks.roundPreview(Learn.state), newNow = p.newNow, key = p.due + '/' + newNow;
+    if (key !== this.lastStudyKey) {
+      this.lastStudyKey = key;
       $('#studyBtn').title = `Раунд карточек — единственный источник λ.\n${p.due ? `Пора повторить: ${p.due} ${plural(p.due, 'слово', 'слова', 'слов')}.` : 'Сейчас повторять нечего — можно повторить досрочно (λ меньше).'}\n${newNow ? `Новых слов в раунде: до ${newNow}.` : 'Новых слов нет: все уже в работе или колоды выключены.'}`;
       $('#studyBtn').classList.toggle('quiet', !p.due && !newNow);
     }
+    this.fitRes();   // в самом конце: ширину ресурсам оставляют жители и кнопка «Учиться»
+  },
+
+  /** Ресурсы не помещаются в шапку — ячейки плотнее (data-fit 1–3, см. styles.css). Обратно к крупным — только при смене
+   *  ширины окна или числа ресурсов: так шапка не дёргается, когда в числе прибавляется цифра. */
+  fitRes(reset) {
+    const bar = $('#resources'), n = bar.children.length;
+    if (reset || n !== this.resN) { this.resN = n; this.resFit = 0; }
+    const was = bar.dataset.fit;
+    bar.dataset.fit = this.resFit;
+    while (this.resFit < 3 && bar.scrollWidth > bar.clientWidth + 1) bar.dataset.fit = ++this.resFit;
+    if (bar.dataset.fit !== was && this.measureTop) this.measureTop();
   },
 
   // ---------------- карта ----------------

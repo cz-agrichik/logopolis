@@ -24,6 +24,10 @@ const Phone = {
       if (b.dataset.tab) this.upMode(false);   // открыли вкладку — режим улучшения выключаем
     });
     $('#upHint').addEventListener('click', e => { if (e.target.closest('[data-up-done]')) this.upMode(false); });
+    // карта на всю ширину: север и юг — пальцем; сначала в середине экрана — город
+    $('#mapScroll').addEventListener('scroll', () => this.mapEdges(), { passive: true });
+    window.addEventListener('resize', () => this.mapEdges());
+    requestAnimationFrame(() => { this.centerMap(); this.mapEdges(); });
     $('#side').addEventListener('click', e => { if (e.target.closest('[data-close-drawer]')) UI.drawer(false); });
     // Кипропедия: оглавление — по ☰; выбрали статью — оглавление убирается
     $('#pedia').addEventListener('click', e => {
@@ -35,6 +39,22 @@ const Phone = {
 
   /** Раз в секунду из игрового цикла. */
   tick() { if (UI.upMode) this.markUps(); },
+
+  // ---------------- карта: листается вверх-вниз ----------------
+  /** Тени у верхнего и нижнего края — там ещё есть карта. */
+  mapEdges() {
+    const sc = $('#mapScroll'), w = $('#mapWrap'), can = sc.scrollHeight > sc.clientHeight + 2;
+    w.classList.toggle('more-n', can && sc.scrollTop > 2);
+    w.classList.toggle('more-s', can && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 2);
+  },
+  /** Город — посередине экрана (по постройкам; если их нет — середина карты). */
+  centerMap() {
+    const sc = $('#mapScroll');
+    if (!this.active() || sc.scrollHeight <= sc.clientHeight) return;
+    const ys = Game.state.buildings.map(b => b.y), rows = Game.map.reduce((m, t) => Math.max(m, t.y), 0) + 1;
+    const mid = ys.length ? (Math.min(...ys) + Math.max(...ys) + 1) / 2 : rows / 2;
+    sc.scrollTop = mid * sc.scrollHeight / rows - sc.clientHeight / 2;
+  },
 
   // ---------------- подсказка по долгому нажатию ----------------
   bindTips() {

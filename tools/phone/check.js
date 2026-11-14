@@ -54,6 +54,8 @@ function setupCity(ep) {
   const ev = f => page.evaluate(f);
   const shot = async n => { await page.waitForTimeout(250); await page.screenshot({ path: path.join(OUT, n + '.png') }); };
   const center = async sel => { const b = await (await page.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  // клетка карты: на телефоне карта листается — сначала прокрутить к ней, как сделал бы игрок
+  const tile = async (tx, ty) => { const sel = `#map .tile[data-x="${tx}"][data-y="${ty}"]`; await page.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(60); return center(sel); };
   const cdp = await ctx.newCDPSession(page);
   const longPress = async (x, y) => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
@@ -73,6 +75,7 @@ function setupCity(ep) {
   ok(!(await ev(() => document.body.classList.contains('fs-need'))), 'после касания заслонки её нет');
   await ev(() => { Game.paused = true; Math.random = () => 0.5; delete Game.state.planPending; UI.closeModal(); });
   await ev(`(${setupCity})(${EP})`);
+  await ev(() => Phone.centerMap());
 
   // 1. снимки
   await shot('01_map');
@@ -93,6 +96,12 @@ function setupCity(ep) {
   await ev(() => Study.close()); await ev(() => UI.showEpoch(false)); await shot('07_epoch');
   await ev(() => UI.closeModal()); await ev(() => UI.showLearnPlan()); await shot('08_plan');
   await ev(() => UI.closeModal());
+  if (await ev(() => Phone.active())) {
+    const mp = await ev(() => { const sc = $('#mapScroll'), m = $('#map').getBoundingClientRect(), w = $('#mapWrap').getBoundingClientRect(); return [Math.round(m.width), Math.round(w.width), sc.scrollHeight > sc.clientHeight]; });
+    ok(mp[0] >= mp[1] - 2, `карта на всю ширину (${mp[0]} из ${mp[1]})` + (mp[2] ? ', север и юг — листаются' : ''));
+    const fit = await ev(() => { const b = $('#resources'); return [b.scrollWidth <= b.clientWidth + 1 || b.dataset.fit === '3', b.dataset.fit, [...b.querySelectorAll('.rs-v small')].some(e => e.offsetWidth > 0)]; });
+    ok(fit[0] && fit[2], `ресурсы в шапке помещаются (плотность ${fit[1]}), прирост виден`);
+  }
   const wide = await ev(() => [document.documentElement.scrollWidth, innerWidth]);
   ok(wide[0] <= wide[1], `страница не шире экрана (${wide[0]} ≤ ${wide[1]})`);
 
@@ -102,7 +111,7 @@ function setupCity(ep) {
   ok(await ev(() => !$('#touchTip').classList.contains('hidden') && $('#touchTip').textContent.length > 5), 'долгое нажатие на ресурс — подсказка');
   ok(await ev(() => $('#pedia').classList.contains('hidden')), '…и справка от него не открылась');
   const house = await ev(() => { const b = Game.state.buildings.find(b => b.type === 'house'); return [b.x, b.y]; });
-  [x, y] = await center(`#map .tile[data-x="${house[0]}"][data-y="${house[1]}"]`);
+  [x, y] = await tile(house[0], house[1]);
   await longPress(x, y);
   ok(await ev(() => $('#modal').classList.contains('hidden')), 'долгое нажатие на здание не открывает его окно');
   // режим ⏫
@@ -111,7 +120,7 @@ function setupCity(ep) {
   const can = await ev(() => [...document.querySelectorAll('#map .tile.up-ok')].map(e => [+e.dataset.x, +e.dataset.y]));
   ok(can.length > 0, `⏫ отмечает, что можно улучшить (${can.length})`);
   const s0 = await sum();
-  for (const [tx, ty] of can.slice(0, 3)) { [x, y] = await center(`#map .tile[data-x="${tx}"][data-y="${ty}"]`); await page.touchscreen.tap(x, y); await page.waitForTimeout(120); }
+  for (const [tx, ty] of can.slice(0, 3)) { [x, y] = await tile(tx, ty); await page.touchscreen.tap(x, y); await page.waitForTimeout(120); }
   ok(await sum() === s0 + Math.min(3, can.length), '⏫: каждое касание — +1 уровень');
   ok(await ev(() => $('#modal').classList.contains('hidden')), '⏫: окно здания не открывается');
   await page.tap('[data-up-done]');
@@ -126,7 +135,7 @@ function setupCity(ep) {
   for (let i = 0; i < 2; i++) {
     const t = await ev(() => { const t = Game.map.find(t => !Game.buildingAt(t.x, t.y) && Game.canPlaceOn(UI.placing, t)); return t && [t.x, t.y]; });
     if (!t) break;
-    [x, y] = await center(`#map .tile[data-x="${t[0]}"][data-y="${t[1]}"]`); await page.touchscreen.tap(x, y); await page.waitForTimeout(150);
+    [x, y] = await tile(t[0], t[1]); await page.touchscreen.tap(x, y); await page.waitForTimeout(150);
   }
   ok(await ev(() => Game.state.buildings.length) - n0 === 2, '🔁 ещё: два здания подряд');
   await page.tap('[data-cancel-place]');

@@ -27,10 +27,6 @@
   .lm-v b { font-size: 15px; }
   .lm-v small { display: none; }
   .resbar { padding: 2px; border-radius: 9px; }
-  .rs { padding: 2px 4px 5px; gap: 3px; max-width: 74px; }
-  .rs-ic, .rs-ic .ico { width: 18px; height: 18px; }
-  .rs-v b { font-size: 12px; }
-  .rs-v small { display: none; }
   .rs-bar { left: 4px; right: 4px; bottom: 1px; height: 2px; }
   .popbox { font-size: 11px; }
   .popbox b { font-size: 12px; }
@@ -38,7 +34,6 @@
   .pedia-btn { width: 30px; height: 30px; font-size: 15px; flex: none; }
   .study-btn { padding: 3px 10px; flex: none; }
   .study-btn .sb-main { font-size: 13px; }
-  .study-btn .sb-sub { font-size: 9px; }
   /* карта и панель рядом */
   main { flex-direction: row; gap: 8px; padding: 8px 8px 6px; }
   #map { width: min(100%, calc((100vh - 86px) * 18 / 11)); border-radius: 10px; }
@@ -184,14 +179,49 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   /* шапка: Кипропедия и «Обучение» уехали в полосу справа; ресурсы — значок над числом */
   #pediaBtn, #schoolBtn { display: none; }
   .wide-only { display: none; }
-  .rs { flex-direction: column; justify-content: center; gap: 0; padding: 1px 1px 4px; max-width: 50px; }
-  .rs-ic, .rs-ic .ico { width: 17px; height: 17px; }
-  .rs-v { align-items: center; }
-  .rs-v b { font-size: 11px; letter-spacing: -.02em; }
-  .rs-bar { left: 3px; right: 3px; }
-  .popbox { gap: 0; }
+  /* ресурсы — ровно по содержимому (число и прирост), а не на всю ширину: остальной шапке — место */
+  .resbar { flex: 0 1 auto; }
+  .rs { flex: 0 0 auto; gap: 3px; padding: 2px 5px 5px; max-width: none; }
+  .rs-ic, .rs-ic .ico { width: 16px; height: 16px; }
+  .rs-v b { font-size: 12px; }
+  .rs-v small { font-size: 9px; }
+  .resbar[data-fit="1"] .rs { gap: 2px; padding: 2px 3px 5px; }
+  .resbar[data-fit="1"] .rs-ic, .resbar[data-fit="1"] .rs-ic .ico { width: 14px; height: 14px; }
+  .resbar[data-fit="1"] .rs-v b { font-size: 11px; }
+  .resbar[data-fit="1"] .rs-v small { font-size: 8.5px; }
+  .resbar[data-fit="2"] .rs, .resbar[data-fit="3"] .rs { gap: 0; padding: 1px 2px 4px; }
+  .resbar[data-fit="2"] .rs-ic, .resbar[data-fit="2"] .rs-ic .ico { width: 14px; height: 14px; }
+  .resbar[data-fit="2"] .rs-v b { font-size: 11px; }
+  .resbar[data-fit="2"] .rs-v small { font-size: 8.5px; }
+  .resbar[data-fit="3"] .rs-ic, .resbar[data-fit="3"] .rs-ic .ico { width: 13px; height: 13px; }
+  .resbar[data-fit="3"] .rs-v b { font-size: 10px; }
+  .resbar[data-fit="3"] .rs-v small { font-size: 8px; }
+  .popbox { gap: 1px; margin-left: auto; }
   .popbox > div { gap: 3px; }
-  .popbox b { font-size: 12px; }
+  .popbox b { font-size: 13px; }
+  .popbox small { font-size: 10px; }
+  .study-btn { padding: 6px 14px; }
+  .study-btn .sb-main { font-size: 14px; }
+
+  /* карта — на всю ширину; что не влезло по высоте (север и юг) — листается пальцем; тень у края — там ещё есть */
+  #mapScroll { display: block; position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    touch-action: pan-y; scrollbar-width: none; border-radius: 10px; }
+  #mapScroll::-webkit-scrollbar { display: none; }
+  #map { width: 100%; }
+  @supports (height: 100dvh) { #map { width: 100%; } }
+  #mapWrap::before, #mapWrap::after { position: absolute; left: 0; right: 0; z-index: 4; height: 20px; pointer-events: none; opacity: 0;
+    transition: opacity .2s; color: rgba(255,255,255,.9); font-size: 10px; line-height: 14px; text-align: center; }
+  #mapWrap::before { content: '▲'; top: 0; border-radius: 10px 10px 0 0; background: linear-gradient(rgba(15, 35, 55, .5), transparent); }
+  #mapWrap::after { content: '▼'; bottom: 0; line-height: 26px; border-radius: 0 0 10px 10px; background: linear-gradient(transparent, rgba(15, 35, 55, .5)); }
+  #mapWrap.more-n::before, #mapWrap.more-s::after { opacity: 1; }
+  /* благословения и срок набега — узкой полосой слева от карты (значок над таймером), а не поверх клеток */
+  #mapWrap { margin-left: 34px; }
+  .buffbar { left: -34px; width: 30px; align-items: center; }
+  .bf { flex-direction: column; gap: 0; padding: 3px 1px 2px; border-radius: 9px; width: 30px; }
+  .bf small { font-size: 8.5px; white-space: normal; text-align: center; line-height: 1.1; }
+  .bf .ico.inl { width: 18px; height: 18px; }
+  .bf.raid .bf-ic { padding-left: 0; font-size: 14px; }
+  .bf-slot { width: 14px; height: 14px; }
 
   /* полоса справа: вкладки, ⏫, а внизу — справка и учёба; на низком экране — одни значки */
   .rail { bottom: 6px; gap: 4px; top: calc(var(--top-h, 40px) + 8px); }
