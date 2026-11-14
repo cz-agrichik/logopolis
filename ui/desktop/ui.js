@@ -547,10 +547,11 @@ const UI = {
   },
 
   onPanelClick(e) {
-    let t = e.target.closest('button');
-    if (!t && this.compact()) {   // телефон: вся карточка обычного здания — кнопка «Строить» (чудеса — только кнопкой)
-      const it = e.target.closest('.item:not(.sp)');
+    let t = e.target.closest('button'), fromCard = false;
+    if (!t && this.compact()) {   // телефон: вся карточка здания или чуда — кнопка «Строить»
+      const it = e.target.closest('.item');
       t = it && it.querySelector('[data-build]');
+      fromCard = !!t;
     }
     if (!t) return;
     if (t.dataset.pedia) return Pedia.open(t.dataset.pedia);
@@ -559,10 +560,18 @@ const UI = {
       const st = Game.buildStatus(type, mode);
       if (!st.ok) return this.toast(esc(Msg.reason(st.reason) || 'Нельзя построить'));
       if (st.upgrade) {   // улучшение чуда встаёт на место старого — клетку выбирать не нужно
+        if (fromCard) {   // телефон: касание карточки не тратит ресурсы — сначала окно чуда с ценой и кнопкой «Улучшить»
+          const from = BUILDINGS[type].upgradeOf, base = Game.state.buildings.find(b => b.type === from);
+          if (base) return this.showBuilding(base);
+          return this.confirmModal(`Улучшить «${esc(Cat.bld[from].name)}» (оно на складе) до «${esc(Cat.bld[type].name)}»?</p>
+            <p>${esc(Cat.bld[type].desc)}</p><div class="chips">${this.costHtml(st.cost, st.logos)}</div><p>`, 'Улучшить',
+            () => { if (Game.upgradeWonder(type)) { this.toast(`✨ ${esc(Cat.bld[type].name)}!`); this.renderMap(); this.renderAll(); } });
+        }
         if (Game.upgradeWonder(type)) { this.toast(`✨ ${esc(Cat.bld[type].name)}!`); this.renderMap(); this.renderAll(); }
         return;
       }
-      if (this.placing === type && this.placingMode === mode) this.cancelPlacing(); else this.startPlacing(type, mode);
+      // на компьютере второй клик по выбранному отменяет; на телефоне панель уехала — касание всегда «строить»
+      if (this.placing === type && this.placingMode === mode && !this.compact()) this.cancelPlacing(); else this.startPlacing(type, mode);
       return this.renderPanel();
     }
     if (t.dataset.rite) {

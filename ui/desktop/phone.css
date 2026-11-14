@@ -179,9 +179,8 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   /* шапка: Кипропедия и «Обучение» уехали в полосу справа; ресурсы — значок над числом */
   #pediaBtn, #schoolBtn { display: none; }
   .wide-only { display: none; }
-  /* ресурсы — ровно по содержимому (число и прирост), а не на всю ширину: остальной шапке — место */
-  .resbar { flex: 0 1 auto; }
-  .rs { flex: 0 0 auto; gap: 3px; padding: 2px 5px 5px; max-width: none; }
+  /* ресурсы тянутся на свободное место (ячейка — не шире 110), но соседей не давят: не помещаются — ячейки плотнее (UI.fitRes) */
+  .rs { gap: 3px; padding: 2px 5px 5px; max-width: 110px; }
   .rs-ic, .rs-ic .ico { width: 16px; height: 16px; }
   .rs-v b { font-size: 12px; }
   .rs-v small { font-size: 9px; }
@@ -196,7 +195,7 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .resbar[data-fit="3"] .rs-ic, .resbar[data-fit="3"] .rs-ic .ico { width: 13px; height: 13px; }
   .resbar[data-fit="3"] .rs-v b { font-size: 10px; }
   .resbar[data-fit="3"] .rs-v small { font-size: 8px; }
-  .popbox { gap: 1px; margin-left: auto; }
+  .popbox { gap: 1px; }
   .popbox > div { gap: 3px; }
   .popbox b { font-size: 13px; }
   .popbox small { font-size: 10px; }
@@ -250,13 +249,26 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   /* слов меньше: описания — в две строки (целиком — в Кипропедии по «?»), у путей знания — только значок и название */
   #panel .item-desc, #panel .item-effect { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .fork-d, .ft-w { display: none; }
-  /* «Строить»: вся карточка — кнопка (касание — и выбираем клетку); вместо кнопки — значок «＋» в углу */
-  #panel[data-tab="build"] .item:not(.sp) { position: relative; cursor: pointer; padding-right: 26px; }
-  #panel[data-tab="build"] .item:not(.sp) > [data-build] { display: none; }
-  #panel[data-tab="build"] .item:not(.sp):has(> [data-build])::after { content: '＋'; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
-    border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; line-height: 20px; text-align: center; }
-  #panel[data-tab="build"] .item.disabled:not(.sp)::after { background: var(--parch-3); color: var(--ink-2); }
-  #panel[data-tab="build"] .item:not(.sp):active { background: #fff; }
+  /* «Строить»: вся карточка — кнопка (и у зданий, и у чудес): коснулся — выбираешь клетку; кнопки «Строить» нет — она съедала правый край.
+     «?» — отдельный кусок карточки справа: «изучить вопрос» в Кипропедии. Не хватает ресурсов — карточка серая. */
+  #panel[data-tab="build"] .item { position: relative; cursor: pointer; padding-right: 46px; }
+  #panel[data-tab="build"] .item > [data-build] { display: none; }
+  #panel[data-tab="build"] .item.selected { border-color: transparent; background: #fff8; }   /* «выбрано» — компьютерное: на телефоне сразу ставим */
+  #panel[data-tab="build"] .item .q { position: absolute; top: 0; right: 0; bottom: 0; width: 40px; height: auto; margin: 0; border-radius: 0 8px 8px 0;
+    border-left: 1px solid var(--parch-3); background: rgba(220, 202, 162, .35); color: var(--accent); font-size: 20px; line-height: 1; vertical-align: 0; }
+  #panel[data-tab="build"] .item.disabled { background: rgba(214, 201, 174, .45); }
+  #panel[data-tab="build"] .item.disabled .item-ic { filter: grayscale(1); opacity: .45; }
+  #panel[data-tab="build"] .item.disabled .item-title { color: var(--ink-2); }
+  #panel[data-tab="build"] .item.disabled .chips, #panel[data-tab="build"] .item.disabled .item-effect { opacity: .7; }
+  /* чудо: значок — в строке с названием, а не колонкой слева; описание и цена — на всю ширину */
+  #panel[data-tab="build"] .item.sp { display: grid; grid-template-columns: 36px 1fr; column-gap: 8px; row-gap: 2px; align-items: center; align-content: start; }
+  #panel[data-tab="build"] .item.sp > .item-ic { width: 36px; height: 36px; grid-column: 1; grid-row: 1; }
+  #panel[data-tab="build"] .item.sp > .item-ic .ico { width: 36px; height: 36px; }
+  #panel[data-tab="build"] .item.sp > .item-body { display: contents; }
+  #panel[data-tab="build"] .item.sp .item-title { grid-column: 2; grid-row: 1; }
+  #panel[data-tab="build"] .item.sp .item-body > :not(.item-title) { grid-column: 1 / -1; }
+  /* «?» у знаний и в заголовках — крупнее: на телефоне мелкий кружок неудобен */
+  .q { width: 26px; height: 26px; font-size: 15px; line-height: 26px; margin-left: 4px; vertical-align: -2px; }
   .fork-tag { font-size: 14px; }
   .fork-or { font-size: 10px; }
 
