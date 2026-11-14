@@ -67,7 +67,7 @@ Object.assign(Decks, {
     return {
       type: 'logos-learning', v: 1, exported: new Date().toISOString(),
       decks: state.decks, progress: state.progress, settings: state.settings,
-      learnLog: state.learnLog || {},
+      learnLog: state.learnLog || {}, spread: state.spread || 0,
       stats: { right: state.stats.right, wrong: state.stats.wrong, rounds: state.stats.rounds, learned: state.stats.learned || 0 },
     };
   },
@@ -80,6 +80,8 @@ Object.assign(Decks, {
     state.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
     state.learnLog = data.learnLog || {};
     Object.assign(state.stats, { right: 0, wrong: 0, rounds: 0, learned: 0 }, data.stats || {});
+    if (!data.spread) this.respread(state);   // копия из времён без разброса сроков — разбросать, как при загрузке
+    state.spread = 1;
     this.ensureBuiltins(state);
     return state.decks.length;
   },

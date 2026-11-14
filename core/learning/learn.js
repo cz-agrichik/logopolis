@@ -11,7 +11,7 @@ const Learn = {
 
   newState() {
     return {
-      v: 1,
+      v: 1, spread: 1,
       decks: Decks.builtinDecks(), progress: {}, settings: { ...DEFAULT_SETTINGS }, learnLog: {},
       stats: { right: 0, wrong: 0, rounds: 0, learned: 0 },
     };
@@ -25,6 +25,7 @@ const Learn = {
     s.settings = Object.assign({}, DEFAULT_SETTINGS, s.settings || {});
     s.learnLog = s.learnLog || {};
     s.stats = Object.assign({ right: 0, wrong: 0, rounds: 0, learned: 0 }, s.stats || {});
+    if (!s.spread) { Decks.respread(s); s.spread = 1; }   // сроки, назначенные ещё без разброса, — вразбивку (один раз)
     return Decks.ensureBuiltins(s);
   },
 

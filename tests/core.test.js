@@ -426,6 +426,38 @@ test('обучение: шагов до «выучено» ровно столь
   }
 });
 
+test('обучение: срок повтора выученного — ступень × случайно 10–190%; старые сроки разбрасываются один раз', () => {
+  const C = fresh(); const D = C.get('Decks'), L = C.get('Learn'), [lo, hi] = C.get('DUE_SPREAD');
+  const s = L.state; s.settings.learnSteps = 2;
+  const iv = D.intervals(s), ks = [];
+  for (const card of s.decks[0].cards.slice(0, 20)) {
+    for (let i = 0; i < 3; i++) D.grade(s, card, true, 'due', D.needsBuild(s, card) ? 'build' : 'gr2ru');   // выучено и один повтор
+    const p = s.progress[card.id];
+    assert.equal(p.rev, 1);
+    ks.push((p.due - p.last) / iv[1]);
+  }
+  assert.ok(ks.every(k => k >= lo - 1e-9 && k <= hi + 1e-9), 'в пределах разброса');
+  assert.ok(new Set(ks.map(k => k.toFixed(3))).size > 15, 'сроки разные — не одной волной');
+  // сохранение до разброса: у всех один и тот же срок — после загрузки он разный, а часть уже «пора»
+  const now = Date.now();
+  for (const p of Object.values(s.progress)) { p.last = now; p.due = now + iv[p.rev]; }
+  const raw = JSON.parse(JSON.stringify(s)); delete raw.spread;
+  L.migrate(raw);
+  const dues = Object.values(raw.progress).map(p => p.due);
+  assert.equal(raw.spread, 1);
+  assert.ok(new Set(dues).size > 15 && dues.every(d => d >= now + iv[1] * lo - 1 && d <= now + iv[1] * hi + 1));
+  const again = JSON.stringify(raw.progress); L.migrate(raw);
+  assert.equal(JSON.stringify(raw.progress), again, 'второй раз не разбрасывает');
+  // копия обучения: старая (без разброса) при восстановлении разбрасывается, новая — нет
+  const old = D.backup(s); delete old.spread;
+  for (const p of Object.values(old.progress)) p.due = now + iv[p.rev];
+  D.restore(s, JSON.parse(JSON.stringify(old)));
+  assert.ok(new Set(Object.values(s.progress).map(p => p.due)).size > 15 && s.spread === 1);
+  const fresh2 = D.backup(s), before = JSON.stringify(s.progress);
+  D.restore(s, JSON.parse(JSON.stringify(fresh2)));
+  assert.equal(JSON.stringify(s.progress), before, 'копия с разбросом восстанавливается как есть');
+});
+
 test('обучение: ошибка в написании не откатывает шаг', () => {
   const C = fresh(); const D = C.get('Decks'), L = C.get('Learn');
   const card = L.state.decks[0].cards[0];

@@ -141,6 +141,21 @@ const Art = (() => {
       <path d="M4 0 L12 -10" ${st(1.6)}/><circle cx="13" cy="-12" r="5" fill="${C.thatch}" ${st(1.4)}/><circle cx="13" cy="-12" r="2.4" fill="none" stroke="${C.thatchD}" stroke-width="1"/>
       <path d="M-4 0 L-11 -4 L-11 -20" ${st(1.5)} fill="none"/><path d="M-14 -24 Q-11 -28 -8 -24 Q-11 -20 -14 -24Z" fill="${C.green}" ${st(1.1)}/></g>`;
 
+
+  // Бронзовый век, 7-й уровень строится на этих основах (нарядные облики); 5-й — свой, базовый (ниже, в B).
+  const fieldIrrigated = `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>
+      <path d="M2.5 8 l0 5 M2.5 30 l0 5 M2.5 50 l0 5" stroke="${C.sky}" stroke-width="1.2"/>` + rows(C.furrowD, (x, y) => ear(x + 2, y)) + sheaf(52, 54);
+  const lumberShed = shadow(28) + pine(12, 34, 1.15) + `
+      <path d="M22 26 L50 20 L56 26 L28 32Z" fill="${C.woodD}" ${st()}/>
+      <path d="M28 32 L28 50 M54 26 L54 46" stroke="${C.woodD}" stroke-width="3"/>` +
+      logEnds(38, 48) + logEnds(34, 39) + logEnds(44, 39, .9);
+  const quarryDerrick = shadow(28) + `
+      <path d="M6 44 L10 22 L24 16 L36 20 L36 44Z" fill="${C.stoneD}" ${st()}/>
+      <path d="M38 52 L48 10 L58 52" fill="none" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M41 36 L55 36" stroke="${C.woodD}" stroke-width="2.4"/>
+      <path d="M48 12 L48 30" stroke="${O}" stroke-width="1.2"/>` +
+      block(43, 30, 10, 7) + block(8, 46, 14, 8) + block(23, 46, 14, 8) + block(15, 38, 14, 8);
+
   // ---------- здания: облик меняется с эпохой и на 4-м уровне — и заметно ----------
   const B = {
     house0: shadow(20) + roundHut(32, 36, 1),
@@ -151,9 +166,6 @@ const Art = (() => {
     // поле — «нарисовано» прямо на земле клетки: без подставки и тени
     field0: rows(C.furrow, (x, y) => sprout(x, y, .85)),
     field1: rows(C.furrow, (x, y) => ear(x, y)),   // ур. 4+: всходы → спелый золотой колос
-    // бронзовый век: орошаемое поле — канал вдоль края
-    field2: `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>
-      <path d="M2.5 8 l0 5 M2.5 30 l0 5 M2.5 50 l0 5" stroke="${C.sky}" stroke-width="1.2"/>` + rows(C.furrowD, (x, y) => ear(x + 2, y)) + sheaf(52, 54),
     goatpen0: shadow(26) + fence(40) + goat(30, 42, 1.25, C.white),
     // ур. 4+: каменная овчарня с пастушьей хижиной и стадом
     goatpen1: shadow(29) + roundHut(51, 24, .48) +
@@ -178,10 +190,7 @@ const Art = (() => {
     lumber1: shadow(28) + pine(10, 27, .95) + logEnds(30, 48) + logEnds(24, 38) + logEnds(36, 38) + logEnds(30, 28, .95) + `
       <path d="M50 52 L56 30" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
       <path d="M52 32 Q57 26 62 31 L57 36Z" fill="${C.stone}" ${st(1.4)}/>`,
-    lumber2: shadow(28) + pine(12, 34, 1.15) + `
-      <path d="M22 26 L50 20 L56 26 L28 32Z" fill="${C.woodD}" ${st()}/>
-      <path d="M28 32 L28 50 M54 26 L54 46" stroke="${C.woodD}" stroke-width="3"/>` +
-      logEnds(38, 48) + logEnds(34, 39) + logEnds(44, 39, .9),
+
 
     quarry0: shadow(24) + `
       <path d="M8 52 L14 30 L26 22 L40 26 L50 20 L58 34 L56 52Z" fill="${C.stone}" ${st()}/>
@@ -192,12 +201,7 @@ const Art = (() => {
       <path d="M8 40 L12 18 L30 12 L52 16 L58 40Z" fill="${C.stoneD}" ${st()}/>
       <path d="M18 22 L18 40 M30 18 L30 40 M44 20 L44 40 M12 30 L58 30" stroke="${O}" stroke-width="1.2" opacity=".55"/>` +
       block(10, 44, 14, 9) + block(25, 44, 14, 9) + block(40, 44, 14, 9) + block(17, 36, 14, 8) + block(32, 36, 14, 8),
-    quarry2: shadow(28) + `
-      <path d="M6 44 L10 22 L24 16 L36 20 L36 44Z" fill="${C.stoneD}" ${st()}/>
-      <path d="M38 52 L48 10 L58 52" fill="none" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
-      <path d="M41 36 L55 36" stroke="${C.woodD}" stroke-width="2.4"/>
-      <path d="M48 12 L48 30" stroke="${O}" stroke-width="1.2"/>` +
-      block(43, 30, 10, 7) + block(8, 46, 14, 8) + block(23, 46, 14, 8) + block(15, 38, 14, 8),
+
 
     // мастерская резчиков: верстак, глыба зелёного камня, резец и киянка, нитка бус
     workshop0: shadow(22) + `
@@ -345,12 +349,12 @@ const Art = (() => {
     <path d="M38 31 Q47 25 57 30" stroke="${C.greenD}" stroke-width="2.6" fill="none"/>
     <circle cx="42" cy="29" r="2.6" fill="${C.green}" ${st(1)}/><circle cx="48" cy="27" r="2.8" fill="${C.green}" ${st(1)}/><circle cx="54" cy="28.5" r="2.6" fill="${C.green}" ${st(1)}/>
     <circle cx="46" cy="31" r="1.4" fill="#6b3b6e"/><circle cx="52" cy="31.5" r="1.4" fill="#6b3b6e"/>` + pennant(58, 30) + pithos(59, 51, .42);
-  B.field3 = B.field2 + olive(52, 16, 1.05) + sheaf(16, 57) + sheaf(31, 59) + pithos(42, 54, .42, C.white);
+  B.field3 = fieldIrrigated + olive(52, 16, 1.05) + sheaf(16, 57) + sheaf(31, 59) + pithos(42, 54, .42, C.white);
   B.goatpen3 = B.goatpen2 + pennant(60, 12) + cheeseStack(12, 34) + goat(30, 53, .72, C.mudD, true) + pithos(6, 52, .4, C.white);
-  B.lumber3 = pine(56, 15, .8) + B.lumber2 + `
+  B.lumber3 = pine(56, 15, .8) + lumberShed + `
     <rect x="1" y="45" width="24" height="5" rx="1" fill="${C.wood}" ${st(1.4)}/>
     <circle cx="6" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/><circle cx="20" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/>` + logEnds(14, 41, .55) + logEnds(12, 36, .5);
-  B.quarry3 = B.quarry2 + ashlar(12, 10, 12, 7) + ashlar(22, 6, 11, 7) + `
+  B.quarry3 = quarryDerrick + ashlar(12, 10, 12, 7) + ashlar(22, 6, 11, 7) + `
     <path d="M6 61 L36 61" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M6 58 L1 55" stroke="${C.woodD}" stroke-width="1.6"/>` + ashlar(9, 53, 25, 7);
   B.workshop3 = B.workshop2 + `
     <path d="M3 26 L3 56 M27 26 L27 40" stroke="${C.woodD}" stroke-width="2.4"/>
@@ -411,15 +415,6 @@ const Art = (() => {
       <path d="M-11 -20 L11 -20 M-10.5 -13 L10.5 -13" stroke="${PUR}" stroke-width="2"/></g>`;
 
   Object.assign(B, {
-    // Дом с внутренним двором: каменный дом с верхней комнатой, навес с лозой на крыше, двор за стеной
-    house4: shadow(30) + wallA(4, 40, 18, 13, '#ddd2b6') + `<rect x="9" y="44" width="7" height="9" fill="${C.dark}" ${st(1.2)}/>` +
-      wallA(22, 22, 36, 31) + `<rect x="20" y="18" width="40" height="5" fill="${C.woodD}" ${st()}/>` +
-      wallA(38, 8, 18, 11) + `<rect x="36" y="5" width="22" height="4" fill="${C.woodD}" ${st(1.5)}/>
-      <rect x="43" y="11" width="5" height="5" fill="${C.dark}" ${st(1.1)}/>
-      <path d="M24 18 L24 9 M33 18 L33 9 M22 9 L36 9" stroke="${C.woodD}" stroke-width="2" stroke-linecap="round"/>
-      <path d="M22 9 Q29 5 36 9" stroke="${C.greenD}" stroke-width="2.4" fill="none"/><circle cx="26" cy="8" r="2.2" fill="${C.green}" ${st(.9)}/><circle cx="32" cy="7.5" r="2.3" fill="${C.green}" ${st(.9)}/>
-      <rect x="32" y="35" width="13" height="3" fill="${C.stoneD}" ${st(1.1)}/><rect x="34" y="38" width="9" height="15" fill="${C.dark}" ${st(1.3)}/>
-      <rect x="26" y="27" width="5" height="5" fill="${C.dark}" ${st(1.1)}/><rect x="49" y="27" width="5" height="5" fill="${C.dark}" ${st(1.1)}/>` + amphoraShape(13, 34, .38),
     // Дом знатного киприота: портик с протоэолийскими колоннами, верхний этаж, пурпурный флажок
     house5: shadow(31) + wallA(8, 20, 48, 34) + `<rect x="6" y="17" width="52" height="4" fill="${C.woodD}" ${st()}/>` +
       wallA(18, 7, 28, 11) + `<rect x="16" y="4" width="32" height="4" fill="${C.woodD}" ${st(1.5)}/>
@@ -428,13 +423,6 @@ const Art = (() => {
       aeolic(19, 36, 18, .85) + aeolic(45, 36, 18, .85) +
       `<path d="M56 18 L56 4" stroke="${C.woodD}" stroke-width="1.8"/><path d="M56 4 L64 6.5 L56 9Z" fill="${PUR}" ${st(1.1)}/>`,
 
-    // Поле с железным плугом: канал, спелые ряды, рало с железным лемехом и ток для обмолота
-    field4: `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>` +
-      rows(C.furrowD, (x, y) => ear(x + 2, y)) + `
-      <ellipse cx="50" cy="13" rx="12" ry="7" fill="#d9c08a" ${st(1.5)}/><ellipse cx="50" cy="13" rx="8" ry="4.4" fill="none" stroke="${C.stoneD}" stroke-width="1.2"/>
-      <path d="M44 13 Q50 6 56 13Z" fill="${C.wheat}" ${st(1.1)}/>
-      <path d="M22 60 L46 46" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/><path d="M40 50 L44 58" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M43 56 L50 60 L42 61Z" fill="${IRN}" ${st(1.2)}/>`,
     // Поле-усадьба: журавль для полива, круглое каменное зернохранилище
     field5: `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>` +
       rows(C.furrowD, (x, y) => ear(x + 2, y)) + `
@@ -443,14 +431,6 @@ const Art = (() => {
       <path d="M40 58 L40 44 Q50 34 60 44 L60 58Z" fill="#ddd2b6" ${st(1.6)}/><path d="M38 45 Q50 28 62 45Z" fill="${C.thatch}" ${st(1.5)}/>
       <rect x="47" y="49" width="6" height="9" fill="${C.dark}" ${st(1.1)}/>` + sheaf(32, 60),
 
-    // Лесорубы с железными топорами: пила на козлах, доски, топор в колоде
-    lumber4: shadow(28) + pine(9, 30, .95) + `
-      <path d="M22 54 L30 38 M38 54 L30 38 M42 54 L50 38 M58 54 L50 38" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>` +
-      logEnds(40, 36, .95) + `
-      <path d="M30 22 L36 46" stroke="${IRN}" stroke-width="3.6"/><path d="M30 22 L36 46" stroke="${IRNL}" stroke-width="1"/>
-      <path d="M27 20 L33 19 M35 47 L40 45" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
-      ${[0, 1, 2].map(i => `<rect x="${6 + i * 1.5}" y="${50 - i * 4}" width="16" height="4" rx="1" fill="${i % 2 ? C.wheat : '#e2c178'}" ${st(1.1)}/>`).join('')}
-      <path d="M53 26 L60 12" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M56 13 Q61 7 64 13 L60 17Z" fill="${IRN}" ${st(1.2)}/>`,
     // Верфь: остов корабля из кедровых брусьев на подпорах, штабель брёвен
     lumber5: shadow(30) + pine(56, 18, .85) + `
       <path d="M4 44 L50 44" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
@@ -459,13 +439,6 @@ const Art = (() => {
       <path d="M50 44 Q58 36 56 24" fill="none" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
       <path d="M12 44 L10 54 M30 44 L30 54 M46 44 L48 54" stroke="${C.woodD}" stroke-width="2.4"/>` + logEnds(48, 52, .62) + logEnds(52, 46, .55),
 
-    // Каменоломня с железными кирками: ступенчатая выработка, клинья, блок на волокуше
-    quarry4: shadow(28) + `
-      <path d="M4 46 L4 14 L20 10 L20 22 L36 20 L36 32 L52 30 L52 46Z" fill="#d6ccb3" ${st()}/>
-      <path d="M4 22 L20 22 M20 32 L36 32 M4 32 L20 32 M4 40 L52 40 M12 14 L12 22 M28 22 L28 32 M12 32 L12 40 M44 32 L44 40 M28 40 L28 46" stroke="${C.stoneD}" stroke-width="1.1"/>
-      <path d="M38 22 L44 12" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M38 12 Q44 8 50 13 Q44 12 42 15Z" fill="${IRN}" ${st(1.2)}/>
-      <path d="M22 26 l3 -2 l1 3Z M30 26 l3 -2 l1 3Z" fill="${IRND}" ${st(.8)}/>
-      <path d="M28 56 L60 56 L58 52 L30 52Z" fill="${C.wood}" ${st(1.3)}/>` + ashlar(32, 44, 22, 8) + `<path d="M28 54 L18 50" stroke="${C.woodD}" stroke-width="1.6"/>`,
     // Царская каменоломня: подъёмник с блоком, высеченная протоэолийская капитель
     quarry5: shadow(30) + `
       <path d="M2 44 L2 18 L16 14 L16 26 L30 24 L30 44Z" fill="#d6ccb3" ${st()}/>
@@ -476,12 +449,6 @@ const Art = (() => {
         <path d="M-8 -3 C-11 -3 -15 -5 -15 -9 C-15 -13 -10 -13 -10 -9.5 C-10 -7.5 -12.5 -7.5 -12.5 -9 M8 -3 C11 -3 15 -5 15 -9 C15 -13 10 -13 10 -9.5 C10 -7.5 12.5 -7.5 12.5 -9" fill="none" ${st(1.4)}/>
         <path d="M-4 -3 L0 -11 L4 -3Z" fill="${C.terra}" ${st(1)}/></g>`,
 
-    // Мастерская расписной керамики: печь, кувшин с птицей «свободного поля», полка с кувшинчиками
-    workshop4: shadow(28) + `
-      <path d="M34 52 Q34 26 48 24 Q62 26 62 52Z" fill="${C.mudD}" ${st()}/>
-      <path d="M43 52 Q43 41 48 41 Q53 41 53 52Z" fill="${C.dark}" ${st(1.4)}/>` + flame(48, 48, .85) + smoke(48, 20) +
-      birdJug(18, 40, 1.05) + `<rect x="2" y="17" width="28" height="3" rx="1" fill="${C.wood}" ${st(1.2)}/><path d="M4 20 L4 26 M28 20 L28 26" stroke="${C.woodD}" stroke-width="2"/>` +
-      birdJug(9, 11, .38) + birdJug(21, 11, .38) + amphoraShape(32, 52, .42, '#b85d33'),
     // Мастерская серебряных дел: весы с гирями, чаши с чеканкой, тигель на огне, навес в пурпурную полоску
     workshop5: shadow(30) + `
       <path d="M4 14 L4 54 M60 14 L60 54" stroke="${C.woodD}" stroke-width="2.6"/>
@@ -492,11 +459,6 @@ const Art = (() => {
       <path d="M36 56 Q36 50 42 50 Q48 50 48 56Z" fill="${C.stoneD}" ${st(1.2)}/>` + flame(42, 52, .55) +
       `<path d="M38 50 L46 50 L45 47 L39 47Z" fill="${IRN}" ${st(1)}/>`,
 
-    // Склад амфор: каменный дом с окованной дверью, амфоры в ряд
-    store4: shadow(30) + wallA(18, 14, 42, 34) + `<rect x="16" y="10" width="46" height="5" fill="${C.woodD}" ${st()}/>
-      <rect x="32" y="30" width="13" height="18" fill="${C.wood}" ${st(1.3)}/><path d="M32 35 L45 35 M32 43 L45 43" stroke="${IRN}" stroke-width="2"/>
-      <circle cx="42" cy="39" r="1.2" fill="${IRND}"/>` +
-      [8, 15, 22].map((x, i) => amphoraShape(x, 46 - (i % 2) * 2, .42, i === 1 ? '#b85d33' : '#c9693a')).join('') + amphoraShape(55, 51, .38) + pithos(12, 32, .4),
     // Царская кладовая: портик с колоннами, сундук с серебром, слитки и амфоры
     store5: shadow(31) + wallA(10, 16, 46, 38) + `<rect x="8" y="12" width="50" height="5" fill="${C.woodD}" ${st()}/>
       <path d="M8 12 L33 3 L58 12Z" fill="${C.terra}" ${st(1.5)}/>
@@ -505,13 +467,6 @@ const Art = (() => {
       <rect x="2" y="46" width="14" height="9" rx="1" fill="${C.wood}" ${st(1.3)}/><path d="M2 49 L16 49" stroke="${IRN}" stroke-width="1.6"/>` +
       silverBowl(9, 45, .55) + amphoraShape(58, 50, .42) + ironBars(52, 58, 2),
 
-    // Рудник с галереями: две штольни, лестница, чёрный шлаковый отвал
-    mine3: shadow(30) + `
-      <path d="M2 54 Q10 14 30 10 Q50 14 56 54Z" fill="${C.stoneD}" ${st()}/>
-      <path d="M10 54 L10 42 Q16 36 22 42 L22 54Z" fill="${C.dark}" ${st(1.4)}/><path d="M8 54 L8 40 M24 54 L24 40 M6 40 L26 40" stroke="${C.wood}" stroke-width="2.8" stroke-linecap="round"/>
-      <path d="M30 30 L30 22 Q35 17 40 22 L40 30Z" fill="${C.dark}" ${st(1.3)}/><path d="M28 30 L28 20 M42 30 L42 20 M26 20 L44 20" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M27 32 L23 54 M33 32 L29 54" stroke="${C.wood}" stroke-width="1.6"/>${[36, 41, 46, 51].map(y => `<path d="M${25.6 - (y - 32) * .18 + 1} ${y} L${31.6 - (y - 32) * .18 + 1} ${y}" stroke="${C.wood}" stroke-width="1.4"/>`).join('')}
-      <circle cx="16" cy="30" r="1.8" fill="#4fa58d"/><circle cx="46" cy="40" r="1.8" fill="${C.copper}"/>` + slag(52, 52, .95) + smoke(54, 38),
     // Рудник с плавильней: печь с мехами, отвал шлака, стопка слитков
     mine4: shadow(31) + `
       <path d="M2 46 Q8 14 24 10 Q40 14 44 46Z" fill="${C.stoneD}" ${st()}/>
@@ -519,12 +474,6 @@ const Art = (() => {
       <path d="M40 56 L42 26 Q48 20 54 26 L56 56Z" fill="${C.mudD}" ${st()}/><path d="M44 56 Q44 46 48 46 Q52 46 52 56Z" fill="${C.dark}"/>` + flame(48, 52, .7) + smoke(48, 20) + `
       <path d="M56 50 Q64 46 62 40 Q58 38 56 44Z" fill="#a9825a" ${st(1.2)}/>` + slag(14, 54, .7) + ingotShape(30, 54, .5) + ingotShape(30, 49, .5) + `<circle cx="34" cy="20" r="1.8" fill="#4fa58d"/>`,
 
-    // Гавань с каменным молом: финикийский «гаулос» и амфоры на причале
-    port3: `
-      <path d="M2 44 Q16 40 32 44 Q48 48 62 44 L62 60 L2 60Z" fill="${C.water}" ${st(1.4)}/>
-      <path d="M10 52 q4 -2 8 0 M44 56 q4 -2 8 0" stroke="${C.sky}" stroke-width="1.6" fill="none"/>
-      <path d="M40 44 L62 40 L62 50 L44 52Z" fill="#d6ccb3" ${st(1.5)}/><path d="M46 44 L46 51 M53 42.6 L53 50.6 M59 41.5 L59 49.4" stroke="${C.stoneD}" stroke-width="1.1"/>` +
-      gaulos(22, 46, .9) + amphoraShape(50, 38, .38) + amphoraShape(56, 37, .36, '#b85d33'),
     // Военная гавань Китиона: корабельный сарай на колоннах и боевой корабль с тараном
     port4: `
       <path d="M2 46 Q16 42 32 46 Q48 50 62 46 L62 60 L2 60Z" fill="${C.water}" ${st(1.4)}/>
@@ -536,11 +485,6 @@ const Art = (() => {
       ${[14, 19, 24, 29].map(x => `<path d="M${x} 51 L${x - 3} 58" stroke="${C.wood}" stroke-width="1.5"/>`).join('')}
       <path d="M20 46 L20 24" stroke="${C.dark}" stroke-width="2"/><path d="M12 26 L28 26 L27 40 L13 40Z" fill="#efe6d2" ${st(1.3)}/><path d="M12.5 33 L27.5 33" stroke="${PUR}" stroke-width="2"/>`,
 
-    // Царский архив: каменный дом с колоннами, бронзовая табличка на стене
-    scribe3: shadow(30) + wallA(8, 18, 48, 36) + `<rect x="6" y="14" width="52" height="5" fill="${C.woodD}" ${st()}/>
-      <rect x="27" y="36" width="10" height="18" fill="${C.dark}" ${st(1.3)}/><rect x="17" y="27" width="30" height="3" fill="${C.plaster}" ${st(1.1)}/>` +
-      aeolic(21, 34, 20, .75) + aeolic(43, 34, 20, .75) + `
-      <rect x="11" y="20" width="9" height="6" rx="1" fill="${C.bronze}" ${st(1.1)}/><path d="M13 22 l2 1.5 l2 -1.5 M13 24.5 l4 0" stroke="${C.bronzeD}" stroke-width=".9" fill="none"/>` + tablet(52, 44, .58),
     // Царская канцелярия: два этажа, портик, большая бронзовая табличка на подставке
     scribe4: shadow(31) + wallA(14, 20, 44, 34) + `<rect x="12" y="16" width="48" height="5" fill="${C.woodD}" ${st()}/>` +
       wallA(24, 6, 26, 11) + `<rect x="22" y="3" width="30" height="4" fill="${C.woodD}" ${st(1.4)}/>
@@ -571,6 +515,119 @@ const Art = (() => {
       <path d="M46 24 L46 46" stroke="${IRNL}" stroke-width="2.6"/><path d="M46 24 L46 46" stroke="${IRND}" stroke-width=".8"/><path d="M43 44 L49 44" stroke="${C.woodD}" stroke-width="2.4"/>
       <path d="M52 22 L52 52" stroke="${C.woodD}" stroke-width="1.8"/><path d="M49.5 22 L52 14 L54.5 22Z" fill="${IRN}" ${st(1)}/>
       <path d="M57 26 L57 46" stroke="${C.woodD}" stroke-width="2"/><path d="M57 27 Q63 29 61 35 L57 33Z" fill="${IRN}" ${st(1)}/>` + ironBars(52, 59, 2),
+  });
+
+
+  // ---------- базовые облики новой эпохи: «с нуля, но уже бронза» (5-й) и «с нуля, но уже железо» (9-й) ----------
+  // Новая эпоха начинает с простого: меньше построек и утвари, чем у нарядного облика прошлой эпохи, —
+  // зато сразу видно, из чего сделано: бронзовые серп, топор, резец; железные лемех, топор, кирка, оковка; тёсаный камень.
+  const bronzeEdge = (d, w = 3) => `<path d="${d}" stroke="${O}" stroke-width="${w + 2}" stroke-linecap="round" fill="none"/><path d="${d}" stroke="${C.bronze}" stroke-width="${w}" stroke-linecap="round" fill="none"/>`;
+  const furrowRows = (ys, col = C.furrowD) => ys.map(y => `<path d="M7 ${y + 2} Q34 ${y - 1} 61 ${y + 2}" stroke="${col}" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>`).join('');
+  Object.assign(B, {
+    // Поле с бронзовыми серпами: небольшой орошаемый участок — половина ещё колосится, половина сжата; на меже — бронзовый серп
+    field2: `<rect x="0" y="0" width="5" height="64" fill="${C.water}"/><path d="M5 0 L5 64" stroke="${C.waterD}" stroke-width="1.4"/>
+      <path d="M2.5 8 l0 5 M2.5 30 l0 5 M2.5 50 l0 5" stroke="${C.sky}" stroke-width="1.2"/>` + furrowRows([14, 28, 42]) +
+      [14, 28, 42].map((y, r) => [11, 20, 29].map(x => ear(x + (r % 2) * 3, y)).join('') +
+        [40, 48, 56].map(x => `<path d="M${x + (r % 2) * 2} ${y} l0 -4 M${x + 2 + (r % 2) * 2} ${y} l0 -3" stroke="${C.wheatD}" stroke-width="1.5"/>`).join('')).join('') + `
+      <path d="M30 61 L38 54" stroke="${C.woodD}" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M37 55 Q40 41 54 42 Q61 43 60 49 Q55 45 47 47 Q41 50 40 57Z" fill="${C.bronze}" ${st(1.5)}/>
+      <path d="M41 53 Q44 47 52 45.5" fill="none" stroke="${C.bronzeD}" stroke-width="1.2"/>`,
+    // Лесорубы с бронзовыми топорами: колода с воткнутым бронзовым топором, срубленный ствол
+    lumber2: shadow(26) + pine(11, 28, .95) + logEnds(28, 50, 1.05) + `
+      <path d="M38 36 L38 48 Q47 52 56 48 L56 36Z" fill="${C.wood}" ${st()}/>
+      <ellipse cx="47" cy="36" rx="9" ry="3.6" fill="${C.wheat}" ${st()}/><ellipse cx="47" cy="36" rx="4.5" ry="1.8" fill="none" stroke="${C.wheatD}" stroke-width="1.1"/>
+      <path d="M48 35 L57 13" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M50 15 Q57 7 64 13 L57 21 Q56 16 50 15Z" fill="${C.bronze}" ${st(1.5)}/><path d="M60 11 L63 14" stroke="${C.bronzeD}" stroke-width="1.2"/>
+      <path d="M34 54 l4 -2 M58 52 l4 -2 M60 45 l3 1" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
+    // Каменоломня тёсаного камня: у скалы — ровный срез, перед ним один тёсаный блок, бронзовый резец и деревянная колотушка
+    quarry2: shadow(26) + `
+      <path d="M6 46 L9 22 L22 14 L34 18 L36 46Z" fill="${C.stoneD}" ${st()}/>
+      <path d="M24 20 L34 18 L36 46 L24 46Z" fill="${C.stone}" ${st(1.4)}/><path d="M24 29 L35 28 M24 38 L35.5 37" stroke="${C.stoneD}" stroke-width="1.2"/>
+      <path d="M12 30 L18 36 L16 44" fill="none" stroke="${O}" stroke-width="1.1" opacity=".5"/>` +
+      block(30, 46, 20, 9) + `<path d="M32 48 l16 0" stroke="#fff" stroke-width="1" opacity=".7"/>` +
+      bronzeEdge('M46 43 L56 27', 3.2) + `<path d="M54 30 L57 25" stroke="${C.bronzeD}" stroke-width="1.4"/>
+      <path d="M54 56 L62 47" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="57" y="40" width="7" height="10" rx="2" transform="rotate(42 60 45)" fill="${C.wood}" ${st(1.3)}/>
+      <path d="M14 52 l3 -1 M22 54 l2 -2" stroke="${C.stoneD}" stroke-width="2" stroke-linecap="round"/>`,
+
+    // Дом с внутренним двором: одноэтажный дом из тёсаного камня, низкая стенка двора, во дворе — железный треножник с котлом
+    house4: shadow(30) + `
+      <path d="M10 52 L13 40 M19 52 L16 40 M14.5 52 L14.5 41" stroke="${IRND}" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M8 34 Q8 42 14.5 42 Q21 42 21 34Z" fill="${IRN}" ${st(1.4)}/><ellipse cx="14.5" cy="34" rx="6.5" ry="1.8" fill="${IRND}" ${st(1.1)}/>` +
+      smoke(14, 28) + wallA(3, 44, 23, 10, '#ddd2b6') + `<rect x="2" y="42" width="25" height="3" fill="${C.stoneD}" ${st(1.1)}/>` +
+      wallA(26, 24, 33, 30) + `<rect x="24" y="20" width="37" height="5" fill="${C.woodD}" ${st()}/>
+      <path d="M27 20 l0 -2.5 M36 20 l0 -2.5 M45 20 l0 -2.5 M54 20 l0 -2.5" stroke="${O}" stroke-width="1.2"/>
+      <rect x="37" y="36" width="11" height="18" fill="${C.wood}" ${st(1.3)}/>
+      <path d="M37 40.5 L48 40.5 M37 49 L48 49" stroke="${IRND}" stroke-width="2"/><circle cx="45.5" cy="45" r="1.4" fill="none" stroke="${IRND}" stroke-width="1.2"/>
+      <rect x="29" y="29" width="5" height="5" fill="${C.dark}" ${st(1.1)}/><rect x="51" y="29" width="5" height="5" fill="${C.dark}" ${st(1.1)}/>`,
+    // Поле с железным плугом: свежая пашня — всходы только в первом ряду, рало с железным лемехом прямо в борозде
+    field4: furrowRows([10, 22, 34, 46, 58], C.furrow) + `
+      <path d="M6 34 Q34 31 61 34 M6 46 Q34 43 61 46 M6 58 Q34 55 61 58" stroke="#7a4f2a" stroke-width="1.3" fill="none" opacity=".7"/>` +
+      [10, 22].map((y, r) => [10, 21, 32, 43, 54].map(x => sprout(x + r * 4, y, .7)).join('')).join('') + `
+      <path d="M8 51 L22 51" stroke="#6e4423" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+      <path d="M20 51 L44 51" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M22 51 L13 36 M10 38 L16 35" stroke="${C.woodD}" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M36 51 L61 31" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M42 47 L57 51 L42 55Z" fill="${IRN}" ${st(1.5)}/><path d="M44 49.5 L54 51" stroke="${IRNL}" stroke-width="1.3"/>`,
+    // Лесорубы с железными топорами: толстое бревно, в нём — железный топор, в торце — железный клин
+    lumber4: shadow(28) + `
+      <rect x="6" y="38" width="44" height="15" rx="7" fill="${C.wood}" ${st()}/>
+      <path d="M12 42 Q28 40 44 42 M12 49 Q28 47 44 49" fill="none" stroke="${C.woodD}" stroke-width="1.1"/>
+      <ellipse cx="50" cy="45.5" rx="6" ry="7.5" fill="${C.wheat}" ${st()}/><ellipse cx="50" cy="45.5" rx="3" ry="3.8" fill="none" stroke="${C.wheatD}" stroke-width="1.1"/>
+      <path d="M58 40 L51 45.5 L58 51Z" fill="${IRND}" ${st(1.2)}/>
+      <path d="M27 38 L16 14" stroke="${C.woodD}" stroke-width="3.6" stroke-linecap="round"/>
+      <path d="M21 35 L28 26 Q34 30 33 39Z" fill="${IRN}" ${st(1.5)}/><path d="M28.5 28.5 Q32 31 31.5 37" fill="none" stroke="${IRNL}" stroke-width="1.3"/>
+      <path d="M8 58 l5 -2 M36 58 l4 -2 M58 58 l4 -3" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
+    // Каменоломня с железными кирками: ровные ступени выработки, железная кирка, клинья в пропиле, один тёсаный блок
+    quarry4: shadow(28) + `
+      <path d="M4 46 L4 14 L22 11 L22 26 L40 24 L40 46Z" fill="#d6ccb3" ${st()}/>
+      <path d="M4 26 L22 26 M4 36 L40 36 M13 14 L13 26 M31 26 L31 36 M13 36 L13 46 M27 36 L27 46" stroke="${C.stoneD}" stroke-width="1.1"/>
+      <path d="M6 31 L20 31" stroke="${O}" stroke-width="1.1"/><path d="M9 31 l2 -3 l2 3Z M15 31 l2 -3 l2 3Z" fill="${IRND}" ${st(.9)}/>` +
+      ashlar(16, 48, 22, 8) + `
+      <path d="M48 56 L54 26" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M42 26 Q52 18 63 25 Q53 22 49 30Z" fill="${IRN}" ${st(1.5)}/><path d="M45 25 Q52 20 60 24" fill="none" stroke="${IRNL}" stroke-width="1.2"/>`,
+    // Мастерская расписной керамики: одна печь и один кувшин нового, расписного стиля; у печи — железная кочерга
+    workshop4: shadow(26) + `
+      <path d="M32 52 Q32 28 46 26 Q60 28 60 52Z" fill="${C.mudD}" ${st()}/>
+      <path d="M41 52 Q41 41 46 41 Q51 41 51 52Z" fill="${C.dark}" ${st(1.4)}/>` + flame(46, 48, .8) + smoke(46, 22) + `
+      <path d="M58 54 L64 34" stroke="${IRND}" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="6" y="50" width="24" height="4" rx="1" fill="${C.wood}" ${st(1.2)}/>` + birdJug(18, 36, .95),
+    // Каменный склад амфор: небольшая кладовая из тёсаного камня, дверь в железной оковке, у стены — две амфоры
+    store4: shadow(28) + wallA(24, 22, 34, 31) + `<rect x="22" y="18" width="38" height="5" fill="${C.woodD}" ${st()}/>
+      <rect x="35" y="35" width="12" height="18" fill="${C.wood}" ${st(1.3)}/>
+      <path d="M35 39.5 L47 39.5 M35 48 L47 48" stroke="${IRND}" stroke-width="2"/><circle cx="44" cy="44" r="1.3" fill="${IRND}"/>
+      <path d="M38 35 L38 53 M44 35 L44 53" stroke="${C.woodD}" stroke-width=".9"/>` +
+      amphoraShape(10, 40, .5) + amphoraShape(19, 43, .46, '#b85d33'),
+    // Рудник с галереями: одна крепёжная галерея в склоне, железная кирка у входа, кучка шлака
+    mine3: shadow(28) + `
+      <path d="M2 54 Q10 18 30 13 Q50 18 58 54Z" fill="${C.stoneD}" ${st()}/>
+      <path d="M18 54 L18 38 Q25 31 32 38 L32 54Z" fill="${C.dark}" ${st(1.4)}/>
+      <path d="M16 54 L16 35 M34 54 L34 35 M13 35 L37 35" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M16 35 L34 35" stroke="${O}" stroke-width=".8"/>
+      <circle cx="24" cy="24" r="1.7" fill="#4fa58d"/><circle cx="44" cy="34" r="1.7" fill="${C.copper}"/>
+      <path d="M44 56 L49 32" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M40 32 Q49 25 58 31 Q50 29 46 36Z" fill="${IRN}" ${st(1.4)}/><path d="M43 31 Q49 27 55 30" fill="none" stroke="${IRNL}" stroke-width="1.1"/>` + slag(57, 54, .55),
+    // Гавань с каменным молом: короткий мол из тёсаных блоков, лодка у тумбы, железный якорь на моле
+    port3: `
+      <path d="M2 42 Q16 38 32 42 Q48 46 62 42 L62 60 L2 60Z" fill="${C.water}" ${st(1.4)}/>
+      <path d="M8 56 q4 -2 8 0 M24 58 q4 -2 8 0" stroke="${C.sky}" stroke-width="1.6" fill="none"/>
+      <path d="M32 46 L62 40 L62 52 L35 54Z" fill="#d6ccb3" ${st(1.5)}/>
+      <path d="M35 49.5 L62 45.5 M42 45 L42 53 M50 43.4 L50 52 M57 42 L57 50.6" stroke="${C.stoneD}" stroke-width="1.1"/>
+      <rect x="37" y="38" width="4" height="8" rx="1.5" fill="${C.woodD}" ${st(1.1)}/>
+      <path d="M4 44 Q16 54 30 44 Q28 42 26 42 L8 42 Q6 42 4 44Z" fill="${C.wood}" ${st(1.5)}/>
+      <path d="M17 42 L17 18" stroke="${C.dark}" stroke-width="2"/><path d="M9 21 L25 21" stroke="${C.woodD}" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="9" y="21" width="16" height="4" rx="2" fill="#efe6d2" ${st(1.2)}/>
+      <path d="M29 43 Q34 40 38 41" fill="none" stroke="${C.woodD}" stroke-width="1.2"/>
+      <g transform="translate(53 33)"><path d="M0 -10 L0 7" stroke="${IRND}" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M-7 1 Q-6 8 0 8 Q6 8 7 1" fill="none" stroke="${IRND}" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M-4 -6 L4 -6" stroke="${IRND}" stroke-width="2.2" stroke-linecap="round"/><circle cx="0" cy="-12" r="2.4" fill="none" stroke="${IRND}" stroke-width="1.8"/></g>`,
+    // Царский архив: небольшая палата из тёсаного камня, перед ней — каменная стела с кипрским слоговым письмом
+    scribe3: shadow(28) + wallA(26, 22, 32, 32) + `<rect x="24" y="18" width="36" height="5" fill="${C.woodD}" ${st()}/>
+      <rect x="37" y="37" width="10" height="17" fill="${C.dark}" ${st(1.3)}/><rect x="35" y="34" width="14" height="3" fill="${C.stoneD}" ${st(1)}/>
+      <rect x="51" y="28" width="4" height="4" fill="${C.dark}" ${st(1)}/>
+      <path d="M5 55 L7 22 Q14 16 21 22 L23 55Z" fill="#ddd2b6" ${st(1.6)}/>
+      <path d="M10 27 l2 3 l2 -3 M16 26 l0 4 M10 34 l4 0 M16 33 l2 2 l2 -2 M10 40 l2 -2 l2 2 M17 39 l0 4 M10 47 l4 0 l0 -3 M16 46 l3 0"
+        fill="none" stroke="${C.stoneD}" stroke-width="1.4" stroke-linecap="round"/>`,
   });
 
   // ---------- спецстроения ----------

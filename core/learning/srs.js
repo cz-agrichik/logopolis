@@ -15,11 +15,26 @@ const APPETITES = {
   often:  { intervals: [10 * MIN, HOUR, DAY, 4 * DAY, 14 * DAY, 60 * DAY] },
 };
 const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', newPerRound: 5, roundSize: 8 };
+// Срок повтора выученного — не ровно ступень лестницы, а ступень × случайный множитель от 10% до 190% (в среднем — ровно ступень).
+// Слова, выученные в один день, возвращаются не одной волной через месяц, а вразбивку — «долг» отрабатывается с первых дней.
+const DUE_SPREAD = [0.1, 1.9];
 
 Object.assign(Decks, {
   // ---------- настройки и состояние карточки ----------
   settings(state) { return Object.assign({}, DEFAULT_SETTINGS, state.settings || {}); },
   intervals(state) { return (APPETITES[this.settings(state).appetite] || APPETITES.normal).intervals; },
+  /** Интервал со случайным разбросом (DUE_SPREAD). */
+  spread(ms) { return Math.round(ms * (DUE_SPREAD[0] + Math.random() * (DUE_SPREAD[1] - DUE_SPREAD[0]))); },
+  /** Разбросать сроки уже выученных слов (сохранения до разброса): срок = последний ответ + интервал × случайный множитель.
+   *  Что выпало в прошлое — пора повторить уже сейчас. */
+  respread(state) {
+    const iv = this.intervals(state);
+    for (const p of Object.values(state.progress)) {
+      if (!p || !(p.rev >= 0) || p.step == null) continue;
+      const step = iv[Math.min(p.rev, iv.length - 1)], base = p.last || (p.due - step);
+      p.due = base + this.spread(step);
+    }
+  },
 
   /** Прогресс карточки в актуальном формате (старые «коробки» переводятся на лету). */
   prog(state, id) {
@@ -131,11 +146,11 @@ Object.assign(Decks, {
         if (p.step >= L && !p.built && this.canType(card)) {
           // без единого набора слово не выучено: ждём задания «Соберите слово»
           p.step = L - 1; p.due = now + LEARN_DELAY; event = 'needtype';
-        } else if (p.step >= L) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + iv[p.rev]; event = 'learned'; }
+        } else if (p.step >= L) { p.rev = Math.min(p.back || 0, iv.length - 1); delete p.back; p.due = now + this.spread(iv[p.rev]); event = 'learned'; }
         else p.due = now + LEARN_DELAY;
       } else if (kind !== 'early') {
         p.rev = Math.min(p.rev + 1, iv.length - 1);
-        p.due = now + iv[p.rev];
+        p.due = now + this.spread(iv[p.rev]);
       }
     } else {
       p.wrong++;
