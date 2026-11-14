@@ -10,6 +10,7 @@ const Pedia = {
   open(id) {
     if (id) this.current = id;
     $('#pedia').classList.remove('hidden');
+    $('#pedia .pedia-box').classList.remove('nav-open');   // телефон: сразу статья, оглавление — по ☰
     if (!this.bound) {
       this.bound = true;
       $('#pedia').addEventListener('click', e => {

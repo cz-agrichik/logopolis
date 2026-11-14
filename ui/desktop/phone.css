@@ -1,0 +1,281 @@
+/* ============================================================
+   Телефон: альбомная ориентация, высота экрана до 520px — (orientation: landscape) and (max-height: 520px).
+   Подключается после styles.css и только дополняет её: компьютерная раскладка здесь не меняется.
+   Логика телефона (подсказки по долгому нажатию, полный экран, режим улучшения) — ui/desktop/phone.js.
+   ============================================================ */
+/* ---------- v11: телефон в альбомной ориентации ----------
+   Раскладка та же, что на компьютере (карта слева, панель справа), только плотнее.
+   В портретной ориентации на телефоне — просьба повернуть экран. */
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 700px) {
+  .rotate-hint { display: flex; position: fixed; inset: 0; z-index: 5000; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center; background: var(--head-bg); color: #fbf3e2; font-size: 17px; }
+  .rotate-hint .rh-ic { font-size: 56px; animation: rhTurn 2.4s ease-in-out infinite; }
+  .rotate-hint small { opacity: .8; font-size: 13px; }
+  body > *:not(.rotate-hint) { display: none !important; }   /* в портрете играть нельзя — и ничего не растягивает экран */
+  @keyframes rhTurn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  body { font-size: 13px; }
+  /* шапка */
+  #topbar { gap: 6px; padding: 4px 8px; flex-wrap: nowrap; }
+  #topbar::after { bottom: -5px; height: 5px; background-size: 10px 5px; }
+  .brand .logo, .brand .epoch-sub { display: none; }
+  .brand .epoch-name { font-size: 12px; line-height: 1.1; max-width: 88px; }
+  .logos-medal { padding: 2px 8px 2px 3px; gap: 4px; }
+  .lm-sign { width: 24px; height: 24px; font-size: 15px; }
+  .lm-v b { font-size: 15px; }
+  .lm-v small { display: none; }
+  .resbar { padding: 2px; border-radius: 9px; }
+  .rs { padding: 2px 4px 5px; gap: 3px; max-width: 74px; }
+  .rs-ic, .rs-ic .ico { width: 18px; height: 18px; }
+  .rs-v b { font-size: 12px; }
+  .rs-v small { display: none; }
+  .rs-bar { left: 4px; right: 4px; bottom: 1px; height: 2px; }
+  .popbox { font-size: 11px; }
+  .popbox b { font-size: 12px; }
+  .popbox small { font-size: 9.5px; }
+  .pedia-btn { width: 30px; height: 30px; font-size: 15px; flex: none; }
+  .study-btn { padding: 3px 10px; flex: none; }
+  .study-btn .sb-main { font-size: 13px; }
+  .study-btn .sb-sub { font-size: 9px; }
+  /* карта и панель рядом */
+  main { flex-direction: row; gap: 8px; padding: 8px 8px 6px; }
+  #map { width: min(100%, calc((100vh - 86px) * 18 / 11)); border-radius: 10px; }
+  .tile .lvl { font-size: 8px; padding: 0 2px; }
+  .buffbar { height: 24px; min-height: 24px; margin-bottom: 4px; gap: 4px; }
+  .buffbar .bf b { display: none; }
+  .bf { padding: 1px 6px 1px 2px; font-size: 11px; }
+  .bf .ico.inl { width: 18px; height: 18px; }
+  .bf-slot { width: 18px; height: 18px; }
+  .bf-empty { display: none; }
+  #log { display: none; }
+  .place-hint { font-size: 11px; padding: 4px 8px; }
+  #side { width: min(320px, 42vw); min-height: 0; }
+  .tabs { padding: 4px 4px 0; gap: 2px; }
+  .tabs button { font-size: 11.5px; padding: 6px 2px; }
+  #panel { padding: 6px; margin: 0 4px 4px; }
+  #panel h3 { margin: 10px 2px 6px; font-size: 12px; }
+  .item { padding: 6px; gap: 6px; }
+  .item-ic { width: 34px; height: 34px; }
+  .item-ic .ico { width: 34px; height: 34px; }
+  .item-title { font-size: 13px; }
+  .chip { font-size: 11px; }
+  .btn.small { padding: 4px 8px; font-size: 12px; }
+  /* окна и раунд — на весь экран */
+  .modal { padding: 6px; }
+  .modal-box { max-height: calc(100vh - 12px); padding: 12px 14px; }
+  .study { padding: 4px; }
+  .st-box { min-height: 0; max-height: calc(100vh - 8px); overflow-y: auto; padding: 8px 14px 12px; border-radius: 12px; }
+  .st-body { gap: 8px; }
+  .q-word { font-size: 26px; }
+  .flash { padding: 10px 22px; }
+  .flash-back { font-size: 18px; }
+  .options { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .opt { padding: 7px 10px; }
+  .slot { width: 32px; height: 38px; font-size: 21px; }
+  .slots.syl .slot { min-width: 42px; font-size: 18px; }
+  .tile-l { width: 36px; height: 38px; font-size: 19px; }
+  .tiles.syl .tile-l { width: auto; min-width: 46px; padding: 0 8px; font-size: 17px; }
+  .pedia, .school { padding: 0; }
+  .pedia-box { width: 100%; height: 100%; border-radius: 0; }
+  .pedia-top { padding: 4px 10px 4px 14px; }
+  .pedia-title { font-size: 15px; }
+  .pedia-main { flex-direction: row; }
+  .pedia-nav { width: 170px; max-height: none; }
+  .pn-item { font-size: 12px; padding: 4px 6px; }
+  .pedia-body { padding: 10px 14px 20px; font-size: 13.5px; }
+}
+
+/* ---------- v12: телефон — карта на весь экран ----------
+   Вкладки — полоской у правого края; панель выезжает поверх карты и уезжает, когда выбрали, что строить,
+   или коснулись карты. Благословения — столбиком у левого края карты. */
+.rail, .mob-only { display: none; }
+@media (orientation: landscape) and (max-height: 520px) {
+  main { padding: 6px; gap: 0; }
+  #mapWrap { margin-right: 60px; justify-content: center; }
+  #map { width: min(100%, calc((100vh - var(--top-h, 40px) - 18px) * 18 / 11)); }
+  @supports (height: 100dvh) { #map { width: min(100%, calc((100dvh - var(--top-h, 40px) - 18px) * 18 / 11)); } }
+  /* благословения — столбиком слева, только значки и таймеры */
+  .buffbar { position: absolute; left: 0; top: 0; z-index: 5; flex-direction: column; align-items: flex-start;
+    height: auto; min-height: 0; margin: 0; gap: 4px; overflow: visible; }
+  .buffbar .bf:not(.raid) { box-shadow: inset 0 0 0 1.5px #e9b93a, 0 2px 6px rgba(0,0,0,.2); }
+  /* вкладки */
+  .rail { display: flex; flex-direction: column; gap: 6px; position: fixed; z-index: 40; right: 6px; top: calc(var(--top-h, 40px) + 10px); }
+  .rail button { width: 52px; padding: 6px 0 4px; border: 0; border-radius: 12px; background: var(--parch-2); color: var(--ink);
+    box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit; cursor: pointer; }
+  .rail button i { font-style: normal; font-size: 20px; line-height: 1; }
+  .rail button span { font-size: 9.5px; line-height: 1.1; }
+  body.drawer-open .rail button.active { background: var(--accent); color: #fff; }
+  /* панель выезжает поверх карты */
+  #side { position: fixed; z-index: 30; top: calc(var(--top-h, 40px) + 6px); bottom: 6px; right: 64px; width: min(340px, calc(100vw - 150px));
+    transform: translateX(calc(100% + 80px)); visibility: hidden; transition: transform .22s ease, visibility 0s .22s;
+    box-shadow: 0 10px 30px rgba(40, 25, 10, .35); }
+  body.drawer-open #side { transform: none; visibility: visible; transition: transform .22s ease; }
+  #side .tabs { display: none; }
+  #panel { margin: 4px; }
+  /* «куда поставить» — плашкой поверх карты, с кнопкой отмены */
+  .place-hint { position: absolute; z-index: 6; left: 50%; bottom: 4px; transform: translateX(-50%); margin: 0; max-width: calc(100% - 8px);
+    display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
+  .place-hint.hidden { display: none; }
+  .mob-only { display: inline-flex; }
+  .desk-only { display: none; }
+}
+/* узкий телефон (iPhone SE и т. п.): шапке не хватает места — убираем название эпохи и подписи */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 680px) {
+  .brand { display: none; }
+  .popbox small { display: none; }
+  #topbar { gap: 4px; padding: 4px 6px; }
+}
+@media (orientation: landscape) and (max-height: 520px) { .bf.raid { margin-left: 0; margin-top: auto; } }
+/* длинные фразы на телефоне — мельче, чтобы варианты помещались на экран */
+@media (orientation: landscape) and (max-height: 520px) { .q-word.long { font-size: 17px; } .options.long .opt { font-size: 13px; line-height: 1.25; } }
+@media (orientation: portrait) and (max-width: 700px) { .q-word.long { font-size: 19px; } .options.long .opt { font-size: 14px; } }
+@media (orientation: landscape) and (max-height: 520px) {
+  .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 6px 0 8px; }
+  .plan { padding: 6px 8px; gap: 6px; }
+  .plan-ico { font-size: 18px; }
+  .plan-desc { font-size: 11px; }
+  .plan-modal h2 { font-size: 20px; }
+  .plan-modal > p { font-size: 12.5px; margin: 4px 0; }
+}
+@media (orientation: portrait) and (max-width: 700px) { .plans { grid-template-columns: 1fr; } }
+@media (orientation: landscape) and (max-height: 520px) { .plan:last-child:nth-child(odd) { grid-column: auto; } }
+
+/* ---------- v13: телефон как приложение ----------
+   Окна — на весь экран, панели — по кнопке, слова — реже, значки — чаще; подсказка — долгим нажатием,
+   Shift+клик — режимом ⏫, полный экран — заслонкой. Код — ui/desktop/phone.js. */
+.side-head, .pn-toggle, .fs-gate { display: none; }
+.mb-cols, .mb-col { display: contents; }          /* окно здания: на компьютере — как было, одной колонкой */
+/* подсказка по долгому нажатию */
+.ttip { position: fixed; z-index: 6000; max-width: min(300px, calc(100vw - 12px)); background: #2a2017; color: #fbf3e2;
+  font-size: 12.5px; line-height: 1.4; padding: 7px 10px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  white-space: pre-line; pointer-events: none; }
+/* режим улучшения: что можно улучшить прямо сейчас — зелёная стрелка, что нельзя — бледнее */
+body.up-mode .tile:not(.has-b):not(.t-sea) { filter: brightness(.85) saturate(.7); }
+body.up-mode .tile.up-ok { box-shadow: inset 0 0 0 2px #8fd05a; }
+body.up-mode .tile.up-ok::before { content: '⬆'; position: absolute; left: 1px; top: 1px; z-index: 4; width: 13px; height: 13px; border-radius: 50%;
+  background: #4f7a2e; color: #fff; font-size: 9px; line-height: 13px; text-align: center; font-weight: 700; }
+body.up-mode .tile.up-ok.up-l::before { content: 'λ'; background: #c08a1e; font-style: italic; }   /* уровень за Логос — касание тратит λ */
+body.up-mode .tile.up-ok.up-l { box-shadow: inset 0 0 0 2px #f0d48a; }
+body.up-mode .tile.up-no .bw, body.up-mode .tile.up-max .bw { opacity: .5; }
+body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2px; top: 0; z-index: 4; font-size: 9px; color: #c08a1e; }
+.place-hint .rep { white-space: nowrap; }
+.place-hint .rep.on { background: var(--good); color: #fff; box-shadow: none; }
+
+/* сенсорный экран: без выделения текста и меню по долгому нажатию, без зума двойным касанием и «потянуть — обновить» */
+@media (pointer: coarse) {
+  .btn kbd, .opt kbd, .build-tools .dim { display: none; }   /* клавиш на телефоне нет — и подсказок про них на кнопках не нужно */
+  html, body { overscroll-behavior: none; }
+  body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  #topbar, main, #rail, .modal, .study, .fs-gate { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  /* заслонка «на весь экран» — как просьба повернуть телефон, только с кнопкой */
+  body.fs-need .fs-gate { display: flex; position: fixed; inset: 0; z-index: 4900; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 20px; text-align: center; background: var(--head-bg); color: #fbf3e2; }
+  .fs-go { display: flex; align-items: center; gap: 12px; font: inherit; font-size: 18px; padding: 14px 28px; border: 0; border-radius: 30px; cursor: pointer;
+    background: linear-gradient(180deg, #ffe39a, #e2ae3c); color: #3a2700; box-shadow: 0 3px 0 #9b6e12; }
+  .fs-ic { font-size: 26px; line-height: 1; }
+  .fs-gate small { opacity: .8; font-size: 13px; }
+  .fs-gate .link { color: #fbf3e2; opacity: .65; font-size: 12px; }
+
+  /* шапка: Кипропедия и «Обучение» уехали в полосу справа; ресурсы — значок над числом */
+  #pediaBtn, #schoolBtn { display: none; }
+  .wide-only { display: none; }
+  .rs { flex-direction: column; justify-content: center; gap: 0; padding: 1px 1px 4px; max-width: 50px; }
+  .rs-ic, .rs-ic .ico { width: 17px; height: 17px; }
+  .rs-v { align-items: center; }
+  .rs-v b { font-size: 11px; letter-spacing: -.02em; }
+  .rs-bar { left: 3px; right: 3px; }
+  .popbox { gap: 0; }
+  .popbox > div { gap: 3px; }
+  .popbox b { font-size: 12px; }
+
+  /* полоса справа: вкладки, ⏫, а внизу — справка и учёба; на низком экране — одни значки */
+  .rail { bottom: 6px; gap: 4px; top: calc(var(--top-h, 40px) + 8px); }
+  .rail button { flex: 0 1 50px; min-height: 30px; justify-content: center; }
+  .rail .rail-low { margin-top: auto; }
+  .rail button[data-up-mode].active { background: var(--good); color: #fff; }
+
+  /* выдвижная панель — на всю ширину, карточки сеткой; сверху — откуда она и крестик */
+  #side { left: 6px; right: 64px; width: auto; }
+  .side-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 4px 0 12px; font-weight: 700; color: var(--accent); }
+  #sideTitle { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  #sideTitle i { font-style: normal; font-size: 16px; }
+  .side-head .st-close { font-size: 17px; padding: 2px 10px; }
+  #panel { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; align-content: start; }
+  #panel > :not(.item) { grid-column: 1 / -1; }
+  #panel .item { margin: 0; }
+  #panel h3 { margin: 6px 2px 0; }
+  #panel[data-tab="tech"] { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+  #panel[data-tab="epoch"] { display: block; columns: 2 260px; column-gap: 12px; }
+  #panel[data-tab="epoch"] > * { break-inside: avoid; }
+  #panel[data-tab="epoch"] h3 { break-after: avoid; }
+  .fold-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; }
+  .fold-body .item { margin: 0; }
+  #panel[data-tab="epoch"] .fold-body { display: block; }
+  .epoch-card details.fold { margin: 6px 0 0; }
+  /* слов меньше: описания — в две строки (целиком — в Кипропедии по «?»), у путей знания — только значок и название */
+  #panel .item-desc, #panel .item-effect { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .fork-d, .ft-w { display: none; }
+  /* «Строить»: вся карточка — кнопка (касание — и выбираем клетку); вместо кнопки — значок «＋» в углу */
+  #panel[data-tab="build"] .item:not(.sp) { position: relative; cursor: pointer; padding-right: 26px; }
+  #panel[data-tab="build"] .item:not(.sp) > [data-build] { display: none; }
+  #panel[data-tab="build"] .item:not(.sp):has(> [data-build])::after { content: '＋'; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; line-height: 20px; text-align: center; }
+  #panel[data-tab="build"] .item.disabled:not(.sp)::after { background: var(--parch-3); color: var(--ink-2); }
+  #panel[data-tab="build"] .item:not(.sp):active { background: #fff; }
+  .fork-tag { font-size: 14px; }
+  .fork-or { font-size: 10px; }
+
+  /* окна — на весь экран; крестик в углу, кнопки — внизу всегда на виду */
+  .modal { padding: 0; }
+  #modal .modal-box { width: 100%; height: 100%; max-height: none; border-radius: 0; padding: 10px 18px 0; }
+  #modal .modal-box.small { width: min(440px, calc(100% - 16px)); height: auto; max-height: calc(100% - 16px); border-radius: 14px; padding: 14px 16px; }
+  .m-x { position: sticky; top: 0; float: right; z-index: 3; margin: -4px -8px 4px 10px; width: 34px; height: 34px; border: 0; border-radius: 50%;
+    background: var(--parch-2); color: var(--ink-2); font-size: 16px; align-items: center; justify-content: center; cursor: pointer; }
+  #modal .modal-box:not(.small) .mb-actions, #modal .modal-box:not(.small) .em-actions { position: sticky; bottom: 0; z-index: 2; margin: 12px -18px 0; padding: 12px 18px;
+    background: linear-gradient(rgba(244, 234, 211, 0), var(--parch) 30%); }
+  #modal .mb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  #modal .mb-cols:has(> .mb-col:empty) { grid-template-columns: 1fr; }
+  #modal .mb-col { display: block; }
+  #modal .mb-col:empty { display: none; }
+  #modal .mb-col .sect:first-child, #modal .mb-col > .upgrade:first-child { margin-top: 0; }
+  .epoch-modal h2 { font-size: 22px; }
+  .epoch-modal p { font-size: 13.5px; line-height: 1.5; }
+
+  /* раунд карточек — на весь экран; буквы — под палец */
+  .study { padding: 0; }
+  .st-box { width: 100%; height: 100%; max-height: none; border-radius: 0; }
+  .tile-l { width: 42px; height: 46px; font-size: 22px; }
+  .tiles.syl .tile-l { min-width: 52px; font-size: 19px; }
+  .slot { width: 34px; height: 40px; }
+
+  /* Кипропедия: оглавление — выезжает по ☰ и прячется, когда выбрали статью */
+  .pedia-top { justify-content: flex-start; gap: 8px; }
+  .pedia-top .st-close { margin-left: auto; }
+  .pn-toggle { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 30px; border: 0; border-radius: 8px;
+    background: rgba(255,255,255,.18); color: #fbf3e2; font-size: 17px; cursor: pointer; }
+  #pedia .pedia-main { position: relative; }
+  #pedia .pedia-nav { position: absolute; left: 0; top: 0; bottom: 0; width: min(270px, 70vw); z-index: 3; box-shadow: 6px 0 20px rgba(0,0,0,.25);
+    transform: translateX(-105%); visibility: hidden; transition: transform .2s ease, visibility 0s .2s; }
+  #pedia .pedia-box.nav-open .pedia-nav { transform: none; visibility: visible; transition: transform .2s ease; }
+  /* «Обучение»: разделы — полоской значков сверху, у открытого — и название */
+  .school .pedia-main { flex-direction: column; }
+  .school .pedia-nav { width: auto; max-height: none; flex: none; display: flex; align-items: center; overflow-x: auto; padding: 4px 8px; }
+  .school .pn-group { display: flex; gap: 4px; margin: 0; }
+  .school .pn-item { white-space: nowrap; padding: 4px 8px; }
+  .school .pn-item:not(.active) { font-size: 0; gap: 0; }
+  .school .pn-item span { font-size: 17px; }
+  .school .pn-foot { display: none; }
+  .school .pedia-body { padding: 8px 14px 16px; }
+}
+/* совсем низкий экран (телефон с панелями браузера): в полосе справа — одни значки */
+@media (orientation: landscape) and (max-height: 370px) {
+  .rail button span { display: none; }
+  .rail button { flex-basis: 40px; }
+}
+/* узкий: на кнопке «Учиться» — только свиток и что ждёт в раунде */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 620px) { .sb-word { display: none; } }

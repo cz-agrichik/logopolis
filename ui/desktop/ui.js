@@ -12,15 +12,19 @@ const UI = {
   init() {
     document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => this.setTab(b.dataset.tab)));
     // телефон: та же вкладка ещё раз — убрать панель, другая — переключить и показать
-    document.querySelectorAll('#rail button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#rail button[data-tab]').forEach(b => b.addEventListener('click', () => {
       const same = this.tab === b.dataset.tab && this.drawerOpen();
       this.setTab(b.dataset.tab);
       this.drawer(!same);
     }));
     $('#mapWrap').addEventListener('click', e => { if (this.compact() && this.drawerOpen() && !e.target.closest('#map')) this.drawer(false); });
-    $('#placeHint').addEventListener('click', e => { if (e.target.closest('[data-cancel-place]')) this.cancelPlacing(); });
-    const measure = () => document.documentElement.style.setProperty('--top-h', $('#topbar').offsetHeight + 'px');
-    measure(); window.addEventListener('resize', measure);
+    $('#placeHint').addEventListener('click', e => {
+      if (e.target.closest('[data-cancel-place]')) return this.cancelPlacing();
+      const r = e.target.closest('[data-place-repeat]');
+      if (r) { this.placeRepeat = !this.placeRepeat; r.classList.toggle('on', this.placeRepeat); }
+    });
+    this.measureTop = () => document.documentElement.style.setProperty('--top-h', $('#topbar').offsetHeight + 'px');
+    this.measureTop(); window.addEventListener('resize', this.measureTop);
     $('#map').addEventListener('click', e => this.onMapClick(e));
     $('#map').addEventListener('contextmenu', e => { if (this.placing) { e.preventDefault(); this.cancelPlacing(); } });
     // в новой игре сначала спрашиваем, что учить (если игрок ещё не ответил)
@@ -64,7 +68,9 @@ const UI = {
 
   setTab(tab) {
     this.tab = tab;
-    document.querySelectorAll('.tabs button, #rail button').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+    document.querySelectorAll('.tabs button, #rail button[data-tab]').forEach(x => x.classList.toggle('active', x.dataset.tab === tab));
+    const rb = $(`#rail button[data-tab="${tab}"]`);
+    if (rb) $('#sideTitle').innerHTML = rb.innerHTML;   // телефон: «🔨 Строить» над выдвинутой панелью — видно, откуда она
     this.lastPanel = null;
     this.renderPanel();
   },
@@ -72,6 +78,8 @@ const UI = {
   compact() { return matchMedia('(orientation: landscape) and (max-height: 520px)').matches; },
   drawerOpen() { return document.body.classList.contains('drawer-open'); },
   drawer(open) { document.body.classList.toggle('drawer-open', !!open); },
+  /** Сенсорный экран (телефон, планшет): нет наведения мыши и Shift. */
+  touch: matchMedia('(pointer: coarse)').matches,
 
   renderAll() {
     this.renderTop();
@@ -105,10 +113,10 @@ const UI = {
 
     // жители и работники — отдельным блоком
     const { short, hands } = Game.labor();
-    $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap} мест</small></div>
+    $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap}<span class="wide-only"> мест</span></small></div>
       <div class="${short ? 'short' : ''}" title="${short ? `Не хватает работников! Зданиям нужно ${Game.need}, а рук ${hands}. Сначала руки идут на поля и загоны: зерно — ${Math.round(Game.effFood * 100)}%. Остальные здания работают на ${Math.round(Game.effOther * 100)}%. Нужны жилища и зерно — или «Всей семьёй».` : `Зданиям нужно ${Game.need} работников — рук хватает (${hands}).`}"><span>${short ? '⚠' : '⚒'}</span>${short
-        ? `<b>${hands} / ${Game.need}</b><small>мало рук · ${Game.effFood < 0.999 ? `даже зерно ${Math.round(Game.effFood * 100)}%` : `прочее ${Math.round(Game.effOther * 100)}%`}</small>`
-        : `<b>${Game.need}</b><small>${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`;
+        ? `<b>${hands} / ${Game.need}</b><small class="wide-only">мало рук · ${Game.effFood < 0.999 ? `даже зерно ${Math.round(Game.effFood * 100)}%` : `прочее ${Math.round(Game.effOther * 100)}%`}</small>`
+        : `<b>${Game.need}</b><small class="wide-only">${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`;
 
     // благословения — полоса над картой: место под неё есть всегда, и она никогда не переносится на вторую строку
     const buffs = Object.entries(s.buffs || {}).filter(([id]) => Cat.rite[id]);
@@ -186,7 +194,8 @@ const UI = {
           inner = `<span class="bw">${ic[2] ? `<span class="b b3">${Art.svg(ic[2])}</span>` : ''}${ic[1] ? `<span class="b b2">${Art.svg(ic[1])}</span>` : ''}<span class="b b1">${Art.svg(ic[0])}</span></span><span class="lvl">${b.level}</span>`;
         }
         const nm = B.special ? F.name : Looks.name(b.type, b.level);
-        title = B.special ? nm : Game.obsoleteType(b.type) ? `${nm} · ур. ${b.level} — устарело: перестройте или продайте` : `${nm} · ур. ${b.level} (Shift+клик — улучшить)`;
+        title = B.special ? nm : Game.obsoleteType(b.type) ? `${nm} · ур. ${b.level} — устарело: перестройте или продайте` : `${nm} · ур. ${b.level}${this.touch ? '' : ' (Shift+клик — улучшить)'}`;
+        if (this.upMode) { const u = this.upClass(b); if (u) cls.push(...u.split(' ')); }
       } else if (t.t === 'forest') inner = `<span class="deco">${Art.svg('tree')}</span>`;
       else if (t.t === 'hill') inner = `<span class="deco">${Art.svg('hill')}</span>`;
       if (Game.goat && Game.goat.x === t.x && Game.goat.y === t.y) {
@@ -198,6 +207,14 @@ const UI = {
       html += `<div class="${cls.join(' ')}" data-x="${t.x}" data-y="${t.y}" title="${esc(title)}">${inner}</div>`;
     }
     map.innerHTML = html;
+  },
+
+  /** Режим улучшения (телефон): можно ли улучшить здание прямо сейчас — up-ok / up-no / up-max, up-l — уровень за λ; чудеса не в счёт. */
+  upClass(b) {
+    if (Cat.bld[b.type].special) return '';
+    if (Game.obsoleteType(b.type)) return 'up-no';
+    const u = Game.upgradeInfo(b);
+    return !u || u.capped ? 'up-max' : (u.ok ? 'up-ok' : 'up-no') + (u.logos ? ' up-l' : '');
   },
 
   onMapClick(e) {
@@ -214,7 +231,7 @@ const UI = {
     }
     if (this.placing) {
       if (Game.build(this.placing, tile.x, tile.y, this.placingMode)) {
-        const keep = e.shiftKey && Game.buildStatus(this.placing, this.placingMode).ok;
+        const keep = (e.shiftKey || this.placeRepeat) && Game.buildStatus(this.placing, this.placingMode).ok;   // Shift или 🔁 на телефоне — строить ещё
         if (!keep) this.cancelPlacing(); else this.renderMap();
         this.renderAll();
       } else {
@@ -225,7 +242,7 @@ const UI = {
     }
     const b = Game.buildingAt(tile.x, tile.y);
     if (b) {
-      if (e.shiftKey && !Cat.bld[b.type].special) {
+      if ((e.shiftKey || this.upMode) && !Cat.bld[b.type].special) {   // Shift+клик или режим ⏫ на телефоне
         const up = Game.upgradeInfo(b);
         const newLook = up && !up.capped && Looks.newLook(b.type, up.target);
         if (Game.upgrade(b)) { this.floatText(el, newLook ? `✨ ур. ${b.level}` : `ур. ${b.level}`, 'gold'); this.renderMap(); this.renderAll(); }
@@ -258,6 +275,7 @@ const UI = {
     const B = Cat.bld[type];
     const where = B.terrain.map(t => Cat.terrain[t].name.toLowerCase()).join(' или ') + (B.coast ? ' у моря' : '');
     $('#placeHint').innerHTML = `<span>Куда поставить «${esc(Looks.name(type, 1))}»? Подходит: ${where}.<span class="desk-only"> <b>Esc</b> или правый клик — отмена, <b>Shift</b> — строить ещё.</span></span>
+      <button class="btn small ghost mob-only rep ${this.placeRepeat ? 'on' : ''}" data-place-repeat title="Строить ещё такие же, пока хватает ресурсов (как Shift на компьютере)">🔁 ещё</button>
       <button class="btn small mob-only" data-cancel-place>Отмена</button>`;
     $('#placeHint').classList.remove('hidden');
     if (this.compact()) this.drawer(false);   // на телефоне панель уезжает — видна вся карта
@@ -360,6 +378,7 @@ const UI = {
     if (html === this.lastPanel) return;   // без лишних перерисовок — клики не теряются
     this.lastPanel = html;
     const scroll = p.scrollTop;
+    p.dataset.tab = this.tab;
     p.innerHTML = html;
     p.scrollTop = scroll;
   },
@@ -409,7 +428,7 @@ const UI = {
   /** Раскрывающийся блок, который помнит, открыт ли он. */
   fold(id, title, inner, defOpen = false) {
     const open = id in this.folds ? this.folds[id] : defOpen;
-    return `<details class="fold" data-fold="${id}" ${open ? 'open' : ''}><summary>${title}</summary>${inner}</details>`;
+    return `<details class="fold" data-fold="${id}" ${open ? 'open' : ''}><summary>${title}</summary><div class="fold-body">${inner}</div></details>`;
   },
 
   techCard(T) {
@@ -428,7 +447,7 @@ const UI = {
           <div class="fork-row"><div class="chips">${this.costHtml(stt.cost, stt.logos)}</div>
             <button class="btn small ${mode === 'logos' ? 'gold' : ''} ${stt.ok ? '' : 'off'}" data-tech="${T.id}" data-mode="${mode}">${btn}</button></div>
         </div>`;
-      body = `<div class="fork">${opt('logos', '🧠 С умом', 'wise', st, 'Изучить')}<div class="fork-or">или</div>${opt('labor', '💪 Через силу', 'force', lab, 'Осилить')}</div>`;
+      body = `<div class="fork">${opt('logos', '🧠<span class="ft-w"> С умом</span>', 'wise', st, 'Изучить')}<div class="fork-or">или</div>${opt('labor', '💪<span class="ft-w"> Через силу</span>', 'force', lab, 'Осилить')}</div>`;
     }
     return `<div class="item tech ${st.learned ? 'learned' : ''}">
       <div class="item-ic">${this.techIcon(T)}</div>
@@ -486,8 +505,9 @@ const UI = {
 
   panel_epoch() {
     const s = Game.state, E = Cat.epochs[s.epoch];
+    const intro = this.compact() ? this.fold('intro' + s.epoch, '📜 Об эпохе', `<p>${E.intro}</p>`) : `<p>${E.intro}</p>`;   // телефон: длинный рассказ — под катом
     let h = `<div class="epoch-card"><div class="epoch-title">${esc(E.name)}</div><div class="epoch-years">${esc(E.sub)}</div>
-      <p>${E.intro}</p>${E.maxLevel ? `<div class="dim">Предел улучшения зданий в эту эпоху: ${E.maxLevel}-й уровень.</div>` : ''}</div>`;
+      ${intro}${E.maxLevel ? `<div class="dim">Предел улучшения зданий в эту эпоху: ${E.maxLevel}-й уровень.</div>` : ''}</div>`;
     const reqs = Game.epochReqs();
     if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Вторая половина эпохи и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
     if (reqs) {
@@ -517,7 +537,11 @@ const UI = {
   },
 
   onPanelClick(e) {
-    const t = e.target.closest('button');
+    let t = e.target.closest('button');
+    if (!t && this.compact()) {   // телефон: вся карточка обычного здания — кнопка «Строить» (чудеса — только кнопкой)
+      const it = e.target.closest('.item:not(.sp)');
+      t = it && it.querySelector('[data-build]');
+    }
     if (!t) return;
     if (t.dataset.pedia) return Pedia.open(t.dataset.pedia);
     if (t.dataset.build) {
@@ -568,9 +592,11 @@ const UI = {
   },
 
   // ---------------- окна ----------------
-  showModal(html) {
+  showModal(html, { small = false, noX = false } = {}) {
     if (this.modalLocked) return;   // вкладка остановлена — поверх ничего не открываем
-    $('#modalBox').innerHTML = html;
+    $('#modalBox').className = 'modal-box' + (small ? ' small' : '');
+    // телефон: окно на весь экран, закрыть — крестиком в углу (на компьютере крестика нет: там Esc и клик мимо)
+    $('#modalBox').innerHTML = (noX ? '' : '<button class="m-x mob-only" data-action="close" title="Закрыть">✕</button>') + html;
     $('#modal').classList.remove('hidden');
   },
   closeModal() {
@@ -598,6 +624,7 @@ const UI = {
         <p class="dim small">Чудо можно убрать на склад и поставить в другое место бесплатно. Пока оно на складе, его бонус не действует.</p>`;
     } else {
       const rb = Game.rebuildInfo(b), sl = Game.sellInfo(b);
+      h += '<div class="mb-cols"><div class="mb-col">';
       if (rb) {
         h += `<div class="upgrade obsolete"><div class="up-head"><b>🔄 Устарело</b></div>
           <p class="small">После знания «${esc(this.retiringTechName(b.type))}» это здание больше не работает. Перестройте его — уровень сохранится — или продайте.
@@ -611,6 +638,7 @@ const UI = {
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
       if (b.rest === 'full') h += `<p class="rest">Отдыхает: всё, что здание даёт, уже не помещается в склады — сырьё не тратится.</p>`;
       if (b.rest === 'part') h += `<p class="rest">Часть того, что здание даёт, уже не помещается в склады — сырья уходит меньше.</p>`;
+      h += '</div><div class="mb-col">';
       const up = rb ? null : Game.upgradeInfo(b);
       if (up) {
         h += `<div class="upgrade ${up.logos ? 'lv-logos' : ''}">`;
@@ -624,6 +652,7 @@ const UI = {
         }
         h += `</div>`;
       }
+      h += '</div></div>';
     }
     h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
       <button class="btn ghost small" data-action="close">Закрыть</button></div>`;
@@ -638,7 +667,7 @@ const UI = {
     this.showModal(`<div class="epoch-modal"><h2>🗂️ Игра открыта в другой вкладке</h2>
       <p>В другой вкладке этого браузера игра ушла вперёд — или там начали новую. Эта вкладка остановлена
       и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
-      <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`);
+      <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`, { small: true, noX: true });
     this.modalLocked = true;
   },
 
@@ -648,8 +677,10 @@ const UI = {
     this.showModal(`<div class="epoch-modal"><h2>📱 Похоже, вы с телефона</h2>
       <p>Простите: пока «Λόγος» сделан под компьютер — большой экран, мышь и клавиатура. На телефоне карта и панели
       будут тесными, а набирать слова неудобно.</p>
-      <p>Играть можно, но на свой страх и риск — мы пока не советуем. Удобная мобильная версия — в планах.</p>
-      <p><b>Держите телефон горизонтально</b> — в альбомной ориентации помещается вся игра.</p>
+      <p>Играть можно, но на свой страх и риск — мы пока не советуем. Мобильная версия — в работе.</p>
+      <p><b>Держите телефон горизонтально</b> — в альбомной ориентации помещается вся игра.
+      <b>Удерживайте палец</b> на значке или здании — появится подсказка. ⏫ у правого края — улучшать здания касанием.</p>
+      ${BrowserIO.isIOS() && !BrowserIO.standalone() ? '<p>📲 <b>На весь экран:</b> «Поделиться» → «На экран „Домой“» — и открывайте игру оттуда.</p>' : ''}
       <div class="em-actions"><button class="btn gold" data-action="close">Всё равно играть</button></div></div>`);
   },
 
@@ -738,7 +769,7 @@ const UI = {
     this.modalBuilding = null;
     this.showModal(`<h2>Вы уверены?</h2><p>${text}</p>
       <div class="mb-actions"><button class="btn ghost small" data-action="close">Отмена</button>
-      <button class="btn danger-fill" data-action="confirm-yes">${esc(yesLabel)}</button></div>`);
+      <button class="btn danger-fill" data-action="confirm-yes">${esc(yesLabel)}</button></div>`, { small: true });
   },
 
   onModalAction(a) {

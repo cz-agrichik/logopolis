@@ -4,13 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Λόγος · Кипр сквозь эпохи</title>
+  <!-- как приложение на телефоне: значок, цвет шапки, «На экран „Домой“» открывает игру во весь экран -->
+  <meta name="theme-color" content="#6e2d14">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Λόγος">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+  <script>if (/^https?:/.test(location.protocol)) document.write('<link rel="manifest" href="manifest.webmanifest">');   // с диска манифест не читается</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <!-- Версия файлов для сброса кэша браузера: после любого изменения кода поднимите ОДНО число — ASSET_V ниже.
        Скрипты и стили подключаются с ?v=ASSET_V; список скриптов — ASSETS в конце страницы (порядок важен). -->
-  <script>var ASSET_V = 51;</script>
-  <script>document.write('<link rel="stylesheet" href="ui/desktop/styles.css?v=' + ASSET_V + '">');</script>
+  <script>var ASSET_V = 52;</script>
+  <script>
+    document.write('<link rel="stylesheet" href="ui/desktop/styles.css?v=' + ASSET_V + '">');
+    document.write('<link rel="stylesheet" href="ui/desktop/phone.css?v=' + ASSET_V + '">');   // телефон — поверх компьютерной раскладки
+  </script>
   <!-- Yandex.Metrika counter: считаем только опубликованный сайт (https), а не запуск файла с диска и не тесты -->
   <script type="text/javascript">
     if (location.protocol === 'https:') {
@@ -41,7 +53,7 @@
     <div class="popbox" id="popbox"></div>
     <button id="pediaBtn" class="pedia-btn" title="Кипропедия — справочник по игре и учёбе (F1)">📖</button>
     <button id="schoolBtn" class="pedia-btn" title="Обучение: прогресс по словам, колоды, темп, экспорт">📚</button>
-    <button id="studyBtn" class="study-btn"><span class="sb-main">📜 Учиться</span><span class="sb-sub" id="studySub"></span></button>
+    <button id="studyBtn" class="study-btn"><span class="sb-main">📜<span class="sb-word"> Учиться</span></span><span class="sb-sub" id="studySub"></span></button>
   </header>
 
   <main>
@@ -49,9 +61,11 @@
       <div id="buffbar" class="buffbar hidden"></div>
       <div id="map"></div>
       <div id="placeHint" class="place-hint hidden"></div>
+      <div id="upHint" class="place-hint up-hint hidden"><span>⏫ Касание здания — +1 уровень · <b>λ</b> — уровень за Логос</span><button class="btn small" data-up-done>Готово</button></div>
       <footer id="log"></footer>
     </section>
     <aside id="side">
+      <div class="side-head"><span id="sideTitle"></span><button class="st-close" data-close-drawer title="Закрыть">✕</button></div>
       <nav class="tabs">
         <button data-tab="build" class="active">Строить</button>
         <button data-tab="tech">Знания</button>
@@ -66,16 +80,22 @@
       <button data-tab="tech"><i>🦉</i><span>Знания</span></button>
       <button data-tab="rites"><i>🏛️</i><span>Обряды</span></button>
       <button data-tab="epoch"><i>⏳</i><span>Эпоха</span></button>
+      <button data-up-mode title="Режим улучшения: каждое касание здания — +1 уровень (как Shift+клик на компьютере)"><i>⏫</i><span>Улучшать</span></button>
+      <button data-open="pedia" class="rail-low" title="Кипропедия — справочник по игре и учёбе"><i>📖</i><span>Справка</span></button>
+      <button data-open="school" title="Обучение: прогресс по словам, колоды, темп"><i>📚</i><span>Учёба</span></button>
     </nav>
   </main>
 
   <div class="rotate-hint" aria-live="polite"><div class="rh-ic">📱</div><b>Поверните телефон горизонтально</b><small>Λόγος раскладывается в альбомной ориентации</small></div>
+  <!-- телефон без полного экрана: одно касание — и игра на весь экран (ui/desktop/phone.js) -->
+  <div id="fsGate" class="fs-gate" aria-live="polite"><button class="fs-go" data-fs-go><span class="fs-ic">⛶</span><b>Играть на весь экран</b></button>
+    <small>Λόγος задуман на весь экран телефона — без панелей браузера</small><button class="link" data-fs-skip>остаться в окне браузера</button></div>
 
   <div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
 
   <div id="pedia" class="pedia hidden">
     <div class="pedia-box">
-      <div class="pedia-top"><div class="pedia-title">📖 Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
+      <div class="pedia-top"><button class="pn-toggle" data-nav-toggle title="Оглавление">☰</button><div class="pedia-title">📖 Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
       <div class="pedia-main"><nav id="pediaNav" class="pedia-nav"></nav><article id="pediaBody" class="pedia-body"></article></div>
     </div>
   </div>
@@ -138,6 +158,7 @@
       'ui/desktop/study.js',
       'ui/desktop/pedia.js',
       'ui/desktop/school.js',
+      'ui/desktop/phone.js',
       'ui/desktop/main.js',
     ];
     for (var i = 0; i < ASSETS.length; i++) document.write('<script src="' + ASSETS[i] + '?v=' + ASSET_V + '"><\/script>');

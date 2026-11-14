@@ -17,6 +17,7 @@
   const away = saved ? Game.catchUp() : null;
   Speech.init();
   UI.init();
+  Phone.init();   // телефон: подсказки по долгому нажатию, полный экран, режим улучшения
 
   const firstScreen = () => {
     if (!saved || Game.state.introPending) {
@@ -53,6 +54,7 @@
     if (sinceRender >= 1 || Game.state.pop !== popBefore) {
       sinceRender = 0;
       UI.renderPanel();
+      Phone.tick();
     }
     if (sinceSave >= 5) { sinceSave = 0; Session.saveAll(); }
   }, 250);

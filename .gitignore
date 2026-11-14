@@ -3,3 +3,4 @@ golden-out/
 golden-base/
 __pycache__/
 *.pyc
+phone-out/
