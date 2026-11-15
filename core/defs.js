@@ -174,7 +174,8 @@ const TECHS = [
   { id: 'pharaoh', epoch: 2, logos: 260, cost: { amphora: 600, stone: 1200, silver: 40 }, req: ['phoenicians'], buy: true },
   { id: 'irontools', epoch: 2, logos: 240, cost: { iron: 160, wood: 1000 }, req: ['iron', 'phoenicians'], buy: true },   // лесорубы и каменоломни: линия железо → +30%
   { id: 'doctors', epoch: 2, logos: 280, cost: { silver: 140, amphora: 500 }, req: ['phoenicians'], buy: true, effect: { houseCap: 2, growth: 0.5 } },
-  { id: 'fleet', epoch: 2, logos: 280, cost: { wood: 2500, iron: 100 }, req: ['pharaoh'], buy: true, effect: { tributeCut: 0.25 } },
+  // reqWonder — чудо, без которого знание не изучить: флот снаряжают цари Саламина
+  { id: 'fleet', epoch: 2, logos: 280, cost: { wood: 2500, iron: 100 }, req: ['pharaoh'], reqWonder: 'sp_salamis', buy: true, effect: { tributeCut: 0.25 } },
   { id: 'gifts', epoch: 2, logos: 320, cost: { silver: 160, amphora: 800 }, req: ['pharaoh', 'fleet'], buy: true, fixTribute: true },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));

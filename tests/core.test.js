@@ -757,6 +757,22 @@ test('вторая половина железного века: «через с
   assert.ok(reqs.some(q => q.kind === 'res' && q.res === 'silver') && reqs.some(q => q.kind === 'res' && q.res === 'iron'));
 });
 
+test('«Флот царей» требует Царские гробницы Саламина (reqWonder)', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, T = C.get('TECH_BY_ID').fleet;
+  s.techs.push('iron', 'phoenicians', 'viticulture', 'pharaoh');
+  for (const k of Object.keys(s.res)) s.res[k] = 30000; s.logos = 5000; G.tick(0.001);
+  let st = G.techStatus(T);
+  assert.ok(st.locked && st.reason.code === 'needBuilding' && st.reason.type === 'sp_salamis');
+  assert.equal(G.research('fleet'), false);
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_salamis', t));
+  s.buildings.push({ id: 991, type: 'sp_salamis', level: 1, x: t.x, y: t.y });
+  st = G.techStatus(T);
+  assert.ok(st.ok, 'с гробницами — можно');
+  assert.ok(G.research('fleet'));
+  assert.equal(G.techLinks('fleet').wonder, 'sp_salamis');
+  assert.deepEqual([...G.wonderFor('sp_salamis')], ['fleet']);
+});
+
 test('справочные расчёты (facts): где добыть, на что идёт, таблица уровней, что устаревает', () => {
   const C = fresh(), G = ironAge(C), s = G.state;
   // до «Финикийцев» товары делают мастерские; после — серебро, а товары уходят

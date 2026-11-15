@@ -15,6 +15,7 @@ Object.assign(Game, {
     if (T.epoch > this.state.epoch) return { hidden: true };
     const miss = (T.req || []).filter(r => !this.hasTech(r));
     if (miss.length) return { locked: true, reason: { code: 'needFirst', techs: miss } };
+    if (T.reqWonder && !this.hasWonder(T.reqWonder)) return { locked: true, reason: { code: 'needBuilding', type: T.reqWonder } };
     const { cost, logos } = this.techPrice(T, mode);
     const reason = this.lackReason(cost, logos);
     return { ok: !reason, reason, cost, logos };

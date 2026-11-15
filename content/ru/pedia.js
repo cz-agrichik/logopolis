@@ -836,7 +836,9 @@ const PediaBook = {
         <p class="lead">${esc(B.desc)}</p>
         <table class="pt"><tr><td>Цена</td><td>${this.costText(Game.liveCost(B.cost), B.logos)}</td></tr>
           <tr><td>Где строить</td><td>${terrain}</td></tr>
-          ${B.retire ? `<tr><td>Чудо эпохи</td><td>${esc(Msg.retireNote(B.retire))}</td></tr>` : ''}</table>${req}
+          ${B.retire ? `<tr><td>Чудо эпохи</td><td>${esc(Msg.retireNote(B.retire))}</td></tr>` : ''}
+          ${Game.wonderFor(type).length || Game.advanceWonders().includes(type) ? `<tr><td>Нужно для</td><td>${[...Game.wonderFor(type).map(t => 'знания ' + pl('t:' + t, '«' + Cat.tech[t].name + '»')),
+            ...(Game.advanceWonders().includes(type) ? ['перехода в следующую эпоху'] : [])].join(' и ')}</td></tr>` : ''}</table>${req}
         <h4>История</h4><p class="lore">${B.lore}</p>`;
     }
     const icon = Art.svg(Looks.icons(type, 1)[0]);
@@ -883,7 +885,7 @@ const PediaBook = {
       <table class="pt">
         <tr><td>🧠 С умом${T.paths ? `<br><b>${T.paths.logos[0]}</b>` : ''}</td><td>${this.costText(Game.techPrice(T).cost, T.logos)}${T.paths ? `<br><span class="dim">${T.paths.logos[1]}</span>` : ''}</td></tr>
         <tr><td>💪 Через силу${T.paths ? `<br><b>${T.paths.labor[0]}</b>` : ''}</td><td>${this.costText(Game.techPrice(T, 'labor').cost)}${T.paths ? `<br><span class="dim">${T.paths.labor[1]}</span>` : ''}</td></tr>
-        ${T.req ? `<tr><td>Требует</td><td>${T.req.map(r => pl('t:' + r, Cat.tech[r].name)).join(', ')}</td></tr>` : ''}
+        ${T.req || TL.wonder ? `<tr><td>Требует</td><td>${[...(T.req || []).map(r => pl('t:' + r, Cat.tech[r].name)), ...(TL.wonder ? [pl('b:' + TL.wonder, Cat.bld[TL.wonder].name) + ' (чудо)'] : [])].join(', ')}</td></tr>` : ''}
         ${opens.length ? `<tr><td>Открывает</td><td>${opens.join(', ')}</td></tr>` : ''}
         ${leadsTo.length ? `<tr><td>Ведёт к</td><td>${leadsTo.join(', ')}</td></tr>` : ''}</table>`;
   },

@@ -106,13 +106,16 @@ Object.assign(Game, {
   /** Обряд уходит со временем: { wonder } — когда святилище улучшат до этого чуда, { tech } — после знания; иначе null. */
   riteLeaves(R) { return R.until ? { wonder: R.until } : R.untilTech ? { tech: R.untilTech } : null; },
 
-  /** Что даёт знание: { opens: [здания и чудеса с этим tech], leadsTo: [знания, которые его требуют] }. */
+  /** Что даёт знание: { opens: [здания и чудеса с этим tech], leadsTo: [знания, которые его требуют], wonder: чудо, без которого его не изучить }. */
   techLinks(id) {
     return {
       opens: Object.keys(BUILDINGS).filter(t => BUILDINGS[t].tech === id),
       leadsTo: TECHS.filter(t => (t.req || []).includes(id)).map(t => t.id),
+      wonder: (TECH_BY_ID[id] || {}).reqWonder || null,
     };
   },
+  /** Знания, которым нужно это чудо (reqWonder): [id]. */
+  wonderFor(type) { return TECHS.filter(t => t.reqWonder === type).map(t => t.id); },
   /** Чудеса, нужные для переходов эпох: [типы] по порядку эпох. */
   advanceWonders() { return EPOCHS.filter(E => E.advance).flatMap(E => E.advance.specials); },
 });
