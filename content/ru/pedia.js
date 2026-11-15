@@ -594,7 +594,7 @@ const PEDIA_ARTICLES = [
   { id: 'religion', icon: '🛐', title: 'Религия и обряды', html: () => `
     <p class="story">Прежде чем сеять, деревня собиралась у святилища: зерно — земле, первый сыр — богине, песня — для стад.
     Обряд не делал работу за людей, но люди после него работали иначе.</p>
-    <p>Вкладка «Обряды». Сверху — <b>«Сбор припасов»</b>: не обряд, а мгновенная выдача: 3 минуты обычного производства (благословения не учитываются) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, раз в ${RITUAL_BY_ID.elders.cooldown / 60} минуты.
+    <p>Вкладка «Обряды». Сверху — <b>«Сбор припасов»</b>: не обряд, а мгновенная выдача: всё, что здания производят за 3 минуты (благословения не учитываются; сырьё, еда жителей и продажи гаваней не вычитаются, так что амфоры, дерево и медь приходят всегда) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, раз в ${RITUAL_BY_ID.elders.cooldown / 60} минуты.
     Ниже — благословения: они удваивают производство своих ресурсов на ${riteRange().minutes} минут — дольше и выгоднее «Сбора припасов», но не на всё сразу. Благословения на один ресурс складываются: два «×2» дают ×3, а не ×4. Идущее благословение светится золотом, его можно продлить
     (до ${BALANCE.maxBuffMinutes} минут), но не усилить. Одновременно — не больше ${BALANCE.maxBuffs} благословений. Активные показаны над картой.</p>
     <table class="pt">${Cat.rites.map(R => `<tr><td>${Looks.riteIcon(R).replace('class="ico', 'class="ico inl')} ${R.name}</td><td>${R.desc}<br><span class="dim">${[R.logos ? 'λ ' + Game.ritualLogos(R) : 'без λ', ...Object.entries(Game.liveCost(R.cost)).map(([k, v]) => ri(k) + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, Cat.bld[R.req].name)}` : ''}${R.epoch ? ` · с эпохи «${Cat.epochs[R.epoch].name}»` : ''}${riteGone(R)}</span></td></tr>`).join('')}</table>
@@ -734,8 +734,8 @@ const PediaBook = {
     h += this.logosCalcHtml() + this.storageCalcHtml();
     const sup = vis.filter(k => I.supplies[k] >= 1);
     h += `<h3>«Сбор припасов» сейчас дал бы</h3>
-      <p>${sup.length ? sup.map(k => `${ri(k)} ${Math.floor(I.supplies[k])}`).join(' · ') : 'почти ничего'} <span class="dim">— ${BALANCE.suppliesSec / 60} минуты обычного выпуска без благословений
-      (зерна, дерева и камня — не меньше 30) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ.</span></p>`;
+      <p>${sup.length ? sup.map(k => `${ri(k)} ${Math.floor(I.supplies[k])}`).join(' · ') : 'почти ничего'} <span class="dim">— ${BALANCE.suppliesSec / 60} минуты выпуска зданий без благословений и без вычета расхода
+      (зерна, дерева и камня — не меньше ${30 * (1 + Game.state.epoch)}) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ.</span></p>`;
     return h;
   },
 

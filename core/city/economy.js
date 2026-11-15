@@ -274,9 +274,8 @@ Object.assign(Game, {
     }
     for (const k of RES_KEYS) res[k].rows.sort((a, b) => b.total - a.total);
     res.food.eaten = { pop: s.pop, per: BALANCE.foodPerPop, total: -s.pop * BALANCE.foodPerPop };
-    const plain = this.plainRates();
     return { res, hands: Math.floor(hands), need: P.need, effFood: P.effFood, effOther: P.effOther, storage: P.storage,
-      supplies: Object.fromEntries(RES_KEYS.map(k => [k, Math.max(0, plain[k] || 0) * BALANCE.suppliesSec])) };
+      supplies: this.suppliesNow() };
   },
   /** Множитель Логоса за карточки и из чего он сложен: { total, parts: [{ kind: 'tech'|'wonder'|'building'|'rite', id, v, level, left }] }. */
   logosBreakdown() {
@@ -306,6 +305,29 @@ Object.assign(Game, {
   },
   /** Выпуск без благословений (и без «Всей семьёй») — для «Сбора припасов». */
   plainRates() { return this.production(this.effects(false), this.state.pop, 0.001).rates; },
+  /** Что здания производят в секунду без благословений — без вычета расхода: сырьё переработчиков, еда жителей и продажи
+   *  (гавань меняет амфоры на серебро — линия с keep) не в счёт; прибавка от железных орудий считается, пока есть железо.
+   *  Так считает «Сбор припасов»: расход и продажи не обнуляют выдачу. */
+  grossRates() {
+    const s = this.state, fx = this.effects(false), P = this.production(fx, s.pop, 0.001), out = {};
+    for (const k of RES_KEYS) out[k] = 0;
+    for (const b of s.buildings) {
+      const e = this.foodFirst(b) ? P.effFood : P.effOther;
+      for (const [k, v] of Object.entries(this.prodOf(b, fx))) if (v > 0) out[k] += v * e;
+      const t = !BUILDINGS[b.type].trade || BUILDINGS[b.type].trade.keep ? null : this.tradeOf(b, fx);
+      if (t && Object.keys(t).every(k => t[k] > 0 || s.res[k] > 0)) for (const [k, v] of Object.entries(t)) if (v > 0) out[k] += v * e;
+    }
+    return out;
+  },
+  /** «Сбор припасов» сейчас дал бы (до складов): столько секунд выпуска зданий, зерна, дерева и камня — не меньше минимума. */
+  suppliesNow() {
+    const g = this.grossRates(), out = {};
+    for (const k of RES_KEYS) {
+      out[k] = g[k] * BALANCE.suppliesSec;
+      if (['food', 'wood', 'stone'].includes(k)) out[k] = Math.max(out[k], 30 * (1 + this.state.epoch));
+    }
+    return out;
+  },
 
   /** Идёт время: благословения и перерывы обрядов истекают (без выпуска). */
   passTime(dt) {

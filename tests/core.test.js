@@ -42,6 +42,27 @@ test('обряды: «Сбор припасов» — 3 минуты выпус�
   assert.equal(s.cooldowns.elders, 120);
 });
 
+test('обряды: «Сбор припасов» считает выпуск зданий без вычета расхода — продажа амфор и кузницы его не обнуляют', () => {
+  const C = fresh(), G = ironAge(C), s = G.state;
+  s.techs.push('iron', 'phoenicians', 'viticulture');
+  const put = (type, n) => { for (let i = 0; i < n; i++) { const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t)); s.buildings.push({ id: 700 + s.buildings.length, type, level: 5, x: t.x, y: t.y }); } };
+  put('vineyard', 2); put('port', 2); put('lumber', 1); put('forge', 3); put('field', 2);
+  G.tick(0.001);
+  for (const k of Object.keys(s.res)) s.res[k] = Math.floor(G.storage * 0.7);   // выше половины склада — гавани продают амфоры
+  G.tick(0.001); s.pop = 400;   // такт подрезает жителей под дома — рук ставим с запасом после него
+  const net = G.plainRates(), gross = G.grossRates();
+  assert.ok(net.amphora <= 1e-9, 'чистый выпуск амфор нулевой: всё сверх половины склада уходит гаваням');
+  assert.ok(net.wood < 0, 'кузницы жгут дерева больше, чем дают лесорубы');
+  assert.ok(gross.amphora > 0 && gross.wood > 0 && gross.food > net.food);
+  const before = { ...s.res }, r = G.perform('elders'), got = Object.fromEntries(r.gains);
+  assert.equal(got.amphora, Math.floor(gross.amphora * 180));
+  assert.equal(got.wood, Math.floor(Math.max(90, gross.wood * 180)));
+  assert.equal(got.iron, Math.floor(gross.iron * 180));
+  assert.ok(!('bronze' in got) && !('cheese' in got), 'ушедшие ресурсы не выдаются');
+  assert.equal(s.res.wood, before.wood + got.wood, 'и дерево за это не списывается');
+  assert.equal(Math.floor(G.suppliesNow().iron), got.iron, 'справка «сейчас дал бы» считает так же');
+});
+
 test('эпохи: Лемба и Мастера Суской в бронзовом веке становятся домом и мастерской 5-го уровня', () => {
   const G = fresh().get('Game');
   const s = G.state;
