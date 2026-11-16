@@ -26,35 +26,26 @@
   td.l { text-align: left; } tr.sum td { font-weight: 700; border-top: 2px solid var(--parch-3); }
   .dim { color: var(--ink-2); font-size: 12px; } .good { color: var(--good); } .bad { color: var(--bad); }
   details { margin: 8px 0; } summary { cursor: pointer; font-weight: 700; color: var(--accent); }
-  .plan input { width: 44px; font: inherit; text-align: right; border: 1px solid var(--parch-3); border-radius: 5px; background: #fff; padding: 1px 4px; }
+  td input[data-budget] { width: 76px; }
+  td input { width: 46px; font: inherit; text-align: right; border: 1px solid var(--parch-3); border-radius: 5px; background: #fff; padding: 1px 4px; }
   .err { background: #f6d8cf; padding: 8px 12px; border-radius: 8px; }
-  .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-  .kpi div { background: #fff8; border-radius: 8px; padding: 6px 12px; } .kpi b { font-size: 17px; }
+  details.extra { margin-top: 30px; } th .dim { font-weight: 400; }
+  .small { font-size: 12.5px; line-height: 1.4; } .small hr { border: 0; border-top: 1px dashed var(--parch-3); margin: 4px 0; }
 </style>
 </head>
 <body>
 <header>
   <h1>Λόγος · балансер</h1>
-  <p>Ожидаемый город на границах эпох и во что обходится каждая эпоха — в Логосе, в ресурсах, в зерне и во времени.
-  Считается движком игры прямо здесь: поменяли числа в игре — обновите страницу. Сколько производственных зданий стоит к концу эпохи —
-  допущение, его можно поправить в «Допущениях»; жилища, поля и склады балансер досчитывает сам.</p>
+  <p>Для каждой эпохи — в начале и в конце (конец эпохи = начало следующей). Считается движком игры прямо на этой странице:
+  поменяли числа в игре — обновите страницу. Сколько зданий стоит к концу эпохи — допущение, правится прямо в разделе 1.</p>
 </header>
 <div class="bar">
   <label><input type="checkbox" id="peek"> + эллинский Кипр (первая треть)</label>
-  <a href="#sum">Сводка</a><a href="#city">Город</a><a href="#rates">Курсы</a><a href="#prod">Выпуск</a><a href="#costs">Цены эпох</a><a href="#coins">Монеты</a>
+  <a href="#s1">1 здания</a><a href="#s2">2 население</a><a href="#s3">3 λ</a><a href="#s4">4 курсы</a><a href="#s5">5 выпуск</a>
+  <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a>
   <span class="sp"></span><span id="status" class="dim"></span>
 </div>
-<main>
-  <details class="plan" id="planBox"><summary>Допущения: производственные здания к концу эпохи (все — на пределе уровня эпохи)</summary>
-    <div id="planTable"></div>
-    <p class="note">Жилищ — столько, чтобы мест хватило и на население перехода, и на всех работников; полей — чтобы зерна хватало всем;
-    складов — чтобы влезла самая большая цена эпохи «с умом». Запасы — 60% склада (переработчики работают, гавань продаёт амфоры).
-    Правки запоминаются в этом браузере.</p>
-    <button class="ghost" id="reset">Вернуть как было</button>
-  </details>
-  <div id="out">Считаю…</div>
-</main>
-
+<main><div id="out">Считаю…</div></main>
 <!-- ядро игры: тот же порядок, что ASSETS в index.html (новый файл ядра — допишите и сюда) -->
 <script src="../../content/ru/words.js"></script>
 <script src="../../core/util.js"></script>
@@ -81,148 +72,228 @@
 'use strict';
 (() => {
   const $ = s => document.querySelector(s);
-  const KEY = 'greekgame.balancer.plan';
+  const KEY = 'greekgame.balancer.plan2';
   const nf = (x, d) => x.toLocaleString('ru-RU', { maximumFractionDigits: d, minimumFractionDigits: 0 });
   const fmt = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? nf(Math.round(x), 0) : Math.abs(x) >= 10 ? nf(x, 1) : nf(x, 2);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const bn = t => (Lex.bld[t] && (Lex.bld[t].name)) || t;
+  const bn = t => (Lex.bld[t] && Lex.bld[t].name) || t;
   const rn = k => (Lex.res[k] && Lex.res[k].name) || k;
   const ri = k => (Lex.res[k] && Lex.res[k].icon) || k;
   const tn = id => (Lex.tech[id] && Lex.tech[id].name) || id;
   const en = e => (Lex.epochs[e] && Lex.epochs[e].name) || ('эпоха ' + e);
-  const cost = c => Object.entries(c || {}).filter(([, v]) => v).map(([k, v]) => `<span title="${esc(rn(k))}">${ri(k)}&nbsp;${fmt(v)}</span>`).join(' ') || '—';
-  const tbl = (head, rows, cls = '') => `<table class="${cls}"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map((c, i) => `<td${i && typeof c === 'string' && c.startsWith('<span title=') ? ' class="l"' : ''}>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+  const L = h => ({ l: h });   // ячейка с выравниванием влево (ресурсы, списки)
+  const cost = c => L(Object.entries(c || {}).filter(([, v]) => v).map(([k, v]) => `<span title="${esc(rn(k))}">${ri(k)}&nbsp;${fmt(v)}</span>`).join(' ') || '—');
+  const tbl = (head, rows) => `<table><tr>${head.map(h => h && typeof h === 'object' ? `<th class="l">${h.l}</th>` : `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map(c =>
+    c && typeof c === 'object' ? `<td class="l">${c.l}</td>` : `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`;
   const x = v => v == null ? '—' : '×' + nf(v, 2);
-  const hrs = s => s >= 3600 ? fmt(s / 3600) + ' ч' : fmt(s / 60) + ' мин';
+  const dim = s => `<span class="dim">${s}</span>`;
+  const hrs = s => s >= 3600 ? nf(s / 3600, 1) + ' ч' : s >= 60 ? nf(s / 60, 0) + ' мин' : nf(s, 0) + ' с';
 
-  // ---------- допущения ----------
-  const loadPlan = () => { try { const p = JSON.parse(localStorage.getItem(KEY)); if (p) return p; } catch (e) {} return JSON.parse(JSON.stringify(Balancer.PLAN)); };
-  const savePlan = p => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {} };
-  let plan = loadPlan();
-  const PLAN_TYPES = ['goatpen', 'lumber', 'quarry', 'workshop', 'mine', 'port', 'foundry', 'scribe', 'vineyard', 'olivegrove', 'forge'];
-  function drawPlan() {
-    const eps = [0, 1, 2, 3].filter(e => EPOCHS[e] && EPOCHS[e].maxLevel);
-    $('#planTable').innerHTML = tbl(['', ...eps.map(e => `${e} · ${esc(en(e))}<br><span class="dim">ур. ${EPOCHS[e].maxLevel}</span>`)],
-      PLAN_TYPES.map(t => [esc(bn(t)), ...eps.map(e => BUILDINGS[t].epoch > e ? '<span class="dim">—</span>'
-        : `<input type="number" min="0" max="20" data-e="${e}" data-t="${t}" value="${(plan[e] || {})[t] || 0}">`)]));
-  }
-  $('#planTable').addEventListener('change', ev => {
-    const i = ev.target.closest('input'); if (!i) return;
-    (plan[i.dataset.e] = plan[i.dataset.e] || {})[i.dataset.t] = Math.max(0, Math.min(20, +i.value || 0));
-    savePlan(plan); go();
+  // ---------- допущения: сколько зданий к концу эпохи (правится в разделе 1) ----------
+  const fresh = () => JSON.parse(JSON.stringify(Balancer.PLAN));
+  let plan = (() => { try { const p = JSON.parse(localStorage.getItem(KEY)); if (p) return p; } catch (e) {} return fresh(); })();
+  // бюджет λ на уровни зданий за эпоху (правится в разделе 8)
+  const KEY_B = 'greekgame.balancer.budget2', freshB = () => Object.assign({}, Balancer.BUDGET);
+  let budget = (() => { try { const p = JSON.parse(localStorage.getItem(KEY_B)); if (p) return p; } catch (e) {} return freshB(); })();
+  const savePlan = () => { try { localStorage.setItem(KEY, JSON.stringify(plan)); localStorage.setItem(KEY_B, JSON.stringify(budget)); } catch (e) {} };
+  $('#out').addEventListener('change', ev => {
+    const i = ev.target.closest('input[data-t]'), bi = ev.target.closest('input[data-budget]');
+    if (i) (plan[i.dataset.e] = plan[i.dataset.e] || {})[i.dataset.t] = Math.max(0, Math.min(40, Math.round(+i.value) || 0));
+    else if (bi) budget[bi.dataset.budget] = Math.max(0, Math.min(100000, Math.round(+bi.value) || 0));
+    else return;
+    savePlan(); go();
   });
-  $('#reset').addEventListener('click', () => { plan = JSON.parse(JSON.stringify(Balancer.PLAN)); savePlan(plan); drawPlan(); go(); });
+  $('#out').addEventListener('click', ev => {
+    if (ev.target.id === 'reset') { plan = fresh(); savePlan(); go(); }
+    if (ev.target.id === 'resetB') { budget = freshB(); savePlan(); go(); }
+  });
   $('#peek').addEventListener('change', go);
 
-  // ---------- отчёт ----------
   function render(R) {
-    const S = R.stages, EP = R.epochs;
-    const colName = st => st.first ? 'начало игры' : `конец: ${esc(en(st.endOf))}`;
-    const cols = ['', ...S.map(colName)];
+    const S = R.stages, EP = R.epochs, last = EP.length - 1;
+    const col = st => st.first ? `начало: ${esc(en(0))}` : `конец: ${esc(en(st.endOf))}${EPOCHS[st.endOf + 1] ? `<br>${dim('= начало: ' + esc(en(st.endOf + 1)))}` : ''}`;
+    const cols = ['', ...S.map(col)];
+    const pct = v => (v > 0 ? '+' : '−') + nf(Math.abs(v) * 100, 0) + '%';
+    const src = s => s.kind === 'tech' ? `«${esc(tn(s.id))}»` : esc(bn(s.id));
+    const typeName = t => esc(bn(t)).toLowerCase();
+    const wheatAt = (st, k, v) => v * (st.a.rates[k] != null ? st.a.rates[k] : (R.worth[k] || 1));
     let h = '';
 
-    // сводка
-    h += `<h2 id="sum">Сводка по эпохам</h2>
-      <p class="note">Выпуск — средний за эпоху, в зерне по «трудовым» курсам. «С умом» — знания за λ и все чудеса; «ресурсами» — знания через силу,
-      без необязательных чудес за λ (λ всё равно нужен на уровни за λ, обязательные чудеса и переход). Время: λ — в раундах учёбы (λ за раунд с бонусами),
-      ресурсы — в часах выпуска всего города.</p>`;
-    h += tbl(['эпоха', 'выпуск, зерна/с', 'λ за раунд', '1 λ ≈ зерна', 'знания: λ «с умом» / силой', 'обязательно λ', 'постройки и уровни', 'итог «с умом»', 'итог «ресурсами»'],
-      EP.map(p => [`${p.e} · ${esc(en(p.e))}`, fmt(p.prod), Math.round(p.lpr), fmt(p.perL), `${p.tl} λ / ${hrs(p.tlab / p.prod)}`, p.mustL,
-        `${fmt(p.up.logos)} λ + ${hrs(p.up.w / p.prod)}`,
-        `<b>${fmt(p.scen.mind.logos)} λ</b> <span class="dim">(${fmt(p.scen.mind.logos / p.lpr)} р.)</span> + ${hrs(p.scen.mind.w / p.prod)}`,
-        `<b>${fmt(p.scen.labor.logos)} λ</b> <span class="dim">(${fmt(p.scen.labor.logos / p.lpr)} р.)</span> + ${hrs(p.scen.labor.w / p.prod)}`]));
-    if (EP.length > 1) h += `<p class="note">К прошлой эпохе: ${EP.slice(1).map((p, i) => { const a = EP[i];
-      return `${a.e}→${p.e}: выпуск ×${nf(p.prod / a.prod, 1)}, 1 λ в зерне ×${nf(p.perL / a.perL, 1)}, λ «с умом» ×${nf(p.scen.mind.logos / a.scen.mind.logos, 1)}, ресурсы «ресурсами» в часах ×${nf((p.scen.labor.w / p.prod) / (a.scen.labor.w / a.prod), 1)}`; }).join('; ')}.</p>`;
+    // ---------- 1. здания и бонусы ----------
+    h += `<h2 id="s1">1. Ожидаемое количество зданий и бонусы-множители</h2>
+      <p class="note">Сколько зданий каждого типа стоит к концу эпохи — допущение, его можно менять прямо в таблице (запоминается в этом браузере).
+      Бывшие чудеса прошлой эпохи (Лемба → жилище…) прибавляются сами (серое «+1»). Уровни — не предел эпохи, а сколько позволит
+      бюджет λ на уровни (раздел 8): серым под числом — какие уровни у зданий к концу эпохи.</p>`;
+    const types = Object.keys(BUILDINGS).filter(t => !BUILDINGS[t].special && BUILDINGS[t].epoch <= last);
+    const lvls = c => { const m = {}; for (const l of c.levels) m[l] = (m[l] || 0) + 1; return Object.entries(m).sort((a, b) => b[0] - a[0]).map(([l, n]) => `${n}×${l}`).join(' '); };
+    h += tbl(cols, [['предел уровня в эпоху', ...S.map(st => st.first ? 1 : EPOCHS[st.endOf].maxLevel)]].concat(types.map(t => [esc(bn(t)), ...S.map(st => {
+      const c = st.a.counts[t], extra = c ? c.n - ((plan[st.endOf] || {})[t] || 0) : 0;
+      if (st.first) return c ? `${c.n}<br>${dim('ур. ' + lvls(c))}` : dim('—');
+      if (BUILDINGS[t].epoch > st.endOf) return dim('—');
+      return `<input type="number" min="0" max="40" data-e="${st.endOf}" data-t="${t}" value="${(plan[st.endOf] || {})[t] || 0}">${extra > 0 ? dim(' +' + extra) : ''}${c ? `<br>${dim('ур. ' + lvls(c))}` : ''}`;
+    })])).concat([
+      ['чудеса (а): обязательные и без λ', ...S.map(st => L(dim(st.a.wonders.map(w => esc(bn(w))).join(', ') || '—')))],
+      ['+ необязательные за λ (б)', ...S.map(st => L(dim(st.b.wonders.filter(w => !st.a.wonders.includes(w)).map(w => esc(bn(w))).join(', ') || '—')))],
+      ['земля: равнина · лес · холмы', ...S.map(st => { const g = st.a.land, bad = k => g.use[k] > g.tiles[k] ? 'bad' : '';
+        return `<span class="${bad('plain')}">${g.use.plain}/${g.tiles.plain}</span> · <span class="${bad('forest')}">${g.use.forest}/${g.tiles.forest}</span> · <span class="${bad('hill')}">${g.use.hill}/${g.tiles.hill}</span>${g.use.flex ? dim(` +${g.use.flex} лес или холмы`) : ''}`; })],
+    ])) + `<button class="ghost" id="reset">Вернуть количество зданий как было</button>`;
+    h += `<h3>Бонус-множители по ресурсам: (а) без необязательных чудес за λ / (б) с ними</h3>
+      <p class="note">Во сколько раз знания и чудеса увеличивают выпуск ресурса всеми зданиями города (благословения обрядов не в счёт).
+      У каждого здания множитель свой: 1 + бонусы к ресурсу (и «ко всему») + бонусы именно этому типу зданий; «вполсилы» и наценка гавани — отдельным множителем.
+      Множитель города — среднее по типам зданий, взвешенное по их выпуску без бонусов.</p>`;
+    h += tbl(cols, RES_KEYS.filter(k => S.some(st => st.a.mult[k] != null))
+      .map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => st.a.mult[k] == null ? dim('—') : `<b>${x(st.a.mult[k])}</b> / ${x(st.b.mult[k])}`)]));
+    h += `<details open><summary>Из чего набирается — по каждому ресурсу</summary>` + tbl(cols, RES_KEYS.filter(k => S.some(st => st.a.bonus[k])).map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => {
+      const A = st.a.bonus[k], Bb = st.b.bonus[k];
+      if (!A) return dim('—');
+      const tot = A.byType.reduce((a, t) => a + t.share, 0);
+      const byType = A.byType.map(t => `${typeName(t.type)} ×${nf(t.mult, 2)} <span class="dim">(${nf(t.share / tot * 100, 0)}% выпуска)</span>`).join('<br>');
+      const line = s => s.scale ? `${typeName(s.scope)} ×${nf(s.v, 2)}: ${src(s)}` : s.trade ? `продажа (${typeName(s.scope)}) ${pct(s.v)}: ${src(s)}`
+        : `${s.scope === 'all' ? 'ко всему ' : s.scope === 'res' ? '' : typeName(s.scope) + ' '}${pct(s.v)}: ${src(s)}`;
+      const key = s => s.kind + s.id + s.scope + s.v;
+      const extra = (Bb ? Bb.sources : []).filter(s => !A.sources.some(a => key(a) === key(s)));
+      return L(`<div class="small">${byType}<hr>${A.sources.map(line).join('<br>') || dim('бонусов нет')}${extra.length ? `<br><span class="dim">(б): ${extra.map(line).join('; ')}</span>` : ''}</div>`);
+    })])) + `</details>`;
 
-    // 1–3. город
-    h += `<h2 id="city">Город</h2><p class="note">Столбцы — состояния города: начало игры и конец каждой эпохи (он же начало следующей).
-      (а) — без необязательных чудес за λ, (б) — с ними.</p>`;
-    const types = [...new Set(S.flatMap(st => Object.keys(st.a.counts)))];
-    h += `<h3>1. Здания (а): сколько × уровень</h3>` + tbl(cols, types.map(t => [esc(bn(t)), ...S.map(st => { const c = st.a.counts[t]; return c ? `${c.n} × ${[...new Set(c.levels)].join('/')}` : '<span class="dim">—</span>'; })]).concat([
-      ['чудеса (а)', ...S.map(st => `<span class="dim">${st.a.wonders.map(w => esc(bn(w))).join(', ') || '—'}</span>`)],
-      ['+ чудеса за λ (б)', ...S.map(st => `<span class="dim">${st.b.wonders.filter(w => !st.a.wonders.includes(w)).map(w => esc(bn(w))).join(', ') || '—'}</span>`)],
-      ['земля: равнина / лес / холмы', ...S.map(st => { const L = st.a.land; return `${L.use.plain}/${L.tiles.plain} · ${L.use.forest}/${L.tiles.forest} · ${L.use.hill}/${L.tiles.hill}${L.use.flex ? ` <span class="dim">+${L.use.flex} на выбор</span>` : ''}`; })],
-    ]));
-    h += `<h3>1. Бонус-множитель выпуска по ресурсам, (а) / (б)</h3>` + tbl(cols, RES_KEYS.filter(k => S.some(st => st.a.mult[k] != null))
-      .map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => st.a.mult[k] == null ? '<span class="dim">—</span>' : `${x(st.a.mult[k])} / ${x(st.b.mult[k])}`)]));
+    // ---------- 2. население и склады ----------
     const tgt = st => { const t = st.target; if (!t || !t.what) return '—'; const w = t.what;
-      const what = w.kind === 'advance' ? 'переход' : w.kind === 'wonder' ? esc(bn(w.id)) : w.kind === 'tech' ? esc(tn(w.id)) : `${esc(bn(w.id))} до ${w.level}`;
-      return `<span class="dim">${what}: ${ri(t.res)} ${fmt(t.v)}</span>`; };
-    h += `<h3>2–3. Население, склады, Логос</h3>` + tbl(cols, [
-      ['мест для жителей, (а) / (б)', ...S.map(st => `${st.a.pop} / ${st.b.pop}`)],
-      ['работников нужно', ...S.map(st => st.a.workers)],
-      ['вместимость склада, (а) / (б)', ...S.map(st => `${fmt(st.a.storage)} / ${fmt(st.b.storage)}`)],
-      ['склад досчитан под', ...S.map(tgt)],
-      ['множитель λ, (а) / (б)', ...S.map(st => `${x(st.a.logos)} / ${x(st.b.logos)}`)],
-      ['λ за раунд, (а) / (б)', ...S.map(st => `${Math.round(R.round * st.a.logos)} / ${Math.round(R.round * st.b.logos)}`)],
+      const what = w.kind === 'advance' ? 'переход' : w.kind === 'wonder' ? esc(bn(w.id)) : w.kind === 'tech' ? esc(tn(w.id)) : `${esc(bn(w.id))} до ${w.level}-го`;
+      return `${what}: ${ri(t.res)} ${fmt(t.v)} ${t.v > st.a.storage ? '<span class="bad">— не влезает</span>' : '<span class="good">✓</span>'}`; };
+    h += `<h2 id="s2">2. Население и складские мощности</h2>`;
+    h += tbl(cols, [
+      ['мест для жителей: (а) / (б)', ...S.map(st => `${st.a.pop} / ${st.b.pop}`)],
+      ['работников нужно', ...S.map(st => `${st.a.workers}${st.a.eff < 0.999 ? ` <span class="bad">— рук не хватает, работают на ${Math.round(st.a.eff * 100)}%</span>` : ''}`)],
+      ['зерно: остаток в секунду (после еды всех жителей)', ...S.map(st => `<span class="${st.a.food < 0 ? 'bad' : ''}">${fmt(st.a.food)}</span>`)],
+      ['вместимость складов: (а) / (б)', ...S.map(st => `${fmt(st.a.storage)} / ${fmt(st.b.storage)}`)],
+      ['самая большая цена эпохи «с умом»', ...S.map(tgt)],
     ]);
 
-    // 4. курсы
-    h += `<h2 id="rates">4. Курсы ресурсов в зерне</h2><p class="note">«Трудовой» курс: сколько зерна дал бы на поле работник, пока делает единицу ресурса
-      (с бонусами города (а); сырьё — плюсом, попутный выпуск — минусом). Серым — ценник игры (BALANCE.worth) для сравнения.</p>`;
-    h += tbl(cols, RES_KEYS.map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => `${st.a.rates[k] == null ? '—' : fmt(st.a.rates[k])} <span class="dim">${R.worth[k] || ''}</span>`)]));
+    // ---------- 3. множитель λ ----------
+    h += `<h2 id="s3">3. Бонус-множитель Логоса</h2><p class="note">На него умножается λ за каждую карточку.
+      Считается так: 1 + бонусы знаний и чудес + каждый дом писцов (8% и ещё 2% за каждый уровень выше первого). Обряды на время не в счёт.</p>`;
+    const lp = p => p.kind === 'building' ? `${p.n > 1 ? p.n + ' × ' : ''}${esc(bn(p.id)).toLowerCase()} ${p.level}-го ур. +${nf(p.v / p.n * 100, 0)}%` : `${src(p)} +${nf(p.v * 100, 0)}%`;
+    h += tbl(cols, [
+      ['множитель λ: (а) / (б)', ...S.map(st => `<b>${x(st.a.logos)}</b> / ${x(st.b.logos)}`)],
+      ['из чего (а)', ...S.map(st => L(`<div class="small">1${st.a.logosParts.map(p => ' + ' + lp(p)).join('<br>')}</div>`))],
+      ['(б) сверх того', ...S.map(st => { const ex = st.b.logosParts.filter(p => !st.a.logosParts.some(q => q.kind === p.kind && q.id === p.id && q.level === p.level && q.n === p.n));
+        return L(`<div class="small">${ex.map(lp).join('<br>') || dim('—')}</div>`); })],
+    ]);
 
-    // 5. выпуск
-    h += `<h2 id="prod">5. Выпуск города</h2><p class="note">Чистый выпуск в секунду (после еды жителей и сырья переработчиков), (а).</p>`;
-    h += tbl(cols, RES_KEYS.filter(k => S.some(st => Math.abs(st.a.net[k]) > 1e-6)).map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => Math.abs(st.a.net[k]) > 1e-6 ? `<span class="${st.a.net[k] < 0 ? 'bad' : ''}">${fmt(st.a.net[k])}</span>` : '<span class="dim">—</span>')]).concat([
-      { cls: 'sum', cells: ['всё в зерне: чистый / валовой', ...S.map(st => `${fmt(st.a.prod)} / ${fmt(st.a.prodGross)}`)] },
-      ['по ценнику игры, чистый', ...S.map(st => fmt(st.a.prodWorth))],
-      ['(б), в зерне', ...S.map(st => fmt(st.b.prod))],
+    // ---------- 4. курсы ----------
+    h += `<h2 id="s4">4. Курсы ресурсов в зерне</h2><p class="note">Сколько зерна стоит единица ресурса: работник, который её делает, на поле дал бы
+      столько зерна за то же время (с бонусами города (а); сырьё прибавлено, попутный выпуск вычтен). Серым — ценник игры (BALANCE.worth), для сравнения.
+      Дальше все ресурсы пересчитываются в зерно по этим курсам; если ресурса в эпохе нет — по ценнику игры.</p>`;
+    h += tbl(cols, RES_KEYS.map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => `${st.a.rates[k] == null ? '—' : fmt(st.a.rates[k])} ${dim(R.worth[k] || '')}`)]));
+
+    // ---------- 5. производительность ----------
+    h += `<h2 id="s5">5. Производительность города</h2><p class="note">Чистый выпуск в секунду — после еды жителей и сырья переработчиков, (а); в скобках — в зерне по курсам раздела 4.</p>`;
+    h += tbl(cols, RES_KEYS.filter(k => S.some(st => Math.abs(st.a.net[k]) > 1e-6)).map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => {
+      const v = st.a.net[k];
+      return Math.abs(v) > 1e-6 ? `<span class="${v < 0 ? 'bad' : ''}">${fmt(v)}</span> ${dim('(' + fmt(wheatAt(st, k, v)) + ')')}` : dim('—'); })]).concat([
+      { cls: 'sum', cells: ['всё в зерне, в секунду: (а) / (б)', ...S.map(st => `${fmt(st.a.prod)} / ${fmt(st.b.prod)}`)] },
+      ['то же по ценнику игры, (а)', ...S.map(st => fmt(st.a.prodWorth))],
     ]));
 
-    // 6–10. цены эпох
-    h += `<h2 id="costs">6–10. Цены эпох</h2><p class="note">Ресурсы пересчитаны в зерно по курсам конца эпохи; «минут выпуска» — при средней производительности эпохи.</p>`;
-    for (const p of EP) {
-      const wh = c => Object.entries(c || {}).reduce((v, [k, n]) => v + n * (p.rates[k] != null ? p.rates[k] : (R.worth[k] || 1)), 0);
-      h += `<details ${p.e === EP.length - 1 ? 'open' : ''}><summary>Эпоха ${p.e} · ${esc(en(p.e))}</summary>
-        <div class="kpi"><div>выпуск <b>${fmt(p.prod)}</b> зерна/с</div><div>раунд <b>${Math.round(p.lpr)}</b> λ</div>
-        <div>1 λ ≈ <b>${fmt(p.perL)}</b> зерна = ${fmt(p.perL / p.prod)} с выпуска</div><div>раунд ≈ <b>${hrs(p.perL * p.lpr / p.prod)}</b> выпуска</div></div>`;
-      h += `<h3>6. Знания</h3>` + tbl(['знание', '«с умом»', 'ресурсы в зерне', '«через силу»', 'в зерне', 'это выпуска'],
-        p.techs.map(t => [esc(tn(t.id)), `λ ${t.logos} + ${cost(t.mind)}`, fmt(t.mindW), cost(t.labor), fmt(t.laborW), hrs(t.laborW / p.prod)])
-          .concat([{ cls: 'sum', cells: ['всего', `λ ${p.tl}`, fmt(p.tm), '', fmt(p.tlab), hrs(p.tlab / p.prod)] }]));
-      const KIND = { must: 'обязательное', logos: 'за λ', res: 'без λ' };
-      h += `<h3>7. Обязательно в λ: ${p.mustL}</h3><p class="note">Переход ${p.adv ? p.adv.logos : 0} λ + обязательные чудеса; без знаний и уровней за λ.
-        ${p.adv ? `Переход ещё просит ${cost(p.adv.res)} (${fmt(p.adv.w)} зерна).` : 'Перехода дальше пока нет.'}</p>`;
-      h += tbl(['чудо', 'вид', 'λ', 'ресурсы', 'в зерне', 'это выпуска'], p.wonders.map(w => [esc(bn(w.id)), KIND[w.kind], w.logos || '—', cost(w.cost), fmt(w.w), hrs(w.w / p.prod)]));
-      h += `<h3>8. Постройки и улучшения</h3><p class="note">Из города на начало эпохи в город на конец, (а): <b>${fmt(p.up.logos)} λ</b> и ${cost(p.up.res)}
-        = <b>${fmt(p.up.w)}</b> зерна (${hrs(p.up.w / p.prod)} выпуска).</p>`;
-      h += `<h3>9. Курс «λ ↔ ресурсы»</h3><p class="note">По знаниям (путь «через силу» минус ресурсы «с умом», делённое на λ): 1 λ ≈ <b>${fmt(p.perL)}</b> зерна.</p>`;
-      h += `<h3>10. Вся эпоха</h3>` + tbl(['сценарий', 'λ', 'раундов', 'ресурсы', 'в зерне', 'это выпуска'], [
-        ['по максимуму «с умом»', fmt(p.scen.mind.logos), fmt(p.scen.mind.logos / p.lpr), cost(p.scen.mind.res), fmt(p.scen.mind.w), hrs(p.scen.mind.w / p.prod)],
-        ['по максимуму ресурсами', fmt(p.scen.labor.logos), fmt(p.scen.labor.logos / p.lpr), cost(p.scen.labor.res), fmt(p.scen.labor.w), hrs(p.scen.labor.w / p.prod)],
-      ]) + `</details>`;
-    }
+    // ---------- 6–10: по эпохам ----------
+    const ep = p => `${p.e} · ${esc(en(p.e))}`;
+    const rateList = p => Object.entries(p.rates).filter(([k]) => k !== 'food').map(([k, v]) => `${ri(k)} ${fmt(v)}`).join(' · ');
+    const secs = (w, prod) => prod > 0 ? hrs(w / prod) : '—';
+    h += `<h2 id="s6">6. Стоимость всей науки эпохи</h2><p class="note">Все знания эпохи по ценам на момент изучения; ресурсы — и как есть, и в зерне
+      по курсам конца эпохи (раздел 4).</p>`;
+    h += tbl(['эпоха', '«с умом»: λ', L('и ресурсы'), 'в зерне', L('«через силу»: ресурсы'), 'в зерне'],
+      EP.map(p => [ep(p), p.tl, cost(p.techMind), fmt(p.tm), cost(p.techLabor), fmt(p.tlab)]));
+    h += EP.map(p => `<details><summary>знания эпохи ${ep(p)}</summary>` + tbl(['знание', '«с умом»: λ', L('и ресурсы'), 'в зерне', L('«через силу»'), 'в зерне'],
+      p.techs.map(t => [esc(tn(t.id)), t.logos, cost(t.mind), fmt(t.mindW), cost(t.labor), fmt(t.laborW)])) + `</details>`).join('');
 
-    // 11. монеты
-    h += `<h2 id="coins">11. Серебро (монеты): мастерская, вино, медь</h2><p class="note">С одного здания уровня города, серебра в секунду; серым — на работника.
-      Вино и медь — через гавань: амфоры по торговой линии, медь по основной (её зерно пересчитано в серебро; руки гавани — по доле её меди).</p>`;
-    const cs = st => st.a.coins, c0 = st => st.a.coins0;
-    const cell = v => v ? `${fmt(v.v)} <span class="dim">${fmt(v.w)}</span>` : '<span class="dim">—</span>';
-    h += tbl(cols, [['мастерская', 'workshop'], ['виноградник → гавань', 'vineyard'], ['оливковая роща → гавань', 'olivegrove'], ['рудник → гавань (медь)', 'mine']]
-      .map(([n, k]) => [n, ...S.map(st => cell(cs(st)[k]))]).concat([
-        { cls: 'sum', cells: ['виноградник к мастерской', ...S.map(st => cs(st).vineyard && cs(st).workshop ? x(cs(st).vineyard.v / cs(st).workshop.v) : '—')] },
-        ['то же без чудес (только знания)', ...S.map(st => c0(st).vineyard && c0(st).workshop ? x(c0(st).vineyard.v / c0(st).workshop.v) : '—')],
-        ['рудник к мастерской, на работника', ...S.map(st => cs(st).mine && cs(st).workshop ? x(cs(st).mine.w / cs(st).workshop.w) : '—')],
-      ]));
+    h += `<h2 id="s7">7. Стоимость в Логосе обязательной части</h2><p class="note">Без чего не перейти в следующую эпоху, в λ: сам переход и обязательные чудеса.
+      Знания тоже обязательны, но их можно взять «через силу» (раздел 6); уровни за λ — в разделе 8.</p>`;
+    h += tbl(['эпоха', 'переход', L('обязательные чудеса'), 'итого λ'],
+      EP.map(p => { const m = p.wonders.filter(w => w.kind === 'must'); return [ep(p), p.adv ? p.adv.logos : dim('перехода пока нет'),
+        L(m.map(w => `${esc(bn(w.id))} — ${w.logos}`).join(', ') || '—'), `<b>${p.mustL}</b>`]; }));
+
+    h += `<h2 id="s8">8. λ-бюджет улучшений: все постройки и улучшения зданий за эпоху</h2><p class="note">Из города на начало эпохи в город на конец (раздел 1, (а)).
+      Новые здания — по цене постройки (каждое следующее того же типа в ${BALANCE.buildCostGrowth} раза дороже); перестроенные (загон → виноградник, литейня → кузница) —
+      по цене нового, уровень сохраняется. Уровни ${Object.keys(BALANCE.wisdomLevels).join(', ')} — только за λ, остальные — только за ресурсы.</p>
+      <p class="note"><b>Как модель тратит λ на уровни.</b> Ресурсы игрок тратит до последнего, а λ — нет: на уровни за Логос за эпоху уходит
+      бюджет (ориентир, правится ниже). Порядок: 1) склады — чтобы влезла самая большая цена эпохи; 2) жилища — под население перехода;
+      3) дома писцов — пока уровень окупается Логосом до конца эпохи (прибавка множителя × половина λ эпохи ≥ цене уровня);
+      4) остальное — ровно: следующий уровень получает самое отстающее производственное здание (при равных — то, где уровень дешевле);
+      не хватает зерна — сначала поля, новым работникам негде жить — сначала жилище. Уровни за ресурсы — сразу, пока цена влезает в склад.</p>`;
+    h += tbl(['эпоха', 'бюджет λ на уровни', 'потрачено λ', L('ресурсы'), 'в зерне'], EP.map(p => [ep(p),
+      `<input type="number" min="0" step="50" data-budget="${p.e}" value="${budget[p.e] != null ? budget[p.e] : p.up.budget}">`, `<b>${fmt(p.up.logos)}</b>`, cost(p.up.res), fmt(p.up.w)]))
+      + `<button class="ghost" id="resetB">Вернуть бюджеты как было</button>`;
+    h += EP.map(p => `<details open><summary>на что уйдёт: эпоха ${ep(p)}</summary>` + tbl(
+      ['здание', L('было → стало'), L('λ по уровням'), 'λ', L('постройка и перестройка'), L('улучшения'), 'в зерне'],
+      p.up.detail.map(d => [esc(bn(d.type)),
+        L(`${Object.entries(d.from).map(([lv, n]) => `${n} × ${lv}-й`).join(' + ')} → ${Object.entries(d.to).sort((a, b) => b[0] - a[0]).map(([lv, n]) => `${n} × ${lv}-й`).join(' + ')}${d.built ? dim(` (новых ${d.built})`) : ''}${d.rebuilt.length ? dim(` (из ${d.rebuilt.length} × ${esc(bn(d.rebuilt[0])).toLowerCase()})`) : ''}${d.wonder ? dim(` (бывших чудес ${d.wonder})`) : ''}`),
+        L(Object.entries(d.logosLv).map(([lv, v]) => `${lv}-й: ${fmt(v)}`).join(' · ') || dim('—')), d.logos ? `<b>${fmt(d.logos)}</b>` : dim('—'), cost(d.buildRes), cost(d.upRes), fmt(d.w)])
+        .concat([{ cls: 'sum', cells: ['всего', '', '', `<b>${fmt(p.up.logos)}</b>`, '', cost(p.up.res), fmt(p.up.w)] }])) + `</details>`).join('');
+
+    h += `<h2 id="s9">9. Прикидочный курс «Логос ↔ ресурсы»</h2><p class="note">По знаниям эпохи: сколько зерна заменяет 1 λ, если брать знания «через силу», а не «с умом».
+      Справа — сколько это секунд выпуска города (раздел 5) в начале и в конце эпохи (* — для медно-каменного века мощь на начало взята как треть от конца).</p>`;
+    h += tbl(['эпоха', '«через силу», в зерне', '− ресурсы «с умом», в зерне', '÷ λ «с умом»', '= 1 λ ≈ зерна', 'выпуск города: начало → конец', '1 λ = секунд выпуска: начало → конец'],
+      EP.map(p => [ep(p), fmt(p.tlab), fmt(p.tm), p.tl, `<b>${fmt(p.perL)}</b>`, `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''} → ${fmt(p.prod1)}`,
+        `${fmt(p.perL / p.prod0)} → ${fmt(p.perL / p.prod1)}`]));
+    h += `<p class="note">В зерно всё переведено по курсам конца эпохи (раздел 4): ${EP.map(p => `<br>${p.e}: ${rateList(p)}`).join('')}</p>`;
+    h += `<h3>Твёрдый курс обрядов (ориентир)</h3><p class="note">${EP[0].riteRate} λ = 1 минута выпуска города на начало эпохи (раздел 5, * — треть от конца эпохи),
+      то есть 1 λ = ${fmt(60 / EP[0].riteRate)} секунд выпуска на начало. Пока по нему стоит только «Сбор припасов» медно-каменного века
+      (${RITUAL_BY_ID.elders.logos} λ за ${BALANCE.suppliesSec / 60} минуты; он даёт выпуск без вычета еды жителей — чуть больше чистого).
+      Для следующих эпох — что вышло бы, если держать тот же курс; ни к чему пока не применено.</p>`;
+    h += tbl(['эпоха', 'выпуск на начало, зерна/с', '1 минута выпуска, зерна', `÷ ${EP[0].riteRate} λ = 1 λ ≈ зерна`, 'курс по знаниям (выше), 1 λ ≈ зерна', 'по знаниям λ дешевле в'],
+      EP.map(p => [ep(p) + (p.e ? dim(' (если так же)') : ''), `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''}`, fmt(p.prod0 * 60), `<b>${fmt(p.riteL)}</b>`, fmt(p.perL),
+        p.perL ? `${fmt(p.riteL / p.perL)} раза` : dim('—')]));
+
+    h += `<h2 id="s10">10. Полные затраты эпохи: два сценария</h2><p class="note"><b>По максимуму «с умом»</b> — знания за λ, все чудеса (и за λ, и без λ).
+      <b>По максимуму ресурсами</b> — знания «через силу», чудеса только обязательные и без λ; λ всё равно нужен на обязательное (раздел 7) и на уровни за λ (раздел 8).
+      Ресурсы складываются как есть, потом переводятся в зерно по курсам конца эпохи (раздел 4). Дальше — две оценки, сколько это работы города:
+      при мощи города <b>на начало эпохи</b> и <b>на конец эпохи</b> (выпуск в зерне в секунду, раздел 5): часы = зерно ÷ мощь ÷ 3600.
+      В начале игры город почти ноль, поэтому для медно-каменного века мощь на начало взята как треть от конца эпохи (*) — легко достижимое состояние.</p>`;
+    const pw = (p, start) => start ? `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''}` : fmt(p.prod1);
+    h += tbl(['эпоха', 'сценарий', 'λ', L('ресурсы'), 'в зерне', 'мощь на начало, зерна/с', '= часов работы', 'мощь на конец, зерна/с', '= часов работы'], EP.flatMap(p => [
+      [ep(p), '«с умом»', `<b>${fmt(p.scen.mind.logos)}</b>`, cost(p.scen.mind.res), fmt(p.scen.mind.w), pw(p, true), `<b>${secs(p.scen.mind.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.mind.w, p.prod1)}</b>`],
+      ['', 'ресурсами', `<b>${fmt(p.scen.labor.logos)}</b>`, cost(p.scen.labor.res), fmt(p.scen.labor.w), pw(p, true), `<b>${secs(p.scen.labor.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.labor.w, p.prod1)}</b>`],
+    ]));
+    const PART = { techMind: 'знания «с умом» (раздел 6)', techLabor: 'знания «через силу» (раздел 6)', must: 'обязательные чудеса (раздел 7)',
+      optLogos: 'необязательные чудеса за λ', resWonders: 'чудеса без λ', up: 'постройки и улучшения (раздел 8)', advance: 'переход (раздел 7)' };
+    const yes = b => b ? '✓' : dim('—');
+    h += EP.map(p => { const sumL = f => p.parts.filter(f).reduce((a, x) => a + x.logos, 0), sumW = f => p.parts.filter(f).reduce((a, x) => a + x.w, 0);
+      return `<details open><summary>из чего сложено: эпоха ${ep(p)}</summary>` + tbl(['слагаемое', 'λ', L('ресурсы'), 'в зерне', '«с умом»', 'ресурсами'],
+        p.parts.filter(x => x.logos || Object.keys(x.res).length).map(x => [PART[x.key], x.logos ? fmt(x.logos) : dim('—'), cost(x.res), fmt(x.w), yes(x.mind), yes(x.labor)]).concat([
+          { cls: 'sum', cells: ['итого «с умом»', fmt(sumL(x => x.mind)), '', fmt(sumW(x => x.mind)), '✓', ''] },
+          { cls: 'sum', cells: ['итого ресурсами', fmt(sumL(x => x.labor)), '', fmt(sumW(x => x.labor)), '', '✓'] },
+        ])) + `<p class="note">Мощь города: на начало эпохи ${fmt(p.prod0)} зерна/с${p.prod0Assumed ? ' (треть от конца — начало игры почти ноль)' : ''}, на конец ${fmt(p.prod1)} (раздел 5).
+          Итого «с умом» — ${secs(sumW(x => x.mind), p.prod0)} работы города при мощи на начало, ${secs(sumW(x => x.mind), p.prod1)} — при мощи на конец;
+          ресурсами — ${secs(sumW(x => x.labor), p.prod0)} и ${secs(sumW(x => x.labor), p.prod1)}.</p></details>`; }).join('');
+
+    // ---------- дополнительно ----------
+    const cs = st => st.a.coins, c0 = st => st.a.coins0, cell = v => v ? `${fmt(v.v)} ${dim(fmt(v.w))}` : dim('—');
+    h += `<details class="extra"><summary>Дополнительно (не из списка): откуда монеты — мастерская, вино, медь</summary>
+      <p class="note">С одного здания уровня города, серебра в секунду; серым — на работника. Вино и медь — через гавань.</p>` +
+      tbl(cols, [['мастерская', 'workshop'], ['виноградник → гавань', 'vineyard'], ['оливковая роща → гавань', 'olivegrove'], ['рудник → гавань (медь)', 'mine']]
+        .map(([n, k]) => [n, ...S.map(st => cell(cs(st)[k]))]).concat([
+          ['виноградник к мастерской', ...S.map(st => cs(st).vineyard && cs(st).workshop ? x(cs(st).vineyard.v / cs(st).workshop.v) : '—')],
+          ['то же без чудес (только знания)', ...S.map(st => c0(st).vineyard && c0(st).workshop ? x(c0(st).vineyard.v / c0(st).workshop.v) : '—')],
+        ])) + `</details>`;
     return h;
   }
 
   function go() {
     $('#status').textContent = 'считаю…';
+    const y = window.scrollY;
     setTimeout(() => {
       const t0 = performance.now();
       try {
-        const R = Balancer.run({ plan, last: $('#peek').checked ? 3 : 2 });
+        const R = Balancer.run({ plan, budget, last: $('#peek').checked ? 3 : 2 });
         $('#out').innerHTML = render(R);
+        window.scrollTo(0, y);
         $('#status').textContent = `посчитано за ${Math.round(performance.now() - t0)} мс`;
       } catch (e) {
-        $('#out').innerHTML = `<p class="err">Не посчиталось: ${esc(e.message)}. Проверьте допущения (например, «Вернуть как было»).</p>`;
+        $('#out').innerHTML = `<p class="err">Не посчиталось: ${esc(e.message)}.</p><button class="ghost" id="reset">Вернуть количество зданий как было</button>`;
         $('#status').textContent = '';
         console.error(e);
       }
     }, 20);
   }
-  drawPlan();
   go();
 })();
 </script>

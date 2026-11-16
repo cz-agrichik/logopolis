@@ -34,6 +34,9 @@ const BALANCE = {
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
+  // беглые козы: следующая — через столько секунд (пока коза на карте, отсчёт стоит); ловить каждую — около +30% к выпуску,
+  // с Троодосом (чаще и щедрее на 60%) — около +85%
+  goatEvery: [102, 238], goatEveryFast: [60, 136],
   suppliesSec: 180,        // «Сбор припасов»: столько секунд выпуска зданий в медно-каменном веке…
   suppliesPerEpoch: 60,    // …и на минуту больше с каждой эпохой (3, 4, 5, 6 минут)
   raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
@@ -143,9 +146,9 @@ const BUILDINGS = {
   scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
-  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 90, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
+  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 55, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
   sp_troodos: { special: true, epoch: 0, terrain: ['hill'], cost: { food: 1500, wood: 900 }, logos: 0, effect: { bmult: { goatpen: 0.6 }, goats: true } },
-  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 60, effect: { bmult: { workshop: 1.5 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
+  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 60, effect: { bmult: { workshop: 1 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
   shrine1: { special: true, epoch: 0, terrain: ['plain'], cost: { stone: 300, goods: 80 }, logos: 180, effect: { mult: { food: 0.2 }, growth: 0.5, logos: 0.1 } },
   sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } }, retire: { epoch: 2, into: 'port', level: 9 } },
   sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } }, retire: { epoch: 2, into: 'foundry', level: 9 } },
@@ -168,13 +171,15 @@ const BUILDINGS = {
 };
 
 // Знания: λ + ресурсы (путь «с умом») или только ресурсы (путь «через силу»). effect — постоянный бонус.
+// laborLogos — от скольких λ считается путь «через силу» (если не задано — от logos). В медно-каменном веке λ «с умом»
+// пересчитаны по курсу обрядов (1 λ ≈ 120 зерна: оба пути стоят одинаково), а путь «через силу» оставлен прежним.
 const TECHS = [
-  { id: 'cheesemaking', epoch: 0, logos: 30, cost: { food: 150 } },
-  { id: 'carving', epoch: 0, logos: 40, cost: { stone: 150 } },
-  { id: 'granary', epoch: 0, logos: 50, cost: { wood: 400 }, effect: { mult: { food: 0.25 }, storage: 150 } },
-  { id: 'foundations', epoch: 0, logos: 60, cost: { stone: 500 }, effect: { houseCap: 1 } },
-  { id: 'redwhite', epoch: 0, logos: 80, cost: { goods: 120, wood: 300 }, req: ['carving'], effect: { bmult: { workshop: 0.3 } } },
-  { id: 'nativecopper', epoch: 0, logos: 150, cost: { stone: 600, goods: 150 }, req: ['redwhite'], effect: { mult: { wood: 0.2, stone: 0.2 } } },
+  { id: 'cheesemaking', epoch: 0, logos: 7, laborLogos: 30, cost: { food: 150 } },
+  { id: 'carving', epoch: 0, logos: 12, laborLogos: 40, cost: { stone: 150 } },
+  { id: 'granary', epoch: 0, logos: 18, laborLogos: 50, cost: { wood: 400 }, effect: { mult: { food: 0.25 }, storage: 150 } },
+  { id: 'foundations', epoch: 0, logos: 28, laborLogos: 60, cost: { stone: 500 }, effect: { houseCap: 1 } },
+  { id: 'redwhite', epoch: 0, logos: 30, laborLogos: 80, cost: { goods: 120, wood: 300 }, req: ['carving'], effect: { bmult: { workshop: 0.3 } } },
+  { id: 'nativecopper', epoch: 0, logos: 60, laborLogos: 150, cost: { stone: 600, goods: 150 }, req: ['redwhite'], effect: { mult: { wood: 0.2, stone: 0.2 } } },
   { id: 'smelting', epoch: 1, logos: 100, cost: { wood: 900 } },
   { id: 'seafaring', epoch: 1, logos: 130, cost: { wood: 1200 } },
   { id: 'ashlar', epoch: 1, logos: 120, cost: { stone: 1200 }, effect: { houseCap: 2, storagePct: 0.2 } },
@@ -209,17 +214,21 @@ const TECHS = [
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
-// Обряды. «Сбор припасов» — быстро и на всё, поэтому дороже; благословения — дольше (10–30 минут), но на свои ресурсы.
-// Цены сверены по ценнику труда (README, «Ценник ресурсов»): благословение даёт на 1 λ примерно в 1.2–1.6 раза больше «Сбора».
+// Обряды. Курс обрядов (ориентир, tools/balance — раздел 9): 3 λ = 1 минута выпуска города на начало эпохи
+// (в медно-каменном веке — от трети выпуска конца эпохи). «Сбор припасов» — ровно по курсу: 9 λ за 3 минуты.
+// Благословения переводятся на этот курс по очереди: на один ресурс, зато дольше (10–30 минут) — цена = сколько минут выпуска они дают.
 // λ-благословения святилищ — «золотой час»: 15 минут, потом перерыв в настоящих часах (realTime — по часам, а не по игровому времени).
 // instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
 const RITUALS = [
-  { id: 'elders', epoch: 0, logos: 8, instant: 'elders', cooldown: 120 },
+  { id: 'elders', epoch: 0, logos: 9, instant: 'elders', cooldown: 120 },
   // fixedPrice — цена в λ не растёт с эпохами; durPerEpoch — с каждой эпохой обряд длится дольше (30, 35, 40, 45 минут)
   { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800, fixedPrice: true, durPerEpoch: 300 },
-  { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 600 },
-  { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
-  { id: 'herds', epoch: 0, logos: 5, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
+  // «Обряд урожая» (зерно ×2) появляется после «Виноградарства», когда загоны уходят, а с ними и «Благословение полей и стад»
+  { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, tech: 'viticulture', buff: { mult: { food: 1 } }, dur: 600 },
+  // по курсу обрядов: 10 минут дерева и камня ×2 — около 6 минут выпуска города (дерево и камень — главные траты эпохи)
+  { id: 'hearth', epoch: 0, logos: 18, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
+  // поля и загоны ×2 и беглая коза: по курсу около 14 λ, но зерно и сыр в основном лишние (≈8% трат эпохи) — половина благословения + коза
+  { id: 'herds', epoch: 0, logos: 10, buff: { bmult: { field: 1, goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
   { id: 'festival', epoch: 0, logos: 40, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true, until: 'sp_aphrodite' },
   { id: 'bullmask', epoch: 1, logos: 15, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 600 },

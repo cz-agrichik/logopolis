@@ -1195,7 +1195,7 @@ const Art = (() => {
     r_hearth: rdisc + flame(32, 46, 1.3) + `<path d="M14 18 L42 46" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/><path d="M10 18 Q14 10 22 14 L16 22Z" fill="#d8dce3" ${st(1.3)}/>
       <path d="M50 18 L22 46" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/><path d="M44 12 Q52 12 56 18 Q50 16 46 20Z" fill="#d8dce3" ${st(1.3)}/>`,
     r_herds: rdisc + `<path d="M14 32 Q32 10 50 32" fill="none" stroke="${C.green}" stroke-width="3"/>
-      ${[16, 24, 40, 48].map(x => `<ellipse cx="${x}" cy="${x < 32 ? 26 + (x - 16) * -0.6 : 26 - (48 - x) * 0.6 + 0}" rx="3" ry="1.6" fill="${C.green}"/>`).join('')}` + goat(30, 44, 1.2, C.white),
+      ${[16, 24, 40, 48].map(x => `<ellipse cx="${x}" cy="${x < 32 ? 26 + (x - 16) * -0.6 : 26 - (48 - x) * 0.6 + 0}" rx="3" ry="1.6" fill="${C.green}"/>`).join('')}` + sheaf(18, 54) + goat(37, 45, 1.1, C.white),
     r_festival: rdisc + `<circle cx="32" cy="38" r="13" fill="${C.mud}" ${st(1.8)}/><circle cx="32" cy="38" r="8" fill="none" stroke="${C.mudD}" stroke-width="1.4"/>
       ${[0, 72, 144, 216, 288].map(a => { const r = a * Math.PI / 180; return `<circle cx="${32 + Math.cos(r) * 13}" cy="${38 + Math.sin(r) * 13}" r="2" fill="${C.bronze}" stroke="${O}" stroke-width=".8"/>`; }).join('')}
       <path d="M14 16 q4 -4 8 0 q-4 4 -8 0Z M42 14 q4 -4 8 0 q-4 4 -8 0Z" fill="#e88aa8"/><circle cx="18" cy="16" r="1.6" fill="#ffe69a"/><circle cx="46" cy="14" r="1.6" fill="#ffe69a"/>`,

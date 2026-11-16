@@ -242,7 +242,7 @@ const SOLVE = `((wrongAt) => {
       for (let i = 0; i < 400; i++) { Game.tick(1); Game.events(1); }
       Game.addLogos(600);
       out.push('perform elders: ' + rite(Game.perform('elders')));
-      out.push('perform harvest: ' + rite(Game.perform('harvest')));
+      out.push('perform herds: ' + rite(Game.perform('herds')));
       out.push('research cheesemaking: ' + Game.research('cheesemaking', 'logos'));
       out.push('research carving labor: ' + Game.research('carving', 'labor'));
       const f = s.buildings.find(b => b.type === 'field');

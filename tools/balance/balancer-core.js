@@ -4,29 +4,34 @@
 //  только числа; показывает их tools/balance/balancer.html (открыть с диска), а node tools/balance/balancer.js
 //  печатает сводку в консоль.
 //
-//  «Ожидаемый город»:
-//    • к концу эпохи e стоят производственные здания из plan[e], все — на пределе уровня эпохи;
-//    • жилища, поля и склады досчитываются: мест — на население перехода и на всех работников, зерна — всем,
-//      склада — под самую большую цену эпохи «с умом» (переход, чудо, знание, улучшение);
-//    • изучены все знания эпохи; чудеса: (а) обязательные и без λ, (б) — ещё и необязательные за λ;
+//  «Ожидаемый город» к концу эпохи e:
+//    • сколько зданий каждого типа — допущение (plan[e], правится на странице); изучены все знания эпохи;
+//      чудеса: (а) обязательные и без λ, (б) — ещё и необязательные за λ;
+//    • уровни: ресурсы игрок тратит до последнего, а λ — нет. На уровни за Логос за эпоху уходит бюджет (budget[e], правится):
+//      сначала — склады под самую большую цену эпохи и жилища под население перехода, остальное — по одному уровню туда,
+//      где он прибавляет больше всего выпуска города (в зерне) на 1 λ. Уровни за ресурсы — сразу, пока цена влезает в склад;
 //    • начало эпохи e+1 — тот же город после перехода (чудеса прошлой эпохи стали обычными зданиями).
 //  Курсы ресурсов — «трудовые»: сколько зерна дал бы на поле работник, пока делает единицу ресурса.
 // ============================================================
 
 const Balancer = (() => {
-  // Производственные здания к концу эпохи по умолчанию (жилища, поля и склады — досчитываются)
+  // Сколько зданий каждого типа стоит к концу эпохи (по умолчанию). Земли хватает: равнин 68 (у моря 25), леса 22, холмов 18.
+  // Жилищ — чтобы мест было с запасом ~10% на всех работников; складов — чтобы влезала самая большая цена эпохи.
+  // «Виноградарство» переводит загоны в виноградники и рощи, «Железо» — литейни в кузницы (перестройка с тем же уровнем).
   const PLAN = {
-    0: { goatpen: 2, lumber: 2, quarry: 2, workshop: 2 },
-    1: { goatpen: 2, lumber: 3, quarry: 3, workshop: 3, mine: 3, port: 2, foundry: 2, scribe: 2 },
-    // «Виноградарство» переводит загоны в виноградники и рощи, «Железо» — литейни в кузницы (перестройка с тем же уровнем)
-    2: { lumber: 3, quarry: 3, workshop: 3, mine: 3, port: 2, scribe: 2, vineyard: 2, olivegrove: 2, forge: 2 },
-    3: { lumber: 3, quarry: 3, workshop: 3, mine: 3, port: 2, scribe: 2, vineyard: 3, olivegrove: 2, forge: 2 },
+    0: { house: 9, field: 3, goatpen: 4, lumber: 5, quarry: 5, workshop: 4, storehouse: 3 },
+    1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 2 },
+    2: { house: 12, field: 4, lumber: 12, quarry: 6, workshop: 10, storehouse: 4, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
+    3: { house: 14, field: 4, lumber: 12, quarry: 6, workshop: 12, storehouse: 5, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
   };
-  const DEFAULTS = { last: 2, stock: 0.6, foodMargin: 0.05 };
+  // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
+  const BUDGET = { 0: 100, 1: 800, 2: 1000, 3: 1200 };
+  // riteRate — курс обрядов (ориентир): столько λ стоит 1 минута выпуска города на начало эпохи
+  const DEFAULTS = { last: 2, stock: 0.6, riteRate: 3 };
 
   function run(opts = {}) {
-    const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN;
-    const G = Game, B = BUILDINGS, T = TECHS, E = EPOCHS, BAL = BALANCE, W = BAL.worth, ROUND = ROUND_LAMBDA;
+    const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN, budget = Object.assign({}, BUDGET, o.budget || {});
+    const G = Game, B = BUILDINGS, T = TECHS, E = EPOCHS, BAL = BALANCE, W = BAL.worth;
     if (!G.map || !G.map.length) G.genMap();
     G.state = G.newState();
     const LEVEL = e => E[e].maxLevel;
@@ -52,34 +57,96 @@ const Balancer = (() => {
       G.fx = G.effects();
       return s;
     }
-    function storageTarget(e, s) {
+    /** Самая большая цена эпохи «с умом», которая должна влезать в склад: переход, чудеса, знания. */
+    function storageNeed(e) {
       let best = { v: 0, what: null };
       const see = (cost, what) => { for (const [k, v] of Object.entries(G.liveCost(cost))) if (v > best.v) best = { v, res: k, what }; };
       if (E[e].advance) see(E[e].advance.res, { kind: 'advance' });
       for (const t of Object.keys(B).filter(t => B[t].special && B[t].epoch === e)) see(B[t].cost, { kind: 'wonder', id: t });
       for (const t of T.filter(t => t.epoch === e)) see(t.cost, { kind: 'tech', id: t.id });
-      for (const type of new Set(s.buildings.filter(b => !B[b.type].special).map(b => b.type)))
-        for (let l = 2; l <= LEVEL(e); l++) see(G.upgradeCost(type, l).cost, { kind: 'upgrade', id: type, level: l });
       return best;
     }
-    /** Конец эпохи e: plan[e] на пределе уровня + жилища, поля, склады, досчитанные под условия. */
-    function solveEnd(e) {
-      const L = LEVEL(e);
-      const base = Object.entries(plan[e] || {}).flatMap(([t, n]) => Array.from({ length: n }, () => mk(t, L)));
-      const wb = wonders(e, false).map(t => mk(t, 1));
-      const n = { house: 1, field: 1, storehouse: 0 }, advPop = E[e].advance ? E[e].advance.pop : 0;
-      for (let it = 0; it < 300; it++) {
-        const s = load({ epoch: e, techs: techsUpTo(e), buildings: base.concat(wb, ...['house', 'field', 'storehouse'].map(t => Array.from({ length: n[t] }, () => mk(t, L)))) });
-        for (const b of s.buildings) if (b.from && !B[b.type].special) b.level = Math.max(b.level, L);   // бывшее чудо — до предела, как все
-        const fx = G.effects(false), cap = G.popCap(fx), need = G.workersNeeded();
-        if (cap < Math.max(advPop, need)) { n.house++; continue; }
-        s.pop = cap;
-        if (G.production(fx, cap, 0.001).rates.food < cap * BAL.foodPerPop * o.foodMargin) { n.field++; continue; }
-        const target = storageTarget(e, s);
-        if (G.storageCap(fx) < target.v && n.storehouse < 20) { n.storehouse++; continue; }
-        return { epoch: e, techs: techsUpTo(e), buildings: copy(s.buildings), counts: n, target, L };
+    const succ = {};   // устаревшие → во что перестраиваются (загон → виноградник/роща, литейня → кузница)
+    for (const t of T) for (const [from, to] of Object.entries((t.retire && t.retire.buildings) || {}))
+      for (const x of (typeof to === 'string' ? [to] : Object.values(to))) succ[x] = (succ[x] || []).concat(from);
+
+    /** Конец эпохи e из города на её начало: здания из plan[e], уровни — по бюджету λ. */
+    function buildEnd(e, prev) {
+      const L = LEVEL(e), isL = l => !!BAL.wisdomLevels[l];
+      // сколько λ игрок заработает за эпоху (для домов писцов): бюджет на уровни + обязательное + знания «с умом»
+      const epochL = budget[e] + (E[e].advance ? E[e].advance.logos : 0) + wonderCosts(e).filter(w => w.kind === 'must').reduce((a, w) => a + w.logos, 0)
+        + T.filter(t => t.epoch === e).reduce((a, t) => a + t.logos, 0);
+      // начало эпохи: прошлый город после перехода (чудеса прошлой эпохи стали обычными зданиями)
+      const st0 = load({ epoch: e, techs: prev.techs, buildings: prev.buildings });
+      const pool = {}, carried = [];
+      for (const b of st0.buildings) {
+        if (B[b.type].special) continue;
+        if (b.from) carried.push(Object.assign({}, b, { start: b.level, how: 'had' }));   // бывшее чудо — сверх плана, остаётся
+        else (pool[b.type] = pool[b.type] || []).push(b.level);
       }
-      throw new Error('город не сошёлся для эпохи ' + e);
+      for (const t of Object.keys(pool)) pool[t].sort((a, b) => b - a);
+      const startN = {}; for (const t of Object.keys(pool)) startN[t] = pool[t].length;
+      const blds = carried.slice();
+      for (const [t, n] of Object.entries(plan[e] || {})) {
+        if (!B[t] || B[t].special || B[t].epoch > e) continue;
+        for (let i = 0; i < n; i++) {
+          const old = pool[t] && pool[t].length ? t : (succ[t] || []).find(x => pool[x] && pool[x].length);
+          const lv = old ? pool[old].shift() : 1;
+          blds.push(Object.assign(mk(t, lv), { start: lv, how: !old ? 'new' : old === t ? 'had' : 'rebuild', rebuiltFrom: old !== t ? old : null }));
+        }
+      }
+      const keepW = st0.buildings.filter(b => B[b.type].special);   // чудеса прошлых эпох, которые ещё чудеса
+      const have = new Set(keepW.map(b => b.type).concat(st0.buildings.map(b => b.from).filter(Boolean)));
+      const newW = wonders(e, false).filter(t => !have.has(t) && !(B[t].retire && B[t].retire.epoch <= e));
+      const drop = new Set(newW.map(t => B[t].upgradeOf).filter(Boolean));
+      const s = load({ epoch: e, techs: techsUpTo(e), buildings: blds.concat(keepW.filter(b => !drop.has(b.type)), newW.map(t => mk(t, 1))) });
+      const fx = G.effects(false), need = storageNeed(e), advPop = E[e].advance ? E[e].advance.pop : 0;
+      const rates = laborRates(fx);
+      const fits = (b, l) => { const cap = G.storageCap(fx); return Object.values(G.upgradeCost(b.type, l).cost).every(v => v <= cap); };
+      const freeUp = b => { while (b.level < L && !isL(b.level + 1) && fits(b, b.level + 1)) b.level++; };   // уровни за ресурсы — до последнего
+      const canStep = b => !B[b.type].special && b.level < L && isL(b.level + 1);
+      const cost = b => G.upgradeCost(b.type, b.level + 1).logos;
+      const step = b => { b.level++; freeUp(b); };
+      const others = () => s.buildings.filter(b => !B[b.type].special);
+      for (const b of others()) freeUp(b);
+      let spent = 0;
+      const spend = b => { spent += cost(b); step(b); for (const x of others()) freeUp(x); };   // склад подрос — догоняем уровни за ресурсы
+      // 1) склады — под самую большую цену эпохи; 2) жилища — под население перехода
+      for (let guard = 0; guard < 200 && G.storageCap(fx) < need.v; guard++) {
+        const b = s.buildings.filter(x => x.type === 'storehouse' && canStep(x)).sort((a, c) => a.level - c.level)[0];
+        if (!b || spent + cost(b) > budget[e]) break;
+        spend(b);
+      }
+      for (let guard = 0; guard < 200 && G.popCap(fx) < advPop; guard++) {
+        const b = s.buildings.filter(x => x.type === 'house' && canStep(x)).sort((a, c) => a.level - c.level)[0];
+        if (!b || spent + cost(b) > budget[e]) break;
+        spend(b);
+      }
+      // 3) дома писцов — пока уровень окупается Логосом до конца эпохи: прибавка множителя × λ, который ещё заработают
+      //    (половина λ эпохи: бюджет на уровни + обязательное + знания «с умом»), ÷ нынешний множитель ≥ цене уровня
+      const scribes = () => G.state.buildings.filter(x => x.type === 'scribe' && canStep(x)).sort((a, c) => a.level - c.level);
+      for (let guard = 0; guard < 50; guard++) {
+        const b = scribes()[0]; if (!b) break;
+        const m0 = G.effects(false).logos, lv = b.level; step(b); const m1 = G.effects(false).logos; b.level = lv;
+        if ((m1 - m0) / m0 * epochL / 2 < cost(b) || spent + cost(b) > budget[e]) break;
+        spend(b);
+      }
+      // 4) остальное — ровно: следующий уровень за λ получает самое отстающее производственное здание (при равных — с меньшей ценой);
+      //    если зерна не хватает — сначала поля; если новых работников некуда поселить — сначала жилище
+      const prodB = () => G.state.buildings.filter(x => !B[x.type].special && !['house', 'storehouse', 'scribe'].includes(x.type) && canStep(x));
+      const lowest = list => list.sort((a, c) => a.level - c.level || cost(a) - cost(c))[0];
+      const houses = () => G.state.buildings.filter(x => x.type === 'house' && canStep(x));
+      for (let guard = 0; guard < 3000; guard++) {
+        const food = G.production(fx, G.popCap(fx), 0.001).rates.food;
+        let b = food < 0 ? lowest(prodB().filter(x => x.type === 'field')) || lowest(prodB()) : lowest(prodB());
+        if (!b) break;
+        const lv = b.level; step(b); const short = G.workersNeeded() > G.popCap(fx); b.level = lv;
+        if (short) { const h = lowest(houses()); if (h && spent + cost(h) <= budget[e]) { spend(h); continue; } break; }
+        if (spent + cost(b) > budget[e]) break;
+        spend(b);
+      }
+      s.pop = G.popCap(fx);
+      return { epoch: e, techs: techsUpTo(e), buildings: copy(s.buildings), target: need, L, spent, budget: budget[e], startN };
     }
     /** Город (б): тот же, но с необязательными чудесами за λ. */
     function withLogosWonders(city) {
@@ -88,7 +155,6 @@ const Balancer = (() => {
       const add = wonders(city.epoch, true).filter(t => !have.has(t));
       const drop = new Set(add.map(t => B[t].upgradeOf).filter(Boolean));
       load({ epoch: city.epoch, techs: city.techs, buildings: city.buildings.filter(b => !drop.has(b.type)).concat(add.map(t => mk(t, 1))) });
-      for (const b of G.state.buildings) if (b.from && !B[b.type].special) b.level = Math.max(b.level, city.L);
       return Object.assign({}, city, { buildings: copy(G.state.buildings) });
     }
     function neutralFx() {
@@ -147,17 +213,49 @@ const Balancer = (() => {
         }
         if (b0 > 0) mult[k] = a / b0;
       }
+      // из чего набирается множитель: по типам зданий (во сколько раз каждый тип даёт больше) и источники бонусов
+      const bonus = {};
+      for (const k of RES_KEYS) {
+        const byType = {};
+        for (const b of s.buildings) {
+          const p = G.prodOf(b, fx)[k] || 0, q = G.prodOf(b, fx0)[k] || 0, t = G.tradeOf(b, fx), t0 = G.tradeOf(b, fx0);
+          const qq = (q > 0 ? q : 0) + (t0 && t0[k] > 0 ? t0[k] : 0), pp = (q > 0 ? p : 0) + (t0 && t0[k] > 0 ? t[k] : 0);
+          if (qq > 0) { const x = byType[b.type] = byType[b.type] || { n: 0, q: 0, p: 0, trade: false }; x.n++; x.q += qq; x.p += pp; if (t0 && t0[k] > 0) x.trade = true; }
+        }
+        if (!Object.keys(byType).length) continue;
+        const types = Object.keys(byType), sources = [];
+        for (const src of G.bonusSources()) {
+          if (src.kind === 'rite') continue;
+          const e = src.effect || {};
+          if (e.all) sources.push({ kind: src.kind, id: src.id, v: e.all, scope: 'all' });
+          for (const [kk, v] of Object.entries(e.mult || {})) if (G.liveKey(kk) === k) sources.push({ kind: src.kind, id: src.id, v, scope: 'res' });
+          for (const [type, v] of Object.entries(e.bmult || {})) if (types.includes(type)) sources.push({ kind: src.kind, id: src.id, v, scope: type });
+          for (const [type, v] of Object.entries(e.scale || {})) if (types.includes(type)) sources.push({ kind: src.kind, id: src.id, v, scope: type, scale: true });
+          for (const [type, v] of Object.entries(e.trade || {})) if (types.includes(type) && byType[type].trade) sources.push({ kind: src.kind, id: src.id, v, scope: type, trade: true });
+        }
+        bonus[k] = { byType: types.map(t => ({ type: t, n: byType[t].n, mult: byType[t].p / byType[t].q, share: byType[t].q })), sources };
+      }
+      // множитель λ: 1 + знания и чудеса + дома писцов (каждый: 8% + 2% за уровень выше первого)
+      const LB = G.logosBreakdown(), logosParts = [];
+      for (const pt of LB.parts) {
+        if (pt.kind === 'rite') continue;
+        const same = logosParts.find(x => x.kind === pt.kind && x.id === pt.id && x.level === pt.level);
+        if (same) { same.n++; same.v += pt.v; } else logosParts.push(Object.assign({ n: 1 }, pt));
+      }
       const counts = {};
       for (const b of s.buildings) if (!B[b.type].special) { const c = counts[b.type] = counts[b.type] || { n: 0, levels: [] }; c.n++; c.levels.push(b.level); }
       const tiles = { plain: 0, forest: 0, hill: 0 }, use = { plain: 0, forest: 0, hill: 0, flex: 0 };
       for (const t of G.map) if (tiles[t.t] != null) tiles[t.t]++;
       for (const b of s.buildings) { const ter = B[b.type].terrain; if (ter.length === 1) use[ter[0]]++; else use.flex++; }
       const rates = laborRates(fx);
+      const exists = k => RES[k].epoch <= s.epoch && (!RES[k].tech || G.hasTech(RES[k].tech)) && !G.retiredRes(k);
+      for (const k of Object.keys(rates)) if (!exists(k)) delete rates[k];   // ресурса в этой эпохе ещё (или уже) нет
       const val = x => RES_KEYS.reduce((v, k) => v + (x[k] || 0) * (rates[k] != null ? rates[k] : (W[k] || 1)), 0);
+      const wonderList = s.buildings.filter(b => B[b.type].special).map(b => b.type), workers = G.workersNeeded();
       const coins = coinSources(rates, false);
       load(city); const coins0 = coinSources(rates, true);
-      return { epoch: s.epoch, pop, storage, workers: G.workersNeeded(), net: P.rates, gross, mult, logos: fx.logos, counts,
-        wonders: s.buildings.filter(b => B[b.type].special).map(b => b.type), rates, land: { tiles, use },
+      return { epoch: s.epoch, pop, storage, workers, eff: P.eff, food: P.rates.food, net: P.rates, gross, mult, bonus, logos: fx.logos, logosParts, counts,
+        wonders: wonderList, rates, land: { tiles, use },
         prod: val(P.rates), prodGross: val(gross), prodWorth: RES_KEYS.reduce((v, k) => v + (P.rates[k] || 0) * (W[k] || 1), 0), coins, coins0 };
     }
 
@@ -172,29 +270,34 @@ const Balancer = (() => {
         return { id: t.id, logos: m.logos, mind: m.cost, labor: l.cost };
       });
     }
-    function upgradeCosts(startCity, endCity) {
-      load(endCity);
-      const res = {}, pool = {}, built = {}, succ = {};
+    /** Постройки и улучшения за эпоху (здания помнят, с какого уровня начали эпоху и как появились): по типам — сколько было,
+     *  новых, перестроенных, с каких уровней до каких, λ по уровням за Логос, ресурсы на постройку и на улучшения. */
+    function upgradeCosts(endCity) {
+      load(endCity);   // цены — по правилам конца эпохи (ушедшие ресурсы, железо на 10-м…)
+      const res = {}, detail = {}, built = {};
       let logos = 0;
-      for (const b of startCity.buildings) if (!B[b.type].special) (pool[b.type] = pool[b.type] || []).push(b.level);
-      for (const t of T) for (const [from, to] of Object.entries((t.retire && t.retire.buildings) || {}))
-        for (const x of (typeof to === 'string' ? [to] : Object.values(to))) succ[x] = (succ[x] || []).concat(from);
       for (const b of endCity.buildings) {
         if (B[b.type].special) continue;
-        let from = 1, how = 'new';
-        const old = (succ[b.type] || []).find(x => pool[x] && pool[x].length);
-        if (pool[b.type] && pool[b.type].length) { from = pool[b.type].shift(); how = 'had'; }
-        else if (old) { from = pool[old].shift(); how = 'rebuild'; addTo(res, G.liveCost(B[b.type].cost)); }
-        else if (b.from) { from = B[b.from].retire.level; how = 'wonder'; }
-        if (how === 'new') {
-          const own = built[b.type] = (built[b.type] || 0) + 1, startN = startCity.buildings.filter(x => x.type === b.type && !x.from).length;
-          const mult = Math.pow(BAL.buildCostGrowth, startN + own - 1), c = {};
+        const d = detail[b.type] = detail[b.type] || { type: b.type, n: 0, had: 0, built: 0, rebuilt: [], wonder: 0, from: {}, to: {}, buildRes: {}, upRes: {}, logos: 0, logosLv: {} };
+        const from = b.start || 1;
+        d.n++; d.from[from] = (d.from[from] || 0) + 1; d.to[b.level] = (d.to[b.level] || 0) + 1;
+        if (b.from) d.wonder++;
+        else if (b.how === 'had') d.had++;
+        else if (b.how === 'rebuild') { d.rebuilt.push(b.rebuiltFrom); addTo(d.buildRes, G.liveCost(B[b.type].cost)); }
+        else {
+          d.built++;
+          const own = built[b.type] = (built[b.type] || 0) + 1, mult = Math.pow(BAL.buildCostGrowth, ((endCity.startN || {})[b.type] || 0) + own - 1), c = {};
           for (const [k, v] of Object.entries(B[b.type].cost || {})) c[k] = Math.ceil(v * mult);
-          addTo(res, G.liveCost(c));
+          addTo(d.buildRes, G.liveCost(c));
         }
-        for (let l = from + 1; l <= b.level; l++) { const u = G.upgradeCost(b.type, l); addTo(res, u.cost); logos += u.logos; }
+        for (let l = from + 1; l <= b.level; l++) {
+          const u = G.upgradeCost(b.type, l);
+          addTo(d.upRes, u.cost);
+          if (u.logos) { d.logos += u.logos; d.logosLv[l] = (d.logosLv[l] || 0) + u.logos; }
+        }
       }
-      return { res, logos };
+      for (const d of Object.values(detail)) { addTo(res, d.buildRes); addTo(res, d.upRes); logos += d.logos; }
+      return { res, logos, detail: Object.values(detail) };
     }
     function wonderCosts(e) {
       load({ epoch: e, techs: techsUpTo(e), buildings: [] });
@@ -208,21 +311,22 @@ const Balancer = (() => {
     const cities = [first], ends = [];
     for (let e = 0; e <= o.last && e < E.length; e++) {
       if (!E[e].maxLevel) break;
-      const end = solveEnd(e); ends.push(end); cities.push(end);
+      const end = buildEnd(e, cities[cities.length - 1]); ends.push(end); cities.push(end);
     }
     const stages = cities.map((c, i) => ({ index: i, first: !!c.first, endOf: c.first ? null : c.epoch, target: c.target || null,
       a: measure(c), b: measure(withLogosWonders(c)) }));
     const epochs = ends.map((end, e) => {
       const m0 = stages[e].a, m1 = stages[e + 1].a, rates = Object.assign({}, m0.rates, m1.rates), wh = wheatOf(rates);
       // средняя производительность эпохи — геометрическая (город растёт примерно по экспоненте); начало эпохи 0 почти ноль — не меньше 10% конца
-      const prod = Math.sqrt(Math.max(m0.prod, m1.prod * 0.1) * m1.prod), lpr = ROUND * (m0.logos + m1.logos) / 2;
+      const prod = Math.sqrt(Math.max(m0.prod, m1.prod * 0.1) * m1.prod);
       const techs = techCosts(e).map(t => Object.assign(t, { mindW: wh(t.mind), laborW: wh(t.labor) }));
       const tl = techs.reduce((a, t) => a + t.logos, 0), tm = techs.reduce((a, t) => a + t.mindW, 0), tlab = techs.reduce((a, t) => a + t.laborW, 0);
       const wc = wonderCosts(e).map(w => Object.assign(w, { w: wh(w.cost) }));
       const adv = E[e].advance || null, advRes = adv ? G.liveCost(adv.res) : {};
       const must = wc.filter(w => w.kind === 'must'), optL = wc.filter(w => w.kind === 'logos'), resW = wc.filter(w => w.kind === 'res');
       const mustL = must.reduce((a, w) => a + w.logos, 0) + (adv ? adv.logos : 0);
-      const up = upgradeCosts(cities[e], end); up.w = wh(up.res);
+      const up = upgradeCosts(end); up.w = wh(up.res); up.budget = end.budget;
+      for (const d of up.detail) { d.w = wh(d.buildRes) + wh(d.upRes); }
       const sum = list => list.reduce((a, c) => addTo(a, c), {});
       const mindRes = sum([...techs.map(t => t.mind), ...must.map(w => w.cost), ...optL.map(w => w.cost), ...resW.map(w => w.cost), up.res, advRes]);
       const laborRes = sum([...techs.map(t => t.labor), ...must.map(w => w.cost), ...resW.map(w => w.cost), up.res, advRes]);
@@ -230,11 +334,27 @@ const Balancer = (() => {
         mind: { logos: tl + mustL + optL.reduce((a, w) => a + w.logos, 0) + up.logos, res: mindRes, w: wh(mindRes) },
         labor: { logos: mustL + up.logos, res: laborRes, w: wh(laborRes) },
       };
-      return { e, prod, lpr, rates, techs, tl, tm, tlab, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
+      const techMind = sum(techs.map(t => t.mind)), techLabor = sum(techs.map(t => t.labor));
+      // слагаемые итога: что входит в какой сценарий
+      const part = (key, logos, res, mind, labor) => ({ key, logos, res, w: wh(res), mind, labor });
+      const parts = [
+        part('techMind', tl, techMind, true, false),
+        part('techLabor', 0, techLabor, false, true),
+        part('must', must.reduce((a, w) => a + w.logos, 0), sum(must.map(w => w.cost)), true, true),
+        part('optLogos', optL.reduce((a, w) => a + w.logos, 0), sum(optL.map(w => w.cost)), true, false),
+        part('resWonders', 0, sum(resW.map(w => w.cost)), true, true),
+        part('up', up.logos, up.res, true, true),
+        part('advance', adv ? adv.logos : 0, advRes, true, true),
+      ];
+      // мощь города в начале и в конце эпохи; в начале игры город почти ноль — берём легко достижимую треть от конца эпохи
+      const startAssumed = e === 0, prod0 = startAssumed ? m1.prod / 3 : m0.prod;
+      // твёрдый курс обрядов: o.riteRate λ = 1 минута выпуска на начало эпохи → столько зерна в 1 λ
+      const riteL = prod0 * 60 / o.riteRate;
+      return { e, prod, prod0, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate: o.riteRate, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
         perL: tl ? (tlab - tm) / tl : null, scen };
     });
-    return { stages, epochs, worth: W, round: ROUND };
+    return { stages, epochs, worth: W };
   }
-  return { run, PLAN, DEFAULTS };
+  return { run, PLAN, BUDGET, DEFAULTS };
 })();
 if (typeof module !== 'undefined') module.exports = Balancer;

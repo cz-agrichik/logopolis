@@ -265,11 +265,13 @@ test('железный век: «Виноградарство» — сыр в а
   s.buildings.push(penH, penF);
   const R = C.get('RITUAL_BY_ID');
   assert.equal(G.ritualStatus(R.herds).hidden, undefined); assert.equal(G.ritualStatus(R.vintage).hidden, true);
+  assert.equal(G.ritualStatus(R.harvest).hidden, true, 'пока есть загоны, поля благословляют вместе со стадами');
   s.res.cheese = 900; s.res.amphora = 0; s.res.food = 4500; s.res.wood = 4500;
   assert.ok(G.research('viticulture'));
   assert.equal(s.res.amphora, 450, '2 сыра = 1 амфора');
   assert.equal(Object.keys(G.prodOf(penH)).length, 0, 'старый загон стоит');
   assert.equal(G.ritualStatus(R.herds).hidden, true); assert.notEqual(G.ritualStatus(R.vintage).hidden, true);
+  assert.notEqual(G.ritualStatus(R.harvest).hidden, true, 'загонов нет — у полей снова свой «Обряд урожая»');
   assert.equal(G.rebuildInfo(penH).into, 'vineyard'); assert.equal(G.rebuildInfo(penF).into, 'olivegrove');
   assert.ok(G.rebuild(penH) && G.rebuild(penF));
   assert.equal(penH.type, 'vineyard'); assert.equal(penH.level, 7);
@@ -988,4 +990,24 @@ test('вино вместо меди: после «Своей монеты» г�
   // «Хозяйство в цифрах» показывает это отдельным множителем, и сумма сходится с тактом
   const I = G.incomeBreakdown(), row = I.res.copper.rows.find(r => r.type === 'mine');
   assert.ok(row && Math.abs(row.extra - 0.5) < 1e-9);
+});
+
+test('медно-каменный век: λ знаний «с умом» по курсу обрядов, путь «через силу» прежний; благословение полей и стад', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state, T = C.get('TECH_BY_ID'), R = C.get('RITUAL_BY_ID');
+  assert.deepEqual(['cheesemaking', 'carving', 'granary', 'foundations', 'redwhite', 'nativecopper'].map(id => G.techPrice(T[id]).logos), [7, 12, 18, 28, 30, 60]);
+  assert.deepEqual({ ...G.techPrice(T.cheesemaking, 'labor').cost }, { food: 450, wood: 120, stone: 120 }, 'через силу — от прежних 30 λ');
+  assert.deepEqual({ ...G.techPrice(T.nativecopper, 'labor').cost }, { stone: 2400, goods: 450, wood: 600 });
+  assert.equal(G.techPrice(T.smelting, 'labor').cost.wood, 3020, 'бронзовый век не тронут');
+  // благословение полей и стад: поля и загоны ×2, коза сразу
+  const t = G.map.find(t => t.t === 'plain' && !G.buildingAt(t.x, t.y)), field = { id: 950, type: 'field', level: 1, x: t.x, y: t.y };
+  s.buildings.push(field);
+  const pen = s.buildings.find(b => b.type === 'goatpen');
+  const f0 = G.prodOf(field).food, p0 = G.prodOf(pen).food;
+  assert.equal(G.ritualStatus(R.harvest).hidden, true);
+  s.logos = 10; s.pop = 10; G.tick(0.001);
+  assert.ok(G.perform('herds'));
+  assert.equal(s.logos, 0, 'ровно 10 λ, без ресурсов');
+  G.fx = G.effects();
+  assert.ok(Math.abs(G.prodOf(field).food - 2 * f0) < 1e-9 && Math.abs(G.prodOf(pen).food - 2 * p0) < 1e-9, 'поля и загоны ×2');
+  assert.equal(s.timers.goat, 0, 'коза — сразу');
 });

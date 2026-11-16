@@ -28,7 +28,7 @@ Object.assign(Game, {
         const t = free[Math.floor(Math.random() * free.length)];
         // после «Виноградарства» вместо беглой козы по городу проходит шествие вакханок
         if (t) { this.goat = { x: t.x, y: t.y, ttl: 14, kind: this.hasTech('viticulture') ? 'maenad' : 'goat' }; changed = true; }
-        s.timers.goat = fx.goats ? rand(35, 80) : rand(60, 140);
+        s.timers.goat = rand(...(fx.goats ? BALANCE.goatEveryFast : BALANCE.goatEvery));
       }
     }
     if (s.epoch >= 1 && !s.finished) {

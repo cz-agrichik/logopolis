@@ -510,9 +510,10 @@ const UI = {
       <div class="item-ic">${this.riteIcon(R)}</div>
       <div class="item-body"><div class="item-title">${esc(R.name)}${left ? ` <span class="rite-live">идёт · ${mm}</span>` : ''}</div>
         <div class="item-desc">${esc(Looks.riteDesc(R))}</div>
-        ${st.locked ? `<div class="item-lock">🔒 ${esc(Msg.reason(st.reason))}</div>` : `<div class="chips">${this.costHtml(st.cost, st.logos)}${!st.logos ? '<span class="chip muted">без λ</span>' : ''}</div>
+        ${st.hidden ? `<div class="item-lock">Обряд сменился новым — идущее благословение доиграет до конца</div>`
+          : st.locked ? `<div class="item-lock">🔒 ${esc(Msg.reason(st.reason))}</div>` : `<div class="chips">${this.costHtml(st.cost, st.logos)}${!st.logos ? '<span class="chip muted">без λ</span>' : ''}</div>
         ${st.cd ? '' : this.reasonHtml(st)}`}</div>
-      ${st.locked ? '' : btn}
+      ${st.locked || st.hidden ? '' : btn}
     </div>`;
   },
 

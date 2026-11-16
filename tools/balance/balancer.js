@@ -15,7 +15,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, 'balancer-core.js'), 'utf8'
 const R = C.run(`Balancer.run({ last: ${process.argv.includes('--peek') ? 3 : 2} })`);
 const f = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? Math.round(x).toLocaleString('ru-RU') : x.toFixed(1);
 for (const x of R.epochs) {
-  console.log(`эпоха ${x.e}: выпуск ${f(x.prod)} зерна/с · ${Math.round(x.lpr)} λ/раунд · 1 λ ≈ ${f(x.perL)} зерна · ` +
-    `с умом ${f(x.scen.mind.logos)} λ + ${f(x.scen.mind.w / x.prod / 3600)} ч · ресурсами ${f(x.scen.labor.logos)} λ + ${f(x.scen.labor.w / x.prod / 3600)} ч`);
+  console.log(`эпоха ${x.e}: выпуск ${f(x.prod0)} → ${f(x.prod1)} зерна/с · 1 λ ≈ ${f(x.perL)} зерна (по курсу обрядов ${f(x.riteL)}) · ` +
+    `с умом ${f(x.scen.mind.logos)} λ + ${f(x.scen.mind.w)} зерна · ресурсами ${f(x.scen.labor.logos)} λ + ${f(x.scen.labor.w)} зерна`);
 }
 console.log('Полный отчёт: откройте tools/balance/balancer.html');
