@@ -25,9 +25,10 @@ const Balancer = (() => {
     3: { house: 14, field: 4, lumber: 12, quarry: 6, workshop: 12, storehouse: 5, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
-  const BUDGET = { 0: 100, 1: 500, 2: 1000, 3: 1200 };
+  const BUDGET = { 0: 100, 1: 300, 2: 1000, 3: 1200 };
   // курс обрядов — BALANCE.riteRate медных λ за минуту выпуска на начало эпохи × BALANCE.logosInflation (дальше заданных — последняя)
-  const DEFAULTS = { last: 2, stock: 0.6 };
+  // payback — за сколько часов должно окупаться необязательное чудо; raidStock — какая доля склада в среднем лежит в запасах (для стен)
+  const DEFAULTS = { last: 2, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
 
   function run(opts = {}) {
     const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN, budget = Object.assign({}, BUDGET, o.budget || {});
@@ -355,6 +356,45 @@ const Balancer = (() => {
       const riteRate = BAL.riteRate * infl, riteL = prod0 * 60 / riteRate;
       return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
         perL: tl ? (tlab - tm) / tl : null, scen };
+    });
+    // ---------- окупаемость необязательных чудес ----------
+    // Город конца эпохи со всеми чудесами; прибавка чуда — насколько падает чистый выпуск без него (по курсам этого города),
+    // доля выпуска конца эпохи переносится на мощь середины эпохи (между «началом» и концом, геометрически).
+    // Стены (raidShield): сколько в среднем уносили бы «народы моря» — середина raidLoot от запасов (raidStock склада) раз в среднее raidEvery.
+    epochs.forEach((x, e) => {
+      const full = withLogosWonders(cities[e + 1]), must = new Set((E[e].advance && E[e].advance.specials) || []);
+      const base = measure(full), rates = base.rates, val = r => RES_KEYS.reduce((v, k) => v + (r[k] || 0) * (rates[k] != null ? rates[k] : 0), 0);
+      const net = val(base.net), mid = Math.sqrt(x.prod0 * x.prod1);
+      x.payback = { hours: o.payback, mid, list: Object.keys(B).filter(t => B[t].special && B[t].epoch === e && !must.has(t) && full.buildings.some(b => b.type === t)).map(t => {
+        const without = measure(Object.assign({}, full, { buildings: full.buildings.filter(b => b.type !== t) }));
+        const ef = B[t].effect || {}, res = G.liveCost(B[t].cost), resW = val(res), logos = B[t].logos || 0;
+        let gainEnd = net - val(without.net), shield = 0;
+        if (ef.raidShield && e === 1) {
+          load(full);
+          const cap = G.storageCap(G.effects(false)) / (1 + (ef.storagePct || 0)), [a, b] = BAL.raidLoot, [p, q] = BAL.raidEvery;
+          shield = (a + b) / 2 * o.raidStock * cap * RES_KEYS.reduce((v, k) => v + (rates[k] != null && G.resVisible(k) ? rates[k] : 0), 0) / ((p + q) / 2);
+        }
+        // остаток: чем чудо станет после устаревания — сколько стоило бы построить такое здание и поднять до его уровня (по ценам этой эпохи);
+        // если и это здание в следующей эпохе устаревает (литейня) — сколько вернёт его продажа: весь λ уровней и половина постройки
+        let rest = null;
+        const R = B[t].retire;
+        if (R) {
+          load(full);
+          const rr = { cost: G.liveCost(G.buildCost(R.into)), logos: 0 };
+          for (let L = 2; L <= R.level; L++) { const u = G.upgradeCost(R.into, L); addTo(rr.cost, u.cost); rr.logos += u.logos; }
+          const killer = T.find(tt => tt.epoch <= R.epoch && tt.retire && tt.retire.buildings && tt.retire.buildings[R.into]);
+          rest = { into: R.into, level: R.level, epoch: R.epoch, res: rr.cost, logos: rr.logos, obsolete: !!killer };
+          if (killer) {
+            rest.res = {}; for (const [k, v] of Object.entries(G.liveCost(B[R.into].cost))) rest.res[k] = Math.floor(v / 2);
+            const succ = killer.retire.buildings[R.into]; rest.successor = typeof succ === 'string' ? succ : null;
+          }
+          rest.resW = val(rest.res); rest.logosW = rest.logos * x.riteL; rest.w = rest.resW + rest.logosW;
+        }
+        const share = gainEnd / net, gainMid = share * mid + shield, logosW = logos * x.riteL;
+        const priceW = logosW + resW, sec = o.payback * 3600, earn = gainMid * sec, fairW = earn;   // остаток в цену не входит — это проверка
+        return { id: t, logos, logosW, res, resW, priceW, share, gainMid, shield, hours: gainMid > 0 ? priceW / gainMid / 3600 : null,
+          earn, rest, fairW, fairL: logos ? Math.max(0, (fairW - resW) / x.riteL) : null, retire: R || null };
+      }) };
     });
     return { stages, epochs, worth: W };
   }

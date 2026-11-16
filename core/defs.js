@@ -49,7 +49,9 @@ const BALANCE = {
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
-  laborEpochMult: [1, 1, 1.5, 2.25],   // путь «через силу» с каждой эпохой жёстче: вся его цена ×1.5 в железном веке, ×2.25 в эллинском (дальше — ещё больше)
+  // путь «через силу» с эпохами жёстче: вся его цена ×1.7 в бронзе (пересмотрено: знания бронзы на 70% дороже),
+  // ×1.5 в железном, ×2.25 в эллинском (их ещё пересмотрим; дальше — ещё больше)
+  laborEpochMult: [1, 1.7, 1.5, 2.25],
   laborSilverPerLogos: 0.75,   // «купить у чужеземцев» (buy у знания): λ-часть пути «через силу» — серебром; по ценнику столько же, сколько 8 ед. камня/дерева/товаров
   // Дань в железном веке: Ассирия грабит (raidLoot); Египет берёт серебром столько, сколько в среднем унесли бы ассирийцы
   // (середина raidLoot от ценности остальных запасов, стены — вдвое), но без случайности; Персия — твёрдую сумму с присяги: persia серебра с жителя.
@@ -115,8 +117,8 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 // Крупные траты λ разнесены по эпохе: в начале — первые знания и чудо, в середине — обязательное святилище
 // (оно не ждёт поздних ресурсов), в конце — последнее знание; сам переход стоит немного λ, главное в нём — запасы.
 const EPOCHS = [
-  { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
-  { maxLevel: 9, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
+  { maxLevel: 5, advance: { pop: 50, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
+  { maxLevel: 9, advance: { pop: 100, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 200, res: { copper: 3000, bronze: 800, goods: 2000 } } },
   { maxLevel: 11, advance: { pop: 150, specials: ['sp_salamis'], allTechs: true, logos: 400, res: { silver: 2500, iron: 1500, stone: 10000 } } },
   { maxLevel: 13 },   // эллинский Кипр: первая треть — продолжение и переход дальше ещё не описаны
   { locked: true },
@@ -127,6 +129,8 @@ const EPOCHS = [
 //  forms — облик по эпохам (null — в эту эпоху здания ещё нет); capBonus — доп. места в жилище.
 //  Какой облик (и название) показывать на каком уровне, решает интерфейс (ui/common/looks.js): нижние уровни берут облик прошлых эпох.
 //  lp — цена в λ 5-го уровня (уровня за Логос); 9-й — lp × 3. 3-й и 7-й — малые: одна цена для всех (3 и 9 λ).
+//  Цена улучшений — от цены постройки. Рудник, гавань и литейня построены так, чтобы их улучшения окупались в 1.5 раза
+//  (литейня — в 2 раза) дольше, чем у мастерской.
 //  max — не больше стольких зданий; { эпоха: число } — с этой эпохи (дома писцов: в бронзовом веке один, с железного — два).
 //  special — чудо древнего Кипра: одно на игру, одна цена (logos — λ), effect — постоянный бонус.
 //  retire — чудо эпохи: с эпохи retire.epoch оно становится обычным зданием into уровня level (бонус чуда пропадает).
@@ -141,11 +145,11 @@ const BUILDINGS = {
   quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { stone: 0.075 } }, lp: 12, forms: [{}, {}, {}, {}] },
   workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}, {}, {}] },
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}, {}] },
-  mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
+  mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 110, stone: 80 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
   // гавань: работник даёт столько же чистой ценности, сколько в поле или мастерской (с «Кожаными слитками» +25%); товары — в основном мастерские
   // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой)
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.03 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
-  foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.03 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
+  foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 100, copper: 40 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
   vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}, {}] },
   olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}, {}] },
   forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 350, copper: 150 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}, {}] },
@@ -153,15 +157,19 @@ const BUILDINGS = {
   scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: { 1: 1, 2: 2 }, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
-  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 55, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
+  sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 40, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
   sp_troodos: { special: true, epoch: 0, terrain: ['hill'], cost: { food: 1500, wood: 900 }, logos: 0, effect: { bmult: { goatpen: 0.6 }, goats: true } },
-  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 60, effect: { bmult: { workshop: 1 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
+  sp_souskiou: { special: true, epoch: 0, terrain: ['plain'], tech: 'carving', cost: { stone: 200, goods: 60 }, logos: 40, effect: { bmult: { workshop: 1 } }, retire: { epoch: 1, into: 'workshop', level: 5 } },
   shrine1: { special: true, epoch: 0, terrain: ['plain'], cost: { stone: 300, goods: 80 }, logos: 180, effect: { mult: { food: 0.2 }, growth: 0.5, logos: 0.1 } },
-  sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 4000, stone: 2000, copper: 900 }, logos: 0, effect: { bmult: { port: 0.6 }, mult: { food: 0.1 } }, retire: { epoch: 2, into: 'port', level: 9 } },
-  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 400, copper: 200, goods: 150 }, logos: 150, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } }, retire: { epoch: 2, into: 'foundry', level: 9 } },
+  // Чудеса бронзы по окупаемости (≈1.5 ч). Остаток после устаревания — проверка, что переход не обидный: Хала-Султан-Текке —
+  // гавань 7-го уровня (≈27 тыс. зерна при цене 15 тыс.); Святилище Слиткового бога (70 λ + ресурсы, ~2 ч) — литейня 9-го, её продажа вернёт λ уровней
+  sp_halasultan: { special: true, epoch: 1, terrain: ['plain'], coast: true, tech: 'seafaring', cost: { wood: 6000, stone: 3000, copper: 1350 }, logos: 0, effect: { bmult: { port: 0.9 }, mult: { food: 0.15 } }, retire: { epoch: 2, into: 'port', level: 7 } },
+  sp_ingot: { special: true, epoch: 1, terrain: ['plain'], tech: 'smelting', cost: { stone: 800, copper: 400, goods: 250 }, logos: 70, effect: { mult: { copper: 1 }, bmult: { foundry: 0.5 } }, retire: { epoch: 2, into: 'foundry', level: 9 } },
   sp_walls: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 6000, wood: 1500 }, logos: 0, effect: { raidShield: true, storagePct: 0.5 } },
-  sp_palace: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 800, wood: 500, goods: 150 }, logos: 350, effect: { all: 0.15, storage: 2000 } },
-  shrine2: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 600, copper: 200, goods: 200 }, logos: 450, effect: { logos: 0.2, all: 0.1 } },
+  // обязательное бронзы: λ поменьше (дворец 260, святилище 330, переход 200) — реальные λ эпохи растут ровно, ~×2 к меди;
+  // зато в обычных ресурсах эти чудеса весомые (+35 тыс. зерна к пути «ресурсами»)
+  sp_palace: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 4000, wood: 3000, goods: 600 }, logos: 260, effect: { all: 0.15, storage: 2000 } },
+  shrine2: { special: true, epoch: 1, terrain: ['plain'], cost: { stone: 4000, copper: 1200, goods: 800 }, logos: 330, effect: { logos: 0.2, all: 0.1 } },
   // Царства-города: upgradeOf — чудо не строится заново, а улучшает старое на том же месте
   // Ум или сила: Афродита и гробницы — за λ, Аполлон и Троодос — без λ, но очень дорого. tech — после какого знания можно.
   // Улучшение сохраняет λ-бонус старого чуда (богиня +10%, Рогатый бог +20%) и добавляет своё.
@@ -187,13 +195,16 @@ const TECHS = [
   { id: 'foundations', epoch: 0, logos: 28, laborLogos: 60, cost: { stone: 500 }, effect: { houseCap: 1 } },
   { id: 'redwhite', epoch: 0, logos: 30, laborLogos: 80, cost: { goods: 120, wood: 300 }, req: ['carving'], effect: { bmult: { workshop: 0.3 } } },
   { id: 'nativecopper', epoch: 0, logos: 60, laborLogos: 150, cost: { stone: 600, goods: 150 }, req: ['redwhite'], effect: { mult: { wood: 0.2, stone: 0.2 } } },
-  { id: 'smelting', epoch: 1, logos: 100, cost: { wood: 900 } },
-  { id: 'seafaring', epoch: 1, logos: 130, cost: { wood: 1200 } },
-  { id: 'ashlar', epoch: 1, logos: 120, cost: { stone: 1200 }, effect: { houseCap: 2, storagePct: 0.2 } },
-  { id: 'bronze', epoch: 1, logos: 160, cost: { copper: 450 }, req: ['smelting', 'seafaring'] },
-  { id: 'oxhide', epoch: 1, logos: 200, cost: { copper: 600 }, req: ['seafaring', 'smelting'], effect: { bmult: { port: 0.25 } } },
-  { id: 'bronzetools', epoch: 1, logos: 200, cost: { bronze: 150 }, req: ['bronze'], effect: { mult: { food: 0.25, wood: 0.25, stone: 0.25 } } },
-  { id: 'writing', epoch: 1, logos: 160, cost: { goods: 450 } },
+  // Бронзовый век: «через силу» на 70% дороже прежнего (laborEpochMult) и ещё ~25 тыс. зерна на знания (печи, уголь, тёсаный камень, рукояти),
+  // λ «с умом» — по курсу обрядов (1 λ ≈ 400 зерна: оба пути стоят одинаково); λ-часть пути «через силу» считается от прежних цен (laborLogos).
+  // Сыр — в припасы мореходов и в учёт писцов.
+  { id: 'smelting', epoch: 1, logos: 35, laborLogos: 100, cost: { wood: 900, stone: 300 } },
+  { id: 'seafaring', epoch: 1, logos: 35, laborLogos: 130, cost: { wood: 900, cheese: 200 } },
+  { id: 'ashlar', epoch: 1, logos: 60, laborLogos: 120, cost: { stone: 1800 }, effect: { houseCap: 2, storagePct: 0.2 } },
+  { id: 'bronze', epoch: 1, logos: 60, laborLogos: 160, cost: { copper: 450, wood: 600 }, req: ['smelting', 'seafaring'] },
+  { id: 'oxhide', epoch: 1, logos: 70, laborLogos: 200, cost: { copper: 750 }, req: ['seafaring', 'smelting'], effect: { bmult: { port: 0.25 } } },
+  { id: 'bronzetools', epoch: 1, logos: 85, laborLogos: 200, cost: { bronze: 150, wood: 500 }, req: ['bronze'], effect: { mult: { food: 0.25, wood: 0.25, stone: 0.25 } } },
+  { id: 'writing', epoch: 1, logos: 50, laborLogos: 160, cost: { goods: 350, cheese: 200 } },
   // Царства-города. retire — перемены: цены со старым ресурсом пересчитываются в новый (rate — по ценнику труда),
   // запасы переходят в новый по курсу stock (по умолчанию = rate; 0 — запасы просто пропадают),
   // здания, которые его делали, устаревают — их можно перестроить в новые (уровень сохраняется) или продать (λ уровней возвращается).

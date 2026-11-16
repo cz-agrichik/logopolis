@@ -345,13 +345,13 @@ test('железный век: писцам 10-й уровень — тольк�
   assert.equal(G.upgradeCost('house', 10).cost.iron, 30);
 });
 
-test('переход в железный век: Хала-Султан-Текке — гавань 9-го уровня, Бог на слитке — бронзолитейня 9-го', () => {
+test('переход в железный век: Хала-Султан-Текке — гавань 7-го уровня, Бог на слитке — бронзолитейня 9-го', () => {
   const C = fresh(), G = C.get('Game'), s = G.state;
   s.epoch = 1;
   s.buildings.push({ id: 895, type: 'sp_halasultan', level: 1, x: 2, y: 2 }, { id: 896, type: 'sp_ingot', level: 1, x: 3, y: 2 });
   s.epoch = 2;
   const out = G.retireWonders();
-  assert.deepEqual([...out.map(x => [...x])], [['sp_halasultan', 'port', 9], ['sp_ingot', 'foundry', 9]]);
+  assert.deepEqual([...out.map(x => [...x])], [['sp_halasultan', 'port', 7], ['sp_ingot', 'foundry', 9]]);
   assert.equal(s.buildings.find(b => b.id === 895).type, 'port');
   assert.equal(s.buildings.find(b => b.id === 896).level, 9);
 });
@@ -1006,7 +1006,9 @@ test('медно-каменный век: λ знаний «с умом» по �
   assert.deepEqual(['cheesemaking', 'carving', 'granary', 'foundations', 'redwhite', 'nativecopper'].map(id => G.techPrice(T[id]).logos), [7, 12, 18, 28, 30, 60]);
   assert.deepEqual({ ...G.techPrice(T.cheesemaking, 'labor').cost }, { food: 450, wood: 120, stone: 120 }, 'через силу — от прежних 30 λ');
   assert.deepEqual({ ...G.techPrice(T.nativecopper, 'labor').cost }, { stone: 2400, goods: 450, wood: 600 });
-  assert.equal(G.techPrice(T.smelting, 'labor').cost.wood, 3020, 'бронзовый век не тронут');
+  assert.equal(G.techPrice(T.smelting, 'labor').cost.wood, 5140, 'бронзовый век: прежний путь ×1.7');
+  assert.equal(G.techPrice(T.smelting).logos, 35);
+  assert.equal(G.techPrice(T.seafaring).cost.cheese, 200, 'сыр — в припасы мореходов');
   // благословение полей и стад: поля и загоны ×2, коза сразу
   const t = G.map.find(t => t.t === 'plain' && !G.buildingAt(t.x, t.y)), field = { id: 950, type: 'field', level: 1, x: t.x, y: t.y };
   s.buildings.push(field);
@@ -1030,4 +1032,11 @@ test('дома писцов: в бронзовом веке один, с жел�
   assert.equal(G.buildStatus('scribe').reason.code, 'maxCount');
   s.epoch = 2; assert.equal(G.maxCount('scribe'), 2);
   assert.notEqual((G.buildStatus('scribe').reason || {}).code, 'maxCount');
+});
+
+test('улучшения — от цены постройки (рудник, гавань и литейня построены так, чтобы улучшения окупались разумно)', () => {
+  const G = fresh().get('Game');
+  assert.deepEqual({ ...G.upgradeCost('mine', 2).cost }, { wood: 165, stone: 120 });
+  assert.deepEqual({ ...G.upgradeCost('foundry', 2).cost }, { stone: 150, copper: 60 });
+  assert.deepEqual({ ...G.upgradeCost('workshop', 2).cost }, { wood: 90, stone: 60 });
 });
