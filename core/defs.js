@@ -22,12 +22,15 @@ const BALANCE = {
     7: { logos: 9, growth: 1.25 },
     9: { lp: 3, growth: 1.4 },
     11: { lp: 6, growth: 1.4 },   // вдвое дороже 9-го
+    13: { lp: 9, growth: 1.4 },   // в полтора раза дороже 11-го (эллинский Кипр)
   },
   goodsFromLevel: 4,       // с 4-го уровня улучшения требуют товары (в железном веке — серебро по курсу)
   copperFromLevel: 6,      // с 6-го уровня (первого в бронзовом веке) — ещё и медь
   bronzeFromLevel: 8,      // с 8-го — бронзу…
   ironFromLevel: 10,       // …а с 10-го (железный век) вместо бронзы — железо
-  storeGrowth: { 10: 1.3, 11: 1.6 },   // склады на 10-м и 11-м растут резче обычного (×1.15 и ×1.4) — под цены переходов
+  coinFromLevel: 12,       // с 12-го (эллинский Кипр) — ещё и монеты: 60 × 1.5^(уровень − 12); сам уровень открывает знание coinTech
+  coinTech: 'coinage',
+  storeGrowth: { 10: 1.3, 11: 1.6, 12: 1.3, 13: 1.6 },   // склады на 10–13-м растут резче обычного (×1.15 и ×1.4) — под цены переходов
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
@@ -37,14 +40,25 @@ const BALANCE = {
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
   laborTechMult: 3,        //   и ресурсная часть цены знания ×3
   laborSpecialMult: 2,     //   спецстроения ×2
-  laborEpochMult: [1, 1, 1.5],   // путь «через силу» с каждой эпохой жёстче: вся его цена ×1.5 в железном веке (дальше — ещё больше)
+  laborEpochMult: [1, 1, 1.5, 2.25],   // путь «через силу» с каждой эпохой жёстче: вся его цена ×1.5 в железном веке, ×2.25 в эллинском (дальше — ещё больше)
   laborSilverPerLogos: 0.75,   // «купить у чужеземцев» (buy у знания): λ-часть пути «через силу» — серебром; по ценнику столько же, сколько 8 ед. камня/дерева/товаров
   // Дань в железном веке: Ассирия грабит (raidLoot); Египет берёт серебром столько, сколько в среднем унесли бы ассирийцы
   // (середина raidLoot от ценности остальных запасов, стены — вдвое), но без случайности; Персия — твёрдую сумму с присяги: persia серебра с жителя.
   tribute: { persia: 4 },
   // Ценник труда (README, «Ценник ресурсов»): сколько стоит единица ресурса в секундах работы, в пересчёте на зерно.
   // Персия берёт недоимку ровно по нему.
-  worth: { food: 1, wood: 1.4, stone: 2, cheese: 1, goods: 5, copper: 5, bronze: 29, iron: 24, silver: 25, amphora: 3.3 },
+  worth: { food: 1, wood: 1.4, stone: 2, cheese: 1, goods: 5, copper: 5, bronze: 29, iron: 24, silver: 25, amphora: 3.3, papyrus: 350 },
+  // Корабли (эллинский Кипр, знание «Корабли в Пирей»): раз в every секунд игры в гавань приходит корабль и ждёт wait секунд.
+  // Он просит один из пакетов (packs) и даёт за него give; то же можно купить за buy — впятеро дороже, чем товаром по ценнику.
+  // Не отгрузили — корабль уходит без штрафа. Папирус не производится: его привозят только корабли.
+  ships: {
+    every: [360, 720], wait: 300, give: { papyrus: 10 }, buy: { silver: 700 },
+    packs: [
+      { id: 'grain', want: { food: 2500, amphora: 300 } },
+      { id: 'wine', want: { amphora: 800, silver: 30 } },
+      { id: 'iron', want: { iron: 60, food: 1200, amphora: 250 } },
+    ],
+  },
 };
 
 const RES = {
@@ -58,6 +72,7 @@ const RES = {
   iron: { epoch: 2, tech: 'iron' },
   silver: { epoch: 2, tech: 'phoenicians' },   // 1 серебро = 5 ремёсел (мягкая деноминация)
   amphora: { epoch: 2, tech: 'viticulture' },  // амфоры: вино и масло
+  papyrus: { epoch: 3, tech: 'piraeus', imported: true },   // папирус: не производится — привозят корабли
 };
 const RES_KEYS = Object.keys(RES);
 
@@ -92,6 +107,7 @@ const EPOCHS = [
   { maxLevel: 5, advance: { pop: 35, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
   { maxLevel: 9, advance: { pop: 80, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 250, res: { copper: 3000, bronze: 800, goods: 2000 } } },
   { maxLevel: 11, advance: { pop: 150, specials: ['sp_salamis'], allTechs: true, logos: 400, res: { silver: 2500, iron: 1500, stone: 10000 } } },
+  { maxLevel: 13 },   // эллинский Кипр: первая треть — продолжение и переход дальше ещё не описаны
   { locked: true },
 ];
 
@@ -104,24 +120,24 @@ const EPOCHS = [
 //  retire — чудо эпохи: с эпохи retire.epoch оно становится обычным зданием into уровня level (бонус чуда пропадает).
 // ------------------------------------------------------------
 const BUILDINGS = {
-  house: { terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 10, forms: [{}, { capBonus: 2 }, { capBonus: 2 }] },
-  field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 12, forms: [{}, {}, {}] },
+  house: { terrain: ['plain'], epoch: 0, cost: { wood: 30, stone: 15 }, cap: 4, lp: 10, forms: [{}, { capBonus: 2 }, { capBonus: 2 }, { capBonus: 2 }] },
+  field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 12, forms: [{}, {}, {}, {}] },
   goatpen: { terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1, prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 12, forms: [{}, {}] },
   // trade — линия «Железных топоров и кирок»: пока есть железо, +30% выпуска; орудия тупятся — железо понемногу уходит.
   // keep (у гавани) — сырьё уходит в торговлю только сверх этой доли склада: амфоры сначала копятся до половины, потом продаются
-  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { wood: 0.105 } }, lp: 12, forms: [{}, {}, {}] },
-  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { stone: 0.075 } }, lp: 12, forms: [{}, {}, {}] },
-  workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}, {}] },
-  storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}] },
+  lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { wood: 0.105 } }, lp: 12, forms: [{}, {}, {}, {}] },
+  quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { stone: 0.075 } }, lp: 12, forms: [{}, {}, {}, {}] },
+  workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 14, forms: [{}, {}, {}, {}] },
+  storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
   // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой)
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.02 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.02 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
-  vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}] },
-  olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}] },
-  forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 350, copper: 150 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}] },
+  vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}, {}] },
+  olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}, {}] },
+  forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 350, copper: 150 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}, {}] },
   // levelTech — уровни, для которых нужно знание (писцам 10-й и выше — кипрское слоговое письмо)
-  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary' }, max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}] },
+  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: 2, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
   sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 90, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
@@ -177,6 +193,12 @@ const TECHS = [
   // reqWonder — чудо, без которого знание не изучить: флот снаряжают цари Саламина
   { id: 'fleet', epoch: 2, logos: 280, cost: { wood: 2500, iron: 100 }, req: ['pharaoh'], reqWonder: 'sp_salamis', buy: true, effect: { tributeCut: 0.25 } },
   { id: 'gifts', epoch: 2, logos: 320, cost: { silver: 160, amphora: 800 }, req: ['pharaoh', 'fleet'], buy: true, fixTribute: true },
+  // Эллинский Кипр, первая треть. λ в полтора раза выше железного века, ресурсы вдвое; «через силу» — buy (λ заменяют монеты).
+  // coinage: серебро зовётся монетой, открыт 12-й уровень зданий (BALANCE.coinTech); piraeus: корабли и папирус (BALANCE.ships);
+  // alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
+  { id: 'coinage', epoch: 3, logos: 300, cost: { silver: 220, copper: 700 }, buy: true },
+  { id: 'piraeus', epoch: 3, logos: 320, cost: { food: 4000, wood: 2500, amphora: 600 }, req: ['coinage'], buy: true },
+  { id: 'alphabet', epoch: 3, logos: 340, cost: { papyrus: 20, silver: 200 }, req: ['piraeus'], buy: true },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 

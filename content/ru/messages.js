@@ -40,9 +40,13 @@ const Msg = {
     const L = Lex.lords[p.lord || 'assyria'], tail = list && p.lost && p.lost.length ? ': ' + this.resList(p.lost, '−') : '';
     if (p.due == null) return `${L.icon} Сборщики дани ${L.of} забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}${tail}`;
     if (!p.short) return `${L.icon} Дань ${L.to} уплачена: ${Lex.res.silver.icon} −${p.paid}`;
-    if (p.lord === 'egypt') return `${L.icon} Дань ${L.to}: серебра не хватило (${p.paid} из ${p.due}) — недостающее добрали грабежом, ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены — вдвое)' : ''}${tail}`;
-    return `${L.icon} Дань ${L.to}: не хватило ${p.short} серебра — недоимку взяли запасами по ценнику${tail}`;
+    if (p.lord === 'egypt') return `${L.icon} Дань ${L.to}: ${this.silverOf(5)} не хватило (${p.paid} из ${p.due}) — недостающее добрали грабежом, ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены — вдвое)' : ''}${tail}`;
+    return `${L.icon} Дань ${L.to}: не хватило ${p.short} ${this.silverOf(p.short)} — недоимку взяли запасами по ценнику${tail}`;
   },
+  /** «серебра» или, после «Своей монеты», «монет» — к числу n. */
+  silverOf(n) { const g = Lex.res.silver.name === Lex.res.silver.coin.name ? Lex.res.silver.coin.gen : Lex.res.silver.gen; return plural(n, ...g); },
+  /** Груз корабля: { ресурс: сколько } → «🌾 2500 🍷 300». */
+  wantList(want) { return Object.entries(want || {}).map(([k, v]) => `${Lex.res[k].icon} ${v}`).join(' '); },
   /** [[ресурс, сколько]] → «🌾 +30 🪵 +12». */
   resList(list, sign = '+') { return (list || []).map(([k, v]) => `${Lex.res[k].icon} ${sign}${v}`).join(' '); },
 
@@ -114,6 +118,9 @@ const Msg = {
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;
       case 'hintGather': return 'Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.';
       case 'hintLogos': return 'λ Логос даётся только за карточки — кнопка «📜 Учиться».';
+      case 'shipCame': return `${Lex.ship.icon} В гавань пришёл корабль: «${Lex.ship.packs[p.pack][0]}» — ${this.wantList(p.want)} за ${this.wantList(p.give)}`;
+      case 'shipGone': return `${Lex.ship.icon} Корабль ушёл без груза`;
+      case 'shipLoaded': return p.how === 'buy' ? `${Lex.ship.icon} Папирус куплен у кормчего: ${this.resList(p.got)}` : `${Lex.ship.icon} Корабль загружен («${Lex.ship.packs[p.pack][0]}»): ${this.resList(p.got)}`;
       case 'newGameKept': return '📚 Новая игра: выученные слова и колоды остались с вами.';
     }
     return String(e.k);

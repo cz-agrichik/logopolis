@@ -833,3 +833,109 @@ test('с 4-го уровня улучшения просят товары (ка�
   const c = G.upgradeCost('house', 4).cost;
   assert.ok(!c.goods && c.silver === 3, 'после «Финикийцев» товары — серебром 5 : 1');
 });
+
+/** Эллинский Кипр: все знания прошлых эпох, большие запасы, гавань у моря. */
+function hellenic(C) {
+  const G = C.get('Game'), s = G.state;
+  s.epoch = 3;
+  s.techs = C.get('TECHS').filter(t => t.epoch < 3).map(t => t.id);
+  s.pop = 150; s.logos = 5000;
+  for (const k of Object.keys(s.res)) s.res[k] = 3000;
+  s.buildings.push({ id: 880, type: 'storehouse', level: 11, x: 5, y: 7 }, { id: 881, type: 'storehouse', level: 11, x: 6, y: 7 });
+  G.tick(0.001);
+  return G;
+}
+const addPort = G => {
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('port', t));
+  const b = { id: 882, type: 'port', level: 9, x: t.x, y: t.y }; G.state.buildings.push(b); return b;
+};
+
+test('переход из железного века ведёт в эллинский Кипр — он открыт, игра не кончается; старое «конец прототипа» снимается', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, E = C.get('EPOCHS');
+  assert.equal(E[3].maxLevel, 13); assert.ok(!E[3].locked && !E[3].advance && E[4].locked);
+  s.techs.push(...C.get('TECHS').filter(t => t.epoch === 2).map(t => t.id));
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_salamis', t));
+  s.buildings.push({ id: 990, type: 'sp_salamis', level: 1, x: t.x, y: t.y });
+  s.pop = 200; s.res.silver = 2600; s.res.iron = 1600; s.res.stone = 10000;
+  s.buildings.push({ id: 873, type: 'storehouse', level: 11, x: 4, y: 7 }); G.tick(0.001); s.pop = 200;
+  assert.ok(G.advanceEpoch());
+  assert.equal(s.epoch, 3); assert.equal(s.finished, false); assert.equal(G.maxLevel(), 13);
+  assert.equal(G.epochReqs(), null, 'переход дальше — в следующей версии');
+  // старое сохранение, где переход в эпоху 3 был концом прототипа
+  const io = memoryIO({ [G.KEY]: JSON.stringify(Object.assign({}, s, { finished: true })) });
+  G.io = io; assert.equal(G.load().finished, false);
+});
+
+test('эллинский Кипр: 12-й уровень — после «Своей монеты» и за монеты, 13-й — только λ (в полтора раза дороже 11-го)', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE');
+  const up12 = G.upgradeCost('house', 12), up11 = G.upgradeCost('house', 11);
+  assert.ok(up12.cost.silver >= 60 && up12.cost.iron > 0 && !up12.logos, '12-й — ресурсы, железо и монеты');
+  assert.equal(G.upgradeCost('house', 13).logos, Math.round(1.5 * up11.logos));
+  assert.ok(!Object.keys(G.upgradeCost('house', 13).cost).length, '13-й — только λ');
+  const b = { id: 883, type: 'field', level: 11, x: 7, y: 7 }; s.buildings.push(b);
+  let u = G.upgradeInfo(b);
+  assert.ok(!u.ok && u.reason.code === 'needTech' && u.reason.tech === BAL.coinTech, 'без «Своей монеты» 12-го нет');
+  s.techs.push('coinage'); u = G.upgradeInfo(b);
+  assert.ok(u.ok, '12-й открыт'); assert.ok(G.upgrade(b)); assert.equal(b.level, 12);
+  // писцам 12-й — ещё и «Алфавит Эвагора»
+  const sc = { id: 884, type: 'scribe', level: 11, x: 8, y: 7 }; s.buildings.push(sc);
+  u = G.upgradeInfo(sc); assert.ok(u.reason && u.reason.code === 'needTech' && u.reason.tech === 'alphabet');
+  // склады на 12-м и 13-м растут резче
+  assert.ok(Math.abs(G.storeMult(12) / G.storeMult(11) - 1.3) < 1e-9 && Math.abs(G.storeMult(13) / G.storeMult(12) - 1.6) < 1e-9);
+});
+
+test('эллинский Кипр: три знания по цепочке; «через силу» ×2.25 и λ-часть монетами', () => {
+  const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
+  assert.deepEqual(['coinage', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3]);
+  assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 2000, copper: 4730 });
+  assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 27000, wood: 16880, amphora: 4050, silver: 540 });
+  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 140, silver: 1930 });
+  assert.ok(G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
+  assert.ok(G.research('coinage')); assert.ok(!G.techStatus(T.piraeus).locked, 'после монеты — открыто');
+});
+
+test('корабли: приходят только после «Кораблей в Пирей» и при гавани; груз за папирус, покупка впятеро дороже, отпустить без штрафа', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE');
+  s.timers.ship = 0; G.events(1);
+  assert.equal(s.ship, null, 'без знания кораблей нет');
+  s.techs.push('coinage', 'piraeus'); G.events(1);
+  assert.equal(s.ship, null, 'без гавани кораблей нет');
+  addPort(G);
+  s.timers.ship = 0.5; G.events(1);
+  assert.ok(s.ship && s.ship.left === BAL.ships.wait && s.ship.give.papyrus === 10, 'корабль пришёл');
+  assert.ok(G.shipSpot(), 'корабль стоит у гавани');
+  assert.ok(G.resVisible('papyrus'));
+  // отгрузить: груз уходит, папирус приходит
+  const want = Object.assign({}, s.ship.want), before = Object.assign({}, s.res);
+  const r = G.shipLoad();
+  assert.ok(r && r.how === 'load'); assert.equal(s.res.papyrus, before.papyrus + 10);
+  for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v);
+  assert.equal(s.ship, null); assert.ok(s.timers.ship >= BAL.ships.every[0] && s.timers.ship <= BAL.ships.every[1]);
+  // купить за монеты: по ценнику впятеро дороже
+  const W = BAL.worth, worth = c => Object.entries(c).reduce((t, [k, v]) => t + v * W[k], 0);
+  assert.equal(worth(BAL.ships.buy) / worth(BAL.ships.give), 5);
+  s.timers.ship = 0; G.events(1); const silver = s.res.silver;
+  assert.ok(G.shipBuy()); assert.equal(s.res.silver, silver - 700);
+  // не хватает груза — отгрузить нельзя; отпустить — без штрафа
+  s.timers.ship = 0; G.events(1);
+  for (const k of Object.keys(s.ship.want)) s.res[k] = 0;
+  assert.ok(!G.shipStatus().ok); assert.equal(G.shipLoad(), null);
+  const res = JSON.stringify(s.res); assert.ok(G.shipDismiss()); assert.equal(JSON.stringify(s.res), res); assert.equal(s.ship, null);
+  // не отгрузили — уходит сам через 5 минут
+  s.timers.ship = 0; G.events(1); G.events(BAL.ships.wait + 1);
+  assert.equal(s.ship, null); assert.ok(s.log.some(e => e.k === 'shipGone'));
+});
+
+test('корабли и папирус: офлайн корабль не грузят — уходит в свой срок; дань папирус не трогает', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, clock = C.clock;
+  s.techs.push('coinage', 'piraeus'); addPort(G);
+  s.timers.ship = 0; G.events(1); assert.ok(s.ship);
+  const papyrus = (s.res.papyrus = 50);
+  s.lastSave = clock.now; clock.now += 20 * 60 * 1000;
+  G.catchUp();
+  assert.equal(s.ship, null, 'ушёл, пока игрока не было'); assert.equal(s.res.papyrus, papyrus);
+  // Персия: недоимку берут запасами по ценнику — кроме папируса
+  s.tributeFixed = 100000; s.res.silver = 0; s.timers.raid = 0; G.events(0.1);
+  assert.equal(s.res.papyrus, papyrus, 'папирус не берут');
+  assert.ok(s.res.food < 3000, 'остальное берут');
+});

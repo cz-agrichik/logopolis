@@ -20,6 +20,14 @@ const Cat = (() => {
   }
   const techs = TECHS.map(t => m(t, Lex.tech[t.id]));
   const rites = RITUALS.map(r => m(r, Lex.rite[r.id]));
+  // «Своя монета»: серебро зовётся монетами, значок — монета с лежащим бараном. Ключ ресурса прежний (silver):
+  // запасы, цены и дань не меняются, меняется только то, как ресурс называется и рисуется.
+  const coined = () => !!(typeof Game !== 'undefined' && Game.state && Game.hasTech(BALANCE.coinTech));
+  for (const o of [Lex.res.silver, res.silver]) {
+    const base = { name: o.name, icon: o.icon };
+    for (const f of ['name', 'icon']) Object.defineProperty(o, f, { get: () => (coined() ? Lex.res.silver.coin : base)[f], enumerable: true, configurable: true });
+  }
+  Art.resKey = k => k === 'silver' && coined() ? 'coin' : k;
   const byId = list => Object.fromEntries(list.map(x => [x.id, x]));
   const merge = (nums, texts) => Object.fromEntries(Object.entries(nums).map(([k, v]) => [k, m(v, texts[k])]));
   return {
@@ -28,6 +36,7 @@ const Cat = (() => {
     tasks: merge(TASK_REWARDS, Lex.task),
     plans: merge(LEARN_PLANS, Lex.plan),
     lords: Lex.lords,
+    ship: Lex.ship,
     /** Облик здания в эпохе: { name, icon, capBonus }. */
     form(type, epoch = Game.state.epoch) {
       const B = bld[type];

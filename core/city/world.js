@@ -36,6 +36,7 @@ Object.assign(Game, {
       s.timers.raid -= dt;
       if (s.timers.raid <= 0) { this.raid(); s.timers.raid = this.nextRaidIn(); }
     }
+    if (this.shipTick(dt)) changed = true;   // корабли эллинского Кипра (core/city/ships.js)
     return changed;
   },
 
@@ -81,7 +82,7 @@ Object.assign(Game, {
     const s = this.state;
     if (lord === 'persia') return Math.ceil(s.pop * BALANCE.tribute.persia);
     const W = BALANCE.worth, [a, b] = BALANCE.raidLoot, share = (a + b) / 2 / (fx.raidShield ? 2 : 1);
-    const value = RES_KEYS.filter(k => k !== 'silver' && this.resVisible(k)).reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
+    const value = RES_KEYS.filter(k => k !== 'silver' && this.resVisible(k) && !RES[k].imported).reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
     return Math.ceil(value * share / W.silver);
   },
   /** Сколько серебра потребуют: Египет — как средний ассирийский грабёж, Персия — сумма с присяги; «Флот царей» −25%. null — Ассирия: она грабит. */
@@ -127,7 +128,7 @@ Object.assign(Game, {
       let pct = 0, halved = false;
       if (short > 0 && lord === 'egypt') { halved = !!fx.raidShield; pct = grab(short / due); }
       else if (short > 0) {   // Персия: недоимку — ровно по ценнику, одной и той же долей из всех запасов
-        const W = BALANCE.worth, need = short * W.silver, keys = RES_KEYS.filter(k => this.resVisible(k));
+        const W = BALANCE.worth, need = short * W.silver, keys = RES_KEYS.filter(k => this.resVisible(k) && !RES[k].imported);   // привозное (папирус) не трогают
         const total = keys.reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
         pct = total > 0 ? Math.min(1, need / total) : 0;
         for (const k of keys) take(k, s.res[k] * pct);
@@ -168,6 +169,9 @@ Object.assign(Game, {
       if (left <= away) { raid = this.raid(true); s.timers.raid = this.nextRaidIn(); }
       else s.timers.raid = left - away;
     }
+    // корабли без игрока не грузят: тот, что ждал, ушёл (если его срок вышел), следующий придёт уже при игроке
+    if (s.ship) { s.ship.left -= away; if (s.ship.left <= 0) { this.log('shipGone', { pack: s.ship.pack }); s.ship = null; s.timers.ship = this.nextShipIn(); } }
+    else if (s.timers.ship != null) s.timers.ship = Math.max(30, s.timers.ship - away);
     s.lastSave = Date.now();
     return {
       seconds: away, gained, pop: s.pop - popBefore, halved: away > BALANCE.offlineFullSec,

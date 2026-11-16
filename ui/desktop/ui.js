@@ -62,6 +62,9 @@ const UI = {
     Bus.on('raid', r => this.toast(r.shielded ? '🧱 Циклопические стены отразили набег «народов моря»!'
       : r.tribute ? Msg.tributeLine(r) + '.'
       : `⚔️ Набег «народов моря»! Унесли ${Math.round(r.pct * 100)}% всех запасов. Защитят только Циклопические стены.`));
+    // корабль эллинского Кипра: пришёл — тост; плашка над картой и сам корабль у гавани открывают окно
+    Bus.on('ship', sh => this.toast(`${Cat.ship.icon} В гавань пришёл корабль: «${esc(Cat.ship.packs[sh.pack][0])}». Ждёт ${Math.round(sh.left / 60)} минут — нажмите на него.`));
+    $('#buffbar').addEventListener('click', e => { if (e.target.closest('[data-ship]')) this.showShip(); });
     this.renderMap();
     this.renderAll();
   },
@@ -138,8 +141,9 @@ const UI = {
         const L = Cat.lords[lord], have = Math.floor(Game.state.res.silver), cut = (Game.fx || Game.effects()).tributeCut;
         const how = lord === 'egypt' ? `как средний ассирийский грабёж, но серебром: ${(BALANCE.raidLoot[0] + BALANCE.raidLoot[1]) / 2 * 100 / (shield ? 2 : 1)}% остальных запасов по ценнику — сумма растёт вместе с запасами` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
         const miss = lord === 'egypt' ? `недостающее доберут грабежом${shield ? ' (Циклопические стены — вдвое)' : ''}` : 'недоимку возьмут другими запасами ровно по ценнику';
-        raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Дань ${L.to} через ${mm}: ${due} серебра (${how}${cut ? `; «Флот царей» −${Math.round(cut * 100)}%` : ''}).
-          ${have >= due ? 'Серебра хватает.' : `Серебра пока ${have} — не хватит: ${miss}.`}">
+        const sv = Msg.silverOf(5), Sv = sv[0].toUpperCase() + sv.slice(1);   // «серебра» или, после «Своей монеты», «монет»
+        raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Дань ${L.to} через ${mm}: ${due} ${Msg.silverOf(due)} (${how}${cut ? `; «Флот царей» −${Math.round(cut * 100)}%` : ''}).
+          ${have >= due ? `${Sv} хватает.` : `${Sv} пока ${have} — не хватит: ${miss}.`}">
           <i class="bf-ic">${L.icon}</i><b>Дань ${L.to}</b><small>${Art.res('silver', 'inl')} ${due} · ${mm}</small></span>`;
       } else if (lord) {
         raid = `<span class="bf raid ${raidIn < 60 ? 'soon' : ''}" title="Сборщики дани Ассирии придут через ${mm}: заберут от ${a * 100}% до ${b * 100}% всех запасов${shield
@@ -152,7 +156,13 @@ const UI = {
           <i class="bf-ic">${shield ? '🧱' : '⚔️'}</i><b>Народы моря</b><small>${mm}</small></span>`;
       }
     }
-    const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + raid;
+    // корабль у причала (эллинский Кипр): сколько ещё ждёт; нажать — окно корабля
+    const shipLeft = Game.shipLeft(), ship = shipLeft == null ? '' : (() => {
+      const st = Game.shipStatus(), mm = `${Math.floor(shipLeft / 60)}:${String(Math.floor(shipLeft % 60)).padStart(2, '0')}`;
+      return `<span class="bf ship ${st.ok ? 'ready' : ''}" data-ship title="${esc(Cat.ship.name)} ждёт ещё ${mm}: просит «${esc(Cat.ship.packs[st.ship.pack][0])}» (${esc(Msg.wantList(st.ship.want))}) за ${esc(Msg.wantList(st.ship.give))}. Нажмите — отгрузить, купить или отпустить.">
+        <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>${Art.res('papyrus', 'inl')} ${st.ship.give.papyrus} · ${mm}</small></span>`;
+    })();
+    const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + ship + raid;
     if (bhtml !== this.lastBuffs) {
       this.lastBuffs = bhtml;
       bar.classList.remove('hidden', 'compact');
@@ -186,6 +196,7 @@ const UI = {
     const map = $('#map');
     map.style.gridTemplateColumns = `repeat(${MAP_W}, 1fr)`;
     let html = '';
+    const shipAt = Game.shipSpot();
     for (const t of Game.map) {
       const b = Game.buildingAt(t.x, t.y);
       const cls = ['tile', 't-' + t.t];
@@ -208,6 +219,11 @@ const UI = {
         if (this.upMode) { const u = this.upClass(b); if (u) cls.push(...u.split(' ')); }
       } else if (t.t === 'forest') inner = `<span class="deco">${Art.svg('tree')}</span>`;
       else if (t.t === 'hill') inner = `<span class="deco">${Art.svg('hill')}</span>`;
+      if (shipAt && shipAt.x === t.x && shipAt.y === t.y) {
+        cls.push('ship-here');
+        inner = `<span class="ship-ic">${Art.svg('ship')}</span>`;
+        title = `${Cat.ship.name} у причала — нажмите`;
+      }
       if (Game.goat && Game.goat.x === t.x && Game.goat.y === t.y) {
         cls.push('goat');
         inner = `<span class="goat-ic">${Art.svg(Game.goat.kind === 'maenad' ? 'maenad' : 'goat')}</span>`;
@@ -232,6 +248,8 @@ const UI = {
     if (!el) return;
     if (this.compact() && this.drawerOpen()) return this.drawer(false);
     const tile = Game.tile(+el.dataset.x, +el.dataset.y);
+    const shipAt = Game.shipSpot();
+    if (shipAt && shipAt.x === tile.x && shipAt.y === tile.y && !this.placing) return this.showShip();
     if (Game.goat && Game.goat.x === tile.x && Game.goat.y === tile.y) {
       const g = Game.catchGoat(), m = g.kind === 'maenad';
       this.floatText(el, m ? '🍇!' : '🐐!', 'gold');
@@ -536,7 +554,7 @@ const UI = {
     Cat.epochs.forEach((ep, i) => {
       h += `<li class="${i < s.epoch ? 'past' : i === s.epoch ? 'now' : ''} ${ep.locked ? 'future' : ''}"><b>${esc(ep.name)}${ep.locked ? ' · скоро' : ''}</b><small>${esc(ep.sub)}</small></li>`;
     });
-    h += `<li class="future"><b>Эллинизм, Рим, Византия…</b><small>дальше по истории Кипра</small></li></ol>`;
+    h += `<li class="future"><b>Византия и дальше…</b><small>дальше по истории Кипра</small></li></ol>`;
     const st = s.stats;
     h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз и вакханок: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
       <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
@@ -719,6 +737,25 @@ const UI = {
       <div class="em-actions"><button class="btn gold" data-action="close">Продолжить</button></div></div>`);
   },
 
+  /** Окно корабля: что просит, что даёт; отгрузить, купить папирус за монеты или отпустить. */
+  showShip() {
+    const st = Game.shipStatus();
+    if (!st) return this.toast('Корабль уже ушёл');
+    const P = Cat.ship.packs[st.ship.pack], left = Math.ceil(Game.shipLeft() / 60), give = Object.entries(st.ship.give).map(([k, v]) => `<span class="chip good"><i>${Art.res(k)}</i>+${fmt(v)}</span>`).join('');
+    this.showModal(`<div class="ship-modal"><div class="dim">Гавань · ${esc(Cat.ship.name)}</div>
+      <h2>${Art.svg('ship', 'inl')} ${esc(P[0])}</h2>
+      <p class="dim">${esc(P[1])}.</p>
+      <p>Кормчий идёт в Пирей и ждёт ещё ${left} ${plural(left, 'минуту', 'минуты', 'минут')}. Просит груз — и платит папирусом:
+        папирус на Кипре не делают, его везут из Египта.</p>
+      <div class="ship-deal"><span class="chips">${this.costHtml(st.ship.want)}</span><span class="arrow">→</span><span class="chips">${give}</span></div>
+      ${st.ok ? '' : `<div class="item-lock">${esc(Msg.reason(st.reason))}</div>`}
+      <div class="em-actions">
+        <button class="btn gold" data-action="ship-load" ${st.ok ? '' : 'disabled'}>Отгрузить</button>
+        <button class="btn" data-action="ship-buy" ${st.buy.ok ? '' : 'disabled'} title="${st.buy.ok ? '' : esc(Msg.reason(st.buy.reason))}">Купить за <span class="chips">${this.costHtml(st.buy.cost)}</span></button>
+        <button class="btn ghost" data-action="ship-off">Отпустить</button></div>
+      <div class="hint dim">Отпустить — без штрафа: следующий корабль придёт через 6–12 минут. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
+  },
+
   showEpoch(first = false) {
     const s = Game.state, E = Cat.epochs[s.epoch];
     let h = `<div class="epoch-modal"><div class="meander"></div>
@@ -734,10 +771,13 @@ const UI = {
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
     if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Здания с 5-го уровня сменили облик на бронзовый, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
       Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.</p>`;
-    if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо, а на 9-м и 11-м у зданий железный облик.
+    if (!first && !E.locked && s.epoch >= 3) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; на 11-м и 13-м у зданий эллинский облик,
+      13-й, как и 11-й, — за λ. 12-й уровень просит монет: сначала нужно знание «${esc(Cat.tech[BALANCE.coinTech].name)}».
+      После «${esc(Cat.tech.piraeus.name)}» в гавань начнут заходить корабли: они просят груз и платят папирусом. Дань царю царей Кипр платит по-прежнему.</p>`;
+    else if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо, а на 9-м и 11-м у зданий железный облик.
       Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:changes">как это устроено</a>'}).
       «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
-    if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до заката бронзового. Спасибо!</p>`;
+    if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до Рима. Спасибо!</p>`;
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
       <button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'Дальше →' : 'Дальше'}</button></div></div>`;
     this.showModal(h);
@@ -800,6 +840,14 @@ const UI = {
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
     if (act === 'plan-keep') return this.pickPlan('keep');
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }
+    if (act === 'ship-load' || act === 'ship-buy') {
+      const r = act === 'ship-load' ? Game.shipLoad() : Game.shipBuy();
+      this.closeModal();
+      if (r) { this.toast(`${Cat.ship.icon} ${r.how === 'buy' ? 'Папирус куплен' : 'Корабль загружен'}: <b>${Msg.resList(r.got) || 'склады полны'}</b>`); this.renderMap(); this.renderAll(); }
+      else this.toast(Game.state.ship ? 'Не хватает ресурсов' : 'Корабль уже ушёл');
+      return;
+    }
+    if (act === 'ship-off') { Game.shipDismiss(); this.closeModal(); this.renderMap(); this.renderAll(); return; }
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
     if (act === 'wonder-up') { if (Game.upgradeWonder(a.dataset.type)) { this.closeModal(); this.renderMap(); this.renderAll(); this.toast(`✨ ${esc(Cat.bld[a.dataset.type].name)}!`); } return; }

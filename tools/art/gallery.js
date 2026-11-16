@@ -39,7 +39,7 @@ const NOTES = require('./notes.js');
           });
         });
       }
-      const keys = [0, 1, 2, 3, 4, 5, 6].map(i => pre + i).filter(k => Art.has(k));
+      const keys = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => pre + i).filter(k => Art.has(k));
       buildings.push({ type, title: C.forms.find(Boolean).name, epoch: B.epoch,
         items: keys.map(k => ({ key: k, svg: svg(k), name: name[k] || '', where: where[k] || {} })) });
     }
@@ -47,8 +47,9 @@ const NOTES = require('./notes.js');
       .map(t => ({ key: t, svg: svg(t), name: Cat.bld[t].name, sub: Cat.epochs[BUILDINGS[t].epoch].name }));
     const techs = TECHS.filter(T => Art.has('t_' + T.id)).map(T => ({ key: 't_' + T.id, svg: svg('t_' + T.id), name: Cat.tech[T.id].name, sub: Cat.epochs[T.epoch].name }));
     const rites = RITUALS.filter(R => Art.has('r_' + R.id)).map(R => ({ key: 'r_' + R.id, svg: svg('r_' + R.id), name: Cat.rite[R.id].name, sub: Cat.epochs[R.epoch].name }));
-    const res = RES_KEYS.map(k => ({ key: 'res:' + k, svg: Art.res(k), name: Cat.res[k].name, sub: Cat.epochs[RES[k].epoch].name }));
-    const map = [['tree', 'Лес'], ['hill', 'Холм'], ['goat', 'Беглая коза'], ['maenad', 'Вакханка']].filter(([k]) => Art.has(k)).map(([k, n]) => ({ key: k, svg: svg(k), name: n, sub: 'на карте' }));
+    const res = RES_KEYS.map(k => ({ key: 'res:' + k, svg: Art.resRaw(k), name: Lex.res[k].name, sub: Cat.epochs[RES[k].epoch].name }))
+      .concat([{ key: 'res:coin', svg: Art.resRaw('coin'), name: Lex.res.silver.coin.name, sub: Cat.epochs[TECH_BY_ID[BALANCE.coinTech].epoch].name }]);
+    const map = [['tree', 'Лес'], ['hill', 'Холм'], ['goat', 'Беглая коза'], ['maenad', 'Вакханка'], ['ship', 'Купеческий корабль']].filter(([k]) => Art.has(k)).map(([k, n]) => ({ key: k, svg: svg(k), name: n, sub: 'на карте' }));
     return { epochs: Cat.epochs.map(E => E.name), buildings, wonders, techs, rites, res, map };
   });
   await browser.close();
@@ -107,13 +108,14 @@ const NOTES = require('./notes.js');
 <body>
 <header><h1>Λόγος · все рисунки</h1>
 <p>${total} рисунков из <code>assets/art.js</code> — крупно, с тем, что на них хотел сказать автор. Поле 64×64, единая палитра, тёмный контур;
-медь — терракота, бронза — золото, железо — холодный серый, камень железного века — тёсаный. Страница собрана из игры
+медь — терракота, бронза — золото, железо — холодный серый, камень железного века — тёсаный,
+эллинский Кипр — беленая штукатурка, колонны и черепица только у богатых. Страница собрана из игры
 командой <code>node tools/art/gallery.js</code> — после правки рисунков её можно пересобрать.</p></header>
 <nav><a href="#buildings">Здания</a><a href="#wonders">Чудеса</a><a href="#techs">Знания</a><a href="#rites">Обряды</a><a href="#res">Ресурсы</a><a href="#map">Карта</a>
   ${data.buildings.map(b => `<a href="#b-${b.type}" style="font-weight:400">${esc(b.title)}</a>`).join('')}</nav>
 <main>
 ${section('buildings', 'Здания', `Облик здания зависит от уровня, а каждая эпоха дорисовывает свои верхние уровни. Первый облик новой эпохи — базовый,
-  «с нуля, но уже из нового материала» (5-й в бронзе, 9-й в железе); следующий — нарядный (7-й и 11-й). Под каждым рисунком — на каких уровнях
+  «с нуля, но уже из нового материала» (5-й в бронзе, 9-й в железе, 11-й в эллинском Кипре); следующий — нарядный (7-й, 11-й, 13-й). Под каждым рисунком — на каких уровнях
   он стоит на карте; «малым рядом» — второй, маленький рисунок рядом с главным.`, bHtml)}
 ${section('wonders', 'Чудеса и святилища', 'По одному каждого; эффект и история — в Кипропедии.', `<div class="grid">${data.wonders.map(it => card(it)).join('')}</div>`)}
 ${section('techs', 'Знания', 'Светлые медальоны.', `<div class="grid">${data.techs.map(it => card(it)).join('')}</div>`)}

@@ -123,9 +123,10 @@ Object.assign(Game, {
     if (target >= BALANCE.copperFromLevel) cost.copper = (cost.copper || 0) + Math.ceil(15 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.copperFromLevel));
     if (target >= BALANCE.bronzeFromLevel && target < BALANCE.ironFromLevel) cost.bronze = (cost.bronze || 0) + Math.ceil(8 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.bronzeFromLevel));
     if (target >= BALANCE.ironFromLevel) cost.iron = (cost.iron || 0) + Math.ceil(30 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.ironFromLevel));
+    if (target >= BALANCE.coinFromLevel) cost.silver = (cost.silver || 0) + Math.ceil(60 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.coinFromLevel));
     return { cost: this.liveCost(cost), logos: this.upgradeLogos(type, target) };
   },
-  /** λ нужен только на «уровнях за Логос»: 3, 5, 7, 9, 11. */
+  /** λ нужен только на «уровнях за Логос»: 3, 5, 7, 9, 11, 13. */
   needsLogos(target) { return !!BALANCE.wisdomLevels[target]; },
   /** Символический уровень мудрости (3-й, 7-й) — одна маленькая цена для всех. */
   symbolicLevel(target) { const w = BALANCE.wisdomLevels[target]; return !!(w && w.logos); },
@@ -145,7 +146,9 @@ Object.assign(Game, {
       return { capped: true, target, reason: { code: 'levelCap', max: maxL, next: nextE > 0 ? nextE : null, nextMax: nextE > 0 ? EPOCHS[nextE].maxLevel : null } };
     }
     const { cost, logos } = this.upgradeCost(b.type, target);
-    const need = Object.entries(B.levelTech || {}).find(([L, t]) => target >= +L && !this.hasTech(t));   // уровню нужно знание
+    // уровню нужно знание: с 12-го — «Своя монета» у всех зданий, плюс свои знания у здания (levelTech)
+    const need = (target >= BALANCE.coinFromLevel && !this.hasTech(BALANCE.coinTech) ? [0, BALANCE.coinTech] : null)
+      || Object.entries(B.levelTech || {}).find(([L, t]) => target >= +L && !this.hasTech(t));
     if (need) return { target, cost, logos, ok: false, reason: { code: 'needTech', tech: need[1] } };
     const reason = this.lackReason(cost, logos);
     return { target, cost, logos, ok: !reason, reason };

@@ -22,7 +22,7 @@ const Game = {
       techs: [], buildings: [], nextId: 1,
       buffs: {}, cooldowns: {}, readyAt: {}, stash: [],
       stats: { goats: 0 },
-      timers: { goat: 40, raid: null },
+      timers: { goat: 40, raid: null, ship: null }, ship: null,
       log: [], lastSave: Date.now(), finished: false,
     };
     const dist = t => Math.hypot(t.x - 10, t.y - 5);
@@ -82,6 +82,7 @@ const Game = {
       if (!s || s.v !== 2) return null;
       for (const k of RES_KEYS) if (typeof s.res[k] !== 'number') s.res[k] = 0;
       s.timers = s.timers || { goat: 40, raid: null };
+      s.ship = s.ship || null;
       s.stats = s.stats || {};
       s.stats.goats = s.stats.goats || 0;
       s.buffs = s.buffs || {};
