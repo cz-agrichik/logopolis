@@ -625,11 +625,12 @@ const PEDIA_ARTICLES = [
   { id: 'religion', icon: '🛐', title: 'Религия и обряды', html: () => `
     <p class="story">Прежде чем сеять, деревня собиралась у святилища: зерно — земле, первый сыр — богине, песня — для стад.
     Обряд не делал работу за людей, но люди после него работали иначе.</p>
-    <p>Вкладка «Обряды». Сверху — <b>«Сбор припасов»</b>: не обряд, а мгновенная выдача: всё, что здания производят за ${Game.suppliesSec() / 60} ${plural(Game.suppliesSec() / 60, 'минуту', 'минуты', 'минут')} (в медно-каменном веке — 3, с каждой эпохой на минуту больше; благословения не учитываются; сырьё, еда жителей и продажи гаваней не вычитаются, так что амфоры, дерево и медь приходят всегда) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, раз в ${RITUAL_BY_ID.elders.cooldown / 60} минуты.
+    <p>Вкладка «Обряды». Сверху — <b>«Сбор припасов»</b>: не обряд, а мгновенная выдача: всё, что здания производят за ${Game.suppliesSec() / 60} ${plural(Game.suppliesSec() / 60, 'минуту', 'минуты', 'минут')} (${BALANCE.suppliesMin.map((m, e) => `«${Cat.epochs[e].name}» — ${m}`).join(', ')}; благословения не учитываются; сырьё, еда жителей и продажи гаваней не вычитаются, так что амфоры, дерево и медь приходят всегда) за ${Game.ritualLogos(RITUAL_BY_ID.elders)} λ, раз в ${RITUAL_BY_ID.elders.cooldown / 60} минуты.
     Ниже — благословения: они удваивают производство своих ресурсов на ${riteRange().minutes} минут — дольше и выгоднее «Сбора припасов», но не на всё сразу. Благословения на один ресурс складываются: два «×2» дают ×3, а не ×4. Идущее благословение светится золотом, его можно продлить
     (до ${BALANCE.maxBuffMinutes} минут, «Всей семьёй» — до своей длины), но не усилить. Одновременно — не больше ${BALANCE.maxBuffs} благословений. Активные показаны над картой.</p>
     <table class="pt">${Cat.rites.map(R => `<tr><td>${Looks.riteIcon(R).replace('class="ico', 'class="ico inl')} ${R.name}</td><td>${Looks.riteDesc(R)}<br><span class="dim">${[R.logos ? 'λ ' + Game.ritualLogos(R) : 'без λ', ...Object.entries(Game.liveCost(R.cost)).map(([k, v]) => ri(k) + ' ' + v)].join(' · ')}${R.req ? ` · нужно: ${pl('b:' + R.req, Cat.bld[R.req].name)}` : ''}${R.epoch ? ` · с эпохи «${Cat.epochs[R.epoch].name}»` : ''}${R.tech ? ` · после знания «${Cat.tech[R.tech].name}»` : ''}${riteGone(R)}</span></td></tr>`).join('')}</table>
-    <p class="dim">Цены — для вашей эпохи: обряды прошлых эпох с каждой новой стоят в 1.5 раза больше λ — кроме «Всей семьёй»: он всегда стоит ${RITUAL_BY_ID.settlers.logos} λ, зато с каждой эпохой длится на ${RITUAL_BY_ID.settlers.durPerEpoch / 60} минут дольше.</p>
+    <p class="dim">Цены — для вашей эпохи: обряды прошлых эпох в новой обычно стоят больше λ (с железного века — в 1.5 раза за эпоху) — кроме «Всей семьёй»: он всегда стоит ${RITUAL_BY_ID.settlers.logos} λ, зато с каждой эпохой длится на ${RITUAL_BY_ID.settlers.durPerEpoch / 60} минут дольше.
+    «Сбор припасов» стоит по минутам выпуска: ${BALANCE.logosInflation.map((f, e) => `${Math.round(BALANCE.riteRate * f * 10) / 10} λ за минуту в эпоху «${Cat.epochs[e].name}»`).join(', ')}.</p>
     <h4>Религия медно-каменного века</h4>
     <p>Письменных источников нет — только находки. Главный образ эпохи — фигурки с раскинутыми руками, похожие на крест:
     их резали из голубовато-зелёного речного камня и носили как подвески. В Киссонерге нашли глиняную фигурку роженицы
@@ -899,7 +900,7 @@ const PediaBook = {
         ${prod ? `<tr><td>Выпуск на 1-м уровне</td><td>${prod}</td></tr>` : ''}
         ${B.trade ? `<tr><td>Сверх работы</td><td>${Object.entries(B.trade.in).map(([k, v]) => `${ri(k)} −${v}/с`).concat(Object.entries(B.trade.out).map(([k, v]) => `${ri(k)} +${v}/с`)).join(' → ')}
           (после ${pl('t:' + B.trade.tech, '«' + Cat.tech[B.trade.tech].name + '»')}). ${esc(B.tradeNote || '')}.</td></tr>` : ''}
-        ${B.max ? `<tr><td>Ограничение</td><td>не больше ${B.max}</td></tr>` : ''}${gone}
+        ${B.max ? `<tr><td>Ограничение</td><td>${typeof B.max === 'number' ? `не больше ${B.max}` : Object.entries(B.max).map(([e, n]) => `с эпохи «${Cat.epochs[e].name}» — не больше ${n}`).join('; ')}</td></tr>` : ''}${gone}
         ${names.length > 1 ? `<tr><td>Облик</td><td>${names.join('; ')}</td></tr>` : ''}</table>${req}
       <h4>Уровни</h4>
       <table class="pt levels"><tr><th>Ур.</th><th>${label}</th><th>Рост</th>${workers ? '<th>Работники</th>' : ''}<th>Цена</th></tr>${rows}</table>

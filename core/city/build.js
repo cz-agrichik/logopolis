@@ -26,6 +26,14 @@ Object.assign(Game, {
     this.state.logos -= logos;
   },
 
+  /** Сколько зданий типа можно иметь сейчас (max — число или { эпоха: число } — с этой эпохи); null — без ограничения. */
+  maxCount(type) {
+    const m = BUILDINGS[type].max;
+    if (m == null || typeof m === 'number') return m || null;
+    let v = null;
+    for (const [e, n] of Object.entries(m)) if (+e <= this.state.epoch) v = n;
+    return v;
+  },
   /** Цена «трудом» — без λ, но с горой обычных ресурсов. */
   laborCost(cost, logos, epoch, mult, buy = false) {
     const out = {};
@@ -63,7 +71,8 @@ Object.assign(Game, {
     if (B.special && this.built(type)) return { ok: false, done: true, reason: { code: 'builtAlready' } };
     if (B.upgradeOf && !this.owned(B.upgradeOf)) return { ok: false, locked: true, reason: { code: 'needBuilding', type: B.upgradeOf } };
     const { cost, logos } = this.priceOf(type, mode), upgrade = !!B.upgradeOf;
-    if (B.max && this.count(type) >= B.max) return { ok: false, cost, logos, reason: { code: 'maxCount', max: B.max } };
+    const max = this.maxCount(type);
+    if (max && this.count(type) >= max) return { ok: false, cost, logos, reason: { code: 'maxCount', max } };
     const reason = this.lackReason(cost, logos);
     if (reason) return { ok: false, cost, logos, poor: true, reason, upgrade };
     return { ok: true, cost, logos, upgrade };

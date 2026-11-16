@@ -20,14 +20,14 @@ const Balancer = (() => {
   // «Виноградарство» переводит загоны в виноградники и рощи, «Железо» — литейни в кузницы (перестройка с тем же уровнем).
   const PLAN = {
     0: { house: 9, field: 3, goatpen: 4, lumber: 5, quarry: 5, workshop: 4, storehouse: 3 },
-    1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 2 },
+    1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
     2: { house: 12, field: 4, lumber: 12, quarry: 6, workshop: 10, storehouse: 4, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
     3: { house: 14, field: 4, lumber: 12, quarry: 6, workshop: 12, storehouse: 5, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
-  const BUDGET = { 0: 100, 1: 800, 2: 1000, 3: 1200 };
-  // riteRate — курс обрядов (ориентир): столько λ стоит 1 минута выпуска города на начало эпохи
-  const DEFAULTS = { last: 2, stock: 0.6, riteRate: 3 };
+  const BUDGET = { 0: 100, 1: 500, 2: 1000, 3: 1200 };
+  // курс обрядов — BALANCE.riteRate медных λ за минуту выпуска на начало эпохи × BALANCE.logosInflation (дальше заданных — последняя)
+  const DEFAULTS = { last: 2, stock: 0.6 };
 
   function run(opts = {}) {
     const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN, budget = Object.assign({}, BUDGET, o.budget || {});
@@ -346,11 +346,14 @@ const Balancer = (() => {
         part('up', up.logos, up.res, true, true),
         part('advance', adv ? adv.logos : 0, advRes, true, true),
       ];
-      // мощь города в начале и в конце эпохи; в начале игры город почти ноль — берём легко достижимую треть от конца эпохи
-      const startAssumed = e === 0, prod0 = startAssumed ? m1.prod / 3 : m0.prod;
-      // твёрдый курс обрядов: o.riteRate λ = 1 минута выпуска на начало эпохи → столько зерна в 1 λ
-      const riteL = prod0 * 60 / o.riteRate;
-      return { e, prod, prod0, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate: o.riteRate, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
+      // мощь города «на начало» и в конце эпохи. Самый момент перехода — слишком строго: берём чуть позже — четверть пути
+      // от перехода к концу эпохи (рост примерно экспоненциальный — геометрически); в начале игры город почти ноль —
+      // для медно-каменного века легко достижимая треть от конца эпохи
+      const startAssumed = e === 0, prodStart = m0.prod, prod0 = startAssumed ? m1.prod / 3 : Math.pow(m0.prod, 0.75) * Math.pow(m1.prod, 0.25);
+      // твёрдый курс обрядов: 1 минута выпуска на начало = riteRate медных λ × инфляция λ эпохи → столько зерна в 1 номинальном λ
+      const LI = BAL.logosInflation, infl = LI[e] != null ? LI[e] : LI[LI.length - 1], riteSet = LI[e] != null;
+      const riteRate = BAL.riteRate * infl, riteL = prod0 * 60 / riteRate;
+      return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
         perL: tl ? (tlab - tm) / tl : null, scen };
     });
     return { stages, epochs, worth: W };

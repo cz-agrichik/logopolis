@@ -72,7 +72,7 @@
 'use strict';
 (() => {
   const $ = s => document.querySelector(s);
-  const KEY = 'greekgame.balancer.plan2';
+  const KEY = 'greekgame.balancer.plan3';
   const nf = (x, d) => x.toLocaleString('ru-RU', { maximumFractionDigits: d, minimumFractionDigits: 0 });
   const fmt = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? nf(Math.round(x), 0) : Math.abs(x) >= 10 ? nf(x, 1) : nf(x, 2);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -93,7 +93,7 @@
   const fresh = () => JSON.parse(JSON.stringify(Balancer.PLAN));
   let plan = (() => { try { const p = JSON.parse(localStorage.getItem(KEY)); if (p) return p; } catch (e) {} return fresh(); })();
   // бюджет λ на уровни зданий за эпоху (правится в разделе 8)
-  const KEY_B = 'greekgame.balancer.budget2', freshB = () => Object.assign({}, Balancer.BUDGET);
+  const KEY_B = 'greekgame.balancer.budget3', freshB = () => Object.assign({}, Balancer.BUDGET);
   let budget = (() => { try { const p = JSON.parse(localStorage.getItem(KEY_B)); if (p) return p; } catch (e) {} return freshB(); })();
   const savePlan = () => { try { localStorage.setItem(KEY, JSON.stringify(plan)); localStorage.setItem(KEY_B, JSON.stringify(budget)); } catch (e) {} };
   $('#out').addEventListener('change', ev => {
@@ -235,19 +235,20 @@
       EP.map(p => [ep(p), fmt(p.tlab), fmt(p.tm), p.tl, `<b>${fmt(p.perL)}</b>`, `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''} → ${fmt(p.prod1)}`,
         `${fmt(p.perL / p.prod0)} → ${fmt(p.perL / p.prod1)}`]));
     h += `<p class="note">В зерно всё переведено по курсам конца эпохи (раздел 4): ${EP.map(p => `<br>${p.e}: ${rateList(p)}`).join('')}</p>`;
-    h += `<h3>Твёрдый курс обрядов (ориентир)</h3><p class="note">${EP[0].riteRate} λ = 1 минута выпуска города на начало эпохи (раздел 5, * — треть от конца эпохи),
-      то есть 1 λ = ${fmt(60 / EP[0].riteRate)} секунд выпуска на начало. Пока по нему стоит только «Сбор припасов» медно-каменного века
-      (${RITUAL_BY_ID.elders.logos} λ за ${BALANCE.suppliesSec / 60} минуты; он даёт выпуск без вычета еды жителей — чуть больше чистого).
-      Для следующих эпох — что вышло бы, если держать тот же курс; ни к чему пока не применено.</p>`;
-    h += tbl(['эпоха', 'выпуск на начало, зерна/с', '1 минута выпуска, зерна', `÷ ${EP[0].riteRate} λ = 1 λ ≈ зерна`, 'курс по знаниям (выше), 1 λ ≈ зерна', 'по знаниям λ дешевле в'],
-      EP.map(p => [ep(p) + (p.e ? dim(' (если так же)') : ''), `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''}`, fmt(p.prod0 * 60), `<b>${fmt(p.riteL)}</b>`, fmt(p.perL),
+    h += `<h3>Твёрдый курс обрядов</h3><p class="note">Базовое правило: 1 минута полного выпуска города на начало эпохи стоит ${BALANCE.riteRate} «настоящих» (медных) λ.
+      λ с эпохами дешевеет — инфляция λ (BALANCE.logosInflation: сколько номинальных λ эпохи в одном медном): ${BALANCE.logosInflation.map((f, e) => `${esc(en(e))} — ×${fmt(f)}`).join(', ')};
+      где не задана — взята последняя. По курсу стоит «Сбор припасов»: ${BALANCE.suppliesMin[0]} минуты × ${BALANCE.riteRate} λ × инфляция (он даёт выпуск без вычета еды жителей — чуть больше чистого).
+      «Начало» эпохи — не сам переход, а чуть позже: четверть пути от перехода к концу эпохи (геометрически); для медно-каменного века — треть от конца (*).</p>`;
+    h += tbl(['эпоха', 'инфляция λ', 'λ за минуту выпуска', 'мощь при переходе → «начало», зерна/с', '1 минута выпуска, зерна', '1 λ ≈ зерна', 'курс по знаниям (выше), 1 λ ≈ зерна', 'по знаниям λ дешевле в'],
+      EP.map(p => [ep(p), '×' + fmt(p.infl) + (p.riteSet ? '' : dim(' (не задана)')), fmt(p.riteRate), p.prod0Assumed ? `${fmt(p.prod0)}*` : `${fmt(p.prodStart)} → ${fmt(p.prod0)}`, fmt(p.prod0 * 60), `<b>${fmt(p.riteL)}</b>`, fmt(p.perL),
         p.perL ? `${fmt(p.riteL / p.perL)} раза` : dim('—')]));
 
     h += `<h2 id="s10">10. Полные затраты эпохи: два сценария</h2><p class="note"><b>По максимуму «с умом»</b> — знания за λ, все чудеса (и за λ, и без λ).
       <b>По максимуму ресурсами</b> — знания «через силу», чудеса только обязательные и без λ; λ всё равно нужен на обязательное (раздел 7) и на уровни за λ (раздел 8).
       Ресурсы складываются как есть, потом переводятся в зерно по курсам конца эпохи (раздел 4). Дальше — две оценки, сколько это работы города:
       при мощи города <b>на начало эпохи</b> и <b>на конец эпохи</b> (выпуск в зерне в секунду, раздел 5): часы = зерно ÷ мощь ÷ 3600.
-      В начале игры город почти ноль, поэтому для медно-каменного века мощь на начало взята как треть от конца эпохи (*) — легко достижимое состояние.</p>`;
+      «Начало» — не сам переход, а чуть позже: четверть пути от перехода к концу эпохи (геометрически). В начале игры город почти ноль,
+      поэтому для медно-каменного века мощь на начало взята как треть от конца эпохи (*) — легко достижимое состояние.</p>`;
     const pw = (p, start) => start ? `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''}` : fmt(p.prod1);
     h += tbl(['эпоха', 'сценарий', 'λ', L('ресурсы'), 'в зерне', 'мощь на начало, зерна/с', '= часов работы', 'мощь на конец, зерна/с', '= часов работы'], EP.flatMap(p => [
       [ep(p), '«с умом»', `<b>${fmt(p.scen.mind.logos)}</b>`, cost(p.scen.mind.res), fmt(p.scen.mind.w), pw(p, true), `<b>${secs(p.scen.mind.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.mind.w, p.prod1)}</b>`],

@@ -973,6 +973,15 @@ test('обряды: «Всей семьёй» не дорожает с эпох�
     assert.equal(G.suppliesSec(), sup * 60);
   }
   assert.equal(G.ritualLogos(R.harvest), Math.ceil(12 * 1.5 ** 3), 'остальные — ×1.5 за эпоху');
+  // «Сбор припасов» — по курсу обрядов: 3 медных λ за минуту × инфляция λ (бронза — 4/3); дальше — пока ×1.5
+  s.epoch = 0; assert.equal(G.ritualLogos(R.elders), 9);
+  s.epoch = 1; assert.equal(G.ritualLogos(R.elders), 16);
+  s.epoch = 2; assert.equal(G.ritualLogos(R.elders), Math.ceil(9 * 1.5 ** 2));
+  // в бронзе у медных обрядов свои цены (logosAt), в железе — снова ×1.5 от медной
+  s.epoch = 1; assert.deepEqual(['hearth', 'herds', 'festival', 'bullmask', 'ingot'].map(id => G.ritualLogos(R[id])), [18, 10, 50, 15, 16]);
+  assert.equal(G.ritualDur(R.bullmask), 900); assert.deepEqual({ ...R.ingot.buff.bmult }, { port: 1, workshop: 1 });
+  s.epoch = 2; assert.equal(G.ritualLogos(R.festival), Math.ceil(40 * 1.5 ** 2));
+  s.epoch = 3;
   s.logos = 1000; G.tick(0.001); const r = G.perform('settlers');
   assert.equal(r.minutes, 45); assert.equal(s.buffs.settlers, 45 * 60, 'продление — до своей длины, не до 30 минут');
 });
@@ -1010,4 +1019,15 @@ test('медно-каменный век: λ знаний «с умом» по �
   G.fx = G.effects();
   assert.ok(Math.abs(G.prodOf(field).food - 2 * f0) < 1e-9 && Math.abs(G.prodOf(pen).food - 2 * p0) < 1e-9, 'поля и загоны ×2');
   assert.equal(s.timers.goat, 0, 'коза — сразу');
+});
+
+test('дома писцов: в бронзовом веке один, с железного — два', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state;
+  s.epoch = 1; s.techs.push('writing');
+  assert.equal(G.maxCount('scribe'), 1); assert.equal(G.maxCount('house'), null);
+  const t = G.map.find(t => t.t === 'plain' && !G.buildingAt(t.x, t.y));
+  s.buildings.push({ id: 960, type: 'scribe', level: 1, x: t.x, y: t.y });
+  assert.equal(G.buildStatus('scribe').reason.code, 'maxCount');
+  s.epoch = 2; assert.equal(G.maxCount('scribe'), 2);
+  assert.notEqual((G.buildStatus('scribe').reason || {}).code, 'maxCount');
 });
