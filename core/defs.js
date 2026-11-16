@@ -34,7 +34,8 @@ const BALANCE = {
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,      // благословения продлеваются, но не дольше
-  suppliesSec: 180,
+  suppliesSec: 180,        // «Сбор припасов»: столько секунд выпуска зданий в медно-каменном веке…
+  suppliesPerEpoch: 60,    // …и на минуту больше с каждой эпохой (3, 4, 5, 6 минут)
   raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
   raidLoot: [0.1, 0.5],    //   уносят 10–50% всех запасов (без Циклопических стен)        // «Сбор припасов»: столько секунд выпуска (без благословений)
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
@@ -53,6 +54,8 @@ const BALANCE = {
   // Не отгрузили — корабль уходит без штрафа. Папирус не производится: его привозят только корабли.
   ships: {
     every: [360, 720], wait: 300, give: { papyrus: 10 }, buy: { silver: 700 },
+    // гавани 13-го уровня: каждая — корабли на portCut чаще, все вместе — не больше чем вдвое (portMin)
+    portLevel: 13, portCut: 0.2, portMin: 0.5,
     packs: [
       { id: 'grain', want: { food: 2500, amphora: 300 } },
       { id: 'wine', want: { amphora: 800, silver: 30 } },
@@ -131,7 +134,7 @@ const BUILDINGS = {
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 200, stone: 150 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
   // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой)
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.02 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 350, stone: 200 }, workers: 3, prod: { copper: -0.12, goods: 0.2, food: 0.35 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.03 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 350, copper: 150 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
   vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}, {}] },
   olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}, {}] },
@@ -158,6 +161,9 @@ const BUILDINGS = {
   // новое чудо за λ — обязательное для перехода в следующую эпоху
   sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 1500, goods: 600, iron: 120 }, logos: 650, effect: { all: 0.1, mult: { silver: 0.2 } } },
   // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
+  // Эллинский Кипр. ships — корабли: every — множитель промежутка, wait — сколько ждут, choice — из скольких грузов выбрать
+  sp_neapaphos: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 16000, wood: 8000, silver: 800 }, logos: 0,
+    effect: { bmult: { port: 0.25 }, ships: { every: 0.5, wait: 480, choice: 2 } } },
   sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
 };
 
@@ -196,7 +202,8 @@ const TECHS = [
   // Эллинский Кипр, первая треть. λ в полтора раза выше железного века, ресурсы вдвое; «через силу» — buy (λ заменяют монеты).
   // coinage: серебро зовётся монетой, открыт 12-й уровень зданий (BALANCE.coinTech); piraeus: корабли и папирус (BALANCE.ships);
   // alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
-  { id: 'coinage', epoch: 3, logos: 300, cost: { silver: 220, copper: 700 }, buy: true },
+  // coinage: гавань продаёт амфоры на 50% дороже (trade), рудники работают вполсилы (scale) — Кипр вывозит вино, а не медь
+  { id: 'coinage', epoch: 3, logos: 300, cost: { silver: 440, copper: 700 }, buy: true, effect: { trade: { port: 0.5 }, scale: { mine: 0.5 } } },
   { id: 'piraeus', epoch: 3, logos: 320, cost: { food: 4000, wood: 2500, amphora: 600 }, req: ['coinage'], buy: true },
   { id: 'alphabet', epoch: 3, logos: 340, cost: { papyrus: 20, silver: 200 }, req: ['piraeus'], buy: true },
 ];
@@ -208,7 +215,8 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 // instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
 const RITUALS = [
   { id: 'elders', epoch: 0, logos: 8, instant: 'elders', cooldown: 120 },
-  { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800 },
+  // fixedPrice — цена в λ не растёт с эпохами; durPerEpoch — с каждой эпохой обряд длится дольше (30, 35, 40, 45 минут)
+  { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800, fixedPrice: true, durPerEpoch: 300 },
   { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, buff: { mult: { food: 1 } }, dur: 600 },
   { id: 'hearth', epoch: 0, logos: 12, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
   { id: 'herds', epoch: 0, logos: 5, cost: { food: 30 }, buff: { bmult: { goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },

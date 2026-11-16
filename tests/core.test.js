@@ -54,10 +54,11 @@ test('обряды: «Сбор припасов» считает выпуск з
   assert.ok(net.amphora <= 1e-9, 'чистый выпуск амфор нулевой: всё сверх половины склада уходит гаваням');
   assert.ok(net.wood < 0, 'кузницы жгут дерева больше, чем дают лесорубы');
   assert.ok(gross.amphora > 0 && gross.wood > 0 && gross.food > net.food);
-  const before = { ...s.res }, r = G.perform('elders'), got = Object.fromEntries(r.gains);
-  assert.equal(got.amphora, Math.floor(gross.amphora * 180));
-  assert.equal(got.wood, Math.floor(Math.max(90, gross.wood * 180)));
-  assert.equal(got.iron, Math.floor(gross.iron * 180));
+  const before = { ...s.res }, r = G.perform('elders'), got = Object.fromEntries(r.gains), sec = G.suppliesSec();
+  assert.equal(sec, 300, 'в железном веке — 5 минут выпуска');
+  assert.equal(got.amphora, Math.floor(gross.amphora * sec));
+  assert.equal(got.wood, Math.floor(Math.max(90, gross.wood * sec)));
+  assert.equal(got.iron, Math.floor(gross.iron * sec));
   assert.ok(!('bronze' in got) && !('cheese' in got), 'ушедшие ресурсы не выдаются');
   assert.equal(s.res.wood, before.wood + got.wood, 'и дерево за это не списывается');
   assert.equal(Math.floor(G.suppliesNow().iron), got.iron, 'справка «сейчас дал бы» считает так же');
@@ -887,7 +888,7 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
 test('эллинский Кипр: три знания по цепочке; «через силу» ×2.25 и λ-часть монетами', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
   assert.deepEqual(['coinage', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3]);
-  assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 2000, copper: 4730 });
+  assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 3480, copper: 4730 });
   assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 27000, wood: 16880, amphora: 4050, silver: 540 });
   assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 140, silver: 1930 });
   assert.ok(G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
@@ -938,4 +939,53 @@ test('корабли и папирус: офлайн корабль не гру�
   s.tributeFixed = 100000; s.res.silver = 0; s.timers.raid = 0; G.events(0.1);
   assert.equal(s.res.papyrus, papyrus, 'папирус не берут');
   assert.ok(s.res.food < 3000, 'остальное берут');
+});
+
+test('корабли чаще: каждая гавань 13-го — на 20% (вместе не больше чем вдвое); Гавань Нового Пафоса — вдвое чаще, ждут 8 минут, два груза на выбор', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE');
+  s.techs.push('coinage', 'piraeus'); const p = addPort(G); G.tick(0.001);
+  assert.equal(G.shipRules().every, 1);
+  p.level = 13; G.tick(0.001); assert.ok(Math.abs(G.shipRules().every - 0.8) < 1e-9);
+  for (let i = 0; i < 4; i++) s.buildings.push({ id: 960 + i, type: 'port', level: 13, x: 0, y: i });
+  G.tick(0.001); assert.equal(G.shipRules().every, BAL.ships.portMin, 'гавани вместе — не больше чем вдвое');
+  // чудо: ещё вдвое, ждут 8 минут, два разных груза
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_neapaphos', t));
+  assert.ok(t, 'чудо встаёт у моря'); assert.equal(C.get('BUILDINGS').sp_neapaphos.logos, 0);
+  s.buildings.push({ id: 970, type: 'sp_neapaphos', level: 1, x: t.x, y: t.y }); G.tick(0.001);
+  const R = G.shipRules(); assert.equal(R.every, 0.25); assert.equal(R.wait, 480); assert.equal(R.choice, 2);
+  for (let i = 0; i < 20; i++) { const n = G.nextShipIn(); assert.ok(n >= 90 - 1e-9 && n <= 180 + 1e-9); }
+  s.ship = null; s.timers.ship = 0; G.events(1);
+  assert.ok(s.ship.alt && s.ship.alt.pack !== s.ship.pack && s.ship.left === 480);
+  const want = Object.assign({}, s.ship.alt.want), before = Object.assign({}, s.res);
+  const r = G.shipLoad(true); assert.ok(r && r.pack === s.log[0].p.pack);
+  for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v, 'ушёл второй груз');
+  assert.equal(s.res.papyrus, before.papyrus + 10);
+});
+
+test('обряды: «Всей семьёй» не дорожает с эпохами и длится 30/35/40/45 минут; «Сбор припасов» — 3/4/5/6 минут выпуска', () => {
+  const C = fresh(), G = C.get('Game'), s = G.state, R = C.get('RITUAL_BY_ID');
+  for (const [e, min, sup] of [[0, 30, 3], [1, 35, 4], [2, 40, 5], [3, 45, 6]]) {
+    s.epoch = e;
+    assert.equal(G.ritualLogos(R.settlers), 15, 'цена всегда 15 λ');
+    assert.equal(G.ritualDur(R.settlers), min * 60);
+    assert.equal(G.suppliesSec(), sup * 60);
+  }
+  assert.equal(G.ritualLogos(R.harvest), Math.ceil(12 * 1.5 ** 3), 'остальные — ×1.5 за эпоху');
+  s.logos = 1000; G.tick(0.001); const r = G.perform('settlers');
+  assert.equal(r.minutes, 45); assert.equal(s.buffs.settlers, 45 * 60, 'продление — до своей длины, не до 30 минут');
+});
+
+test('вино вместо меди: после «Своей монеты» гавань продаёт амфоры на 50% дороже, а рудники работают вполсилы', () => {
+  const C = fresh(), G = hellenic(C), s = G.state;
+  const port = addPort(G), mine = { id: 990, type: 'mine', level: 11, x: 1, y: 1 }; s.buildings.push(mine); G.tick(0.001);
+  const t0 = G.tradeOf(port, G.effects()), m0 = G.prodOf(mine, G.effects()), p0 = G.prodOf(port, G.effects());
+  assert.ok(Math.abs(t0.silver / -t0.amphora - 0.3 * G.bonusMult('port', 'silver')) < 1e-9, 'базовая цена — 0.03 серебра за 0.1 амфоры');
+  s.techs.push('coinage'); G.tick(0.001);
+  const t1 = G.tradeOf(port, G.effects()), m1 = G.prodOf(mine, G.effects()), p1 = G.prodOf(port, G.effects());
+  assert.ok(Math.abs(t1.silver / t0.silver - 1.5) < 1e-9 && t1.amphora === t0.amphora, 'амфоры — те же, монет на 50% больше');
+  assert.ok(Math.abs(m1.copper / m0.copper - 0.5) < 1e-9, 'рудник — вполсилы');
+  assert.deepEqual(JSON.stringify(p1), JSON.stringify(p0), 'основная работа гавани не меняется');
+  // «Хозяйство в цифрах» показывает это отдельным множителем, и сумма сходится с тактом
+  const I = G.incomeBreakdown(), row = I.res.copper.rows.find(r => r.type === 'mine');
+  assert.ok(row && Math.abs(row.extra - 0.5) < 1e-9);
 });

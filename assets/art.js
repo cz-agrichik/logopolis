@@ -872,7 +872,28 @@ const Art = (() => {
   });
 
   // ---------- спецстроения ----------
+  // корабль у причала: круглый корпус, как у корабля из Кирении, парус с пурпурной полосой, амфоры в трюме (карта и чудо)
+  const merchantShip = `<path d="M6 38 Q32 54 58 38 Q56 36 52 36 L12 36 Q8 36 6 38Z" fill="${C.wood}" ${st(1.8)}/>
+      <path d="M8 42 Q32 52 56 42" fill="none" stroke="${C.woodD}" stroke-width="1.4"/>
+      <path d="M58 38 Q64 32 60 24" fill="none" stroke="${C.woodD}" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M6 38 Q3 34 6 30" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
+      ${[16, 22, 40, 46].map(x => `<ellipse cx="${x}" cy="35" rx="2.2" ry="2.6" fill="#d6966a" ${st(1)}/>`).join('')}
+      <path d="M31 37 L31 6" stroke="${C.dark}" stroke-width="2.2"/>
+      <path d="M17 9 L45 9 L43 31 L19 31Z" fill="#efe6d2" ${st(1.5)}/>
+      <path d="M24 9 L24 31 M31 9 L31 31 M38 9 L38 31" stroke="#c9b48c" stroke-width="1"/>
+      <path d="M18 19 L44 19" stroke="${WINE}" stroke-width="2.6"/><path d="M16 9 L46 9" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M52 38 L57 52" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>`;
   const S = {
+    // Гавань Нового Пафоса: каменный мол с маяком, стоа под черепицей на берегу, купеческий корабль в гавани
+    sp_neapaphos: `<path d="M2 36 Q18 32 34 38 Q48 42 62 38 L62 62 L2 62Z" fill="${C.water}" ${st(1.4)}/>
+      <path d="M30 50 q4 -2 8 0 M44 56 q4 -2 8 0 M6 58 q4 -2 8 0" stroke="${C.sky}" stroke-width="1.6" fill="none"/>
+      <path d="M2 20 L36 20 L38 34 Q20 30 2 34Z" fill="${CALC}" ${st(1.3)}/>` + tiles(2, 36, 12, 6, 3) + `
+      <rect x="3" y="12" width="32" height="3" fill="${STU}" ${st(1)}/>` + doric(7, 15, 14, .7) + doric(15, 15, 14, .7) + doric(23, 15, 14, .7) + doric(31, 15, 14, .7) + `
+      <path d="M62 44 Q50 44 44 52 L40 60 L46 60 Q50 52 62 50Z" fill="${CALC}" ${st(1.4)}/>
+      <path d="M47 52 L51 49 M53 48 L56 47" stroke="${CALCD}" stroke-width="1.1"/>
+      <path d="M38 60 L39 40 L47 40 L48 60Z" fill="${STU}" ${st(1.4)}/><path d="M38.6 52 L47.4 52" stroke="${WINE}" stroke-width="2"/>
+      <rect x="37" y="37" width="12" height="3.4" fill="${STUD}" ${st(1.1)}/><rect x="40" y="31" width="6" height="6" fill="${STU}" ${st(1.1)}/>` +
+      flame(43, 31, .7) + `<g transform="translate(8 34) scale(.5)">${merchantShip}</g>`,
     // Палеопафос: двор с колоннами, конический камень богини, голуби
     sp_aphrodite: shadow(28) + `
       <rect x="6" y="46" width="52" height="9" fill="${C.stone}" ${st()}/>
@@ -1042,17 +1063,7 @@ const Art = (() => {
       <path d="M20 32 L26 40 M38 30 L44 40" stroke="#6f532f" stroke-width="1.6" opacity=".6"/>`,
     goat: goat(30, 40, 1.6, C.white),
     // купеческий корабль у причала: круглый корпус, как у корабля из Кирении, парус с пурпурной полосой, амфоры в трюме
-    ship: `<path d="M6 38 Q32 54 58 38 Q56 36 52 36 L12 36 Q8 36 6 38Z" fill="${C.wood}" ${st(1.8)}/>
-      <path d="M8 42 Q32 52 56 42" fill="none" stroke="${C.woodD}" stroke-width="1.4"/>
-      <path d="M58 38 Q64 32 60 24" fill="none" stroke="${C.woodD}" stroke-width="2.8" stroke-linecap="round"/>
-      <path d="M6 38 Q3 34 6 30" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
-      ${[16, 22, 40, 46].map(x => `<ellipse cx="${x}" cy="35" rx="2.2" ry="2.6" fill="#d6966a" ${st(1)}/>`).join('')}
-      <path d="M31 37 L31 6" stroke="${C.dark}" stroke-width="2.2"/>
-      <path d="M17 9 L45 9 L43 31 L19 31Z" fill="#efe6d2" ${st(1.5)}/>
-      <path d="M24 9 L24 31 M31 9 L31 31 M38 9 L38 31" stroke="#c9b48c" stroke-width="1"/>
-      <path d="M18 19 L44 19" stroke="${WINE}" stroke-width="2.6"/><path d="M16 9 L46 9" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
-      <path d="M52 38 L57 52" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/>
-      <path d="M2 54 q5 -3 10 0 t10 0 M40 56 q5 -3 10 0 t10 0" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>`,
+    ship: merchantShip + `<path d="M2 54 q5 -3 10 0 t10 0 M40 56 q5 -3 10 0 t10 0" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>`,
     maenad: maenad(32, 34, 1.5),
   };
 

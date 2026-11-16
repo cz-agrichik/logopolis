@@ -118,7 +118,7 @@ const Msg = {
       case 'deckImported': return `Новая колода: «${p.name}» (${p.n})`;
       case 'hintGather': return 'Кликайте по лесу, холмам и равнине, чтобы собирать ресурсы.';
       case 'hintLogos': return 'λ Логос даётся только за карточки — кнопка «📜 Учиться».';
-      case 'shipCame': return `${Lex.ship.icon} В гавань пришёл корабль: «${Lex.ship.packs[p.pack][0]}» — ${this.wantList(p.want)} за ${this.wantList(p.give)}`;
+      case 'shipCame': return `${Lex.ship.icon} В гавань пришёл корабль: «${Lex.ship.packs[p.pack][0]}» — ${this.wantList(p.want)}${p.alt ? ` или «${Lex.ship.packs[p.alt][0]}»` : ''} за ${this.wantList(p.give)}`;
       case 'shipGone': return `${Lex.ship.icon} Корабль ушёл без груза`;
       case 'shipLoaded': return p.how === 'buy' ? `${Lex.ship.icon} Папирус куплен у кормчего: ${this.resList(p.got)}` : `${Lex.ship.icon} Корабль загружен («${Lex.ship.packs[p.pack][0]}»): ${this.resList(p.got)}`;
       case 'newGameKept': return '📚 Новая игра: выученные слова и колоды остались с вами.';

@@ -5,7 +5,12 @@
 
 Object.assign(Game, {
   // ---------- обряды ----------
-  ritualLogos(R) { return Math.ceil(R.logos * Math.pow(1.5, Math.max(0, this.state.epoch - R.epoch))); },
+  /** Цена в λ: обряд прошлой эпохи в новой ×1.5 за каждую эпоху (кроме fixedPrice). */
+  ritualLogos(R) { return R.fixedPrice ? R.logos : Math.ceil(R.logos * Math.pow(1.5, Math.max(0, this.state.epoch - R.epoch))); },
+  /** Сколько секунд длится благословение: у durPerEpoch — дольше с каждой эпохой. */
+  ritualDur(R) { return (R.dur || 0) + (R.durPerEpoch || 0) * Math.max(0, this.state.epoch - R.epoch); },
+  /** «Сбор припасов»: сколько секунд выпуска зданий даёт сейчас (с каждой эпохой — на минуту больше). */
+  suppliesSec() { return BALANCE.suppliesSec + BALANCE.suppliesPerEpoch * this.state.epoch; },
   /** Сколько секунд ждать до следующего раза. realTime — по настоящим часам (переживает уход из игры), иначе — игровое время. */
   ritualWait(R) {
     const s = this.state;
@@ -50,7 +55,7 @@ Object.assign(Game, {
       s.pop += n; result = { pop: n };
     }
     if (R.buff) {
-      s.buffs[id] = Math.min(BALANCE.maxBuffMinutes * 60, (s.buffs[id] || 0) + R.dur);
+      s.buffs[id] = Math.min(Math.max(BALANCE.maxBuffMinutes * 60, this.ritualDur(R)), (s.buffs[id] || 0) + this.ritualDur(R));
       result = { minutes: Math.round(s.buffs[id] / 60) };
     }
     if (R.goat && !this.goat) s.timers.goat = 0;

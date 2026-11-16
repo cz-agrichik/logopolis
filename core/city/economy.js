@@ -30,16 +30,19 @@ Object.assign(Game, {
    * хранится прибавка; на постоянные бонусы они умножаются. withBuffs = false — сводка без благословений.
    */
   effects(withBuffs = true) {
-    const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false, tributeCut: 0 };
+    const fx = { bonus: {}, bbonus: {}, buff: {}, bbuff: {}, scale: {}, trade: {}, logos: 1, cap: 0, houseCap: 0, storage: 0, storagePct: 0, growth: 1, goats: false, raidShield: false, tributeCut: 0 };
     for (const k of RES_KEYS) { fx.bonus[k] = 0; fx.buff[k] = 0; }
     const apply = e => {
       if (!e) return;
       if (e.all) for (const k of RES_KEYS) fx.bonus[k] += e.all;
       if (e.mult) for (const [k, v] of Object.entries(e.mult)) fx.bonus[this.liveKey(k)] += v;   // бонус к ушедшему ресурсу — преемнику
       if (e.bmult) for (const [k, v] of Object.entries(e.bmult)) fx.bbonus[k] = (fx.bbonus[k] || 0) + v;
+      if (e.scale) for (const [k, v] of Object.entries(e.scale)) fx.scale[k] = (fx.scale[k] == null ? 1 : fx.scale[k]) * v;   // здание работает в v раз слабее/сильнее — поверх всех бонусов
+      if (e.trade) for (const [k, v] of Object.entries(e.trade)) fx.trade[k] = (fx.trade[k] || 0) + v;   // торговая линия здания платит больше
       for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth', 'tributeCut']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
       if (e.raidShield) fx.raidShield = true;
+      if (e.ships) fx.ships = Object.assign({}, fx.ships, e.ships);   // корабли эллинского Кипра (core/city/ships.js)
     };
     const applyBuff = e => {
       if (!e) return;
@@ -94,10 +97,14 @@ Object.assign(Game, {
   },
   /** Производство здания в секунду при полной занятости. */
   prodOf(b, fx = this.fx || this.effects(), level = b.level) {
-    const out = {}, lm = this.levelMult(level);
+    const out = {}, lm = this.levelMult(level) * this.scaleOf(b.type, fx);
     for (const [k, v] of Object.entries(this.baseProd(b.type))) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
     return out;
   },
+  /** Во сколько раз здание работает слабее или сильнее поверх бонусов (effect.scale: рудники после «Своей монеты» — вполсилы). */
+  scaleOf(type, fx = this.fx || this.effects()) { const v = (fx.scale || {})[type]; return v == null ? 1 : v; },
+  /** Наценка торговой линии здания (effect.trade): гавань после «Своей монеты» продаёт амфоры дороже. */
+  tradeBonus(type, fx = this.fx || this.effects()) { return 1 + ((fx.trade || {})[type] || 0); },
   /** Торговая линия здания (гавань продаёт амфоры за серебро) на 1-м уровне без бонусов или null. */
   baseTrade(type) {
     const T = BUILDINGS[type].trade;
@@ -112,7 +119,7 @@ Object.assign(Game, {
     const base = this.baseTrade(b.type);
     if (!base) return null;
     const out = {}, lm = this.levelMult(level);
-    for (const [k, v] of Object.entries(base)) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
+    for (const [k, v] of Object.entries(base)) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) * this.tradeBonus(b.type, fx) : v * lm;
     return out;
   },
   houseCapOf(b, fx = this.fx || this.effects(), level = b.level) {
@@ -261,7 +268,8 @@ Object.assign(Game, {
       }
       const key = x.k + '|' + t + '|' + L + '|' + x.e + '|' + x.share + '|' + !!x.trade;
       const base = (x.trade ? this.baseTrade(t) : this.baseProd(t))[x.k];
-      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base, lm: this.levelMult(L), eff: x.e, share: x.share, trade: !!x.trade };
+      const extra = (x.trade ? 1 : this.scaleOf(t, fx)) * (x.trade && base > 0 ? this.tradeBonus(t, fx) : 1);   // вполсилы / наценка — отдельным множителем
+      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base, lm: this.levelMult(L), extra, eff: x.e, share: x.share, trade: !!x.trade };
       r.n++; r.total += x.v;
     }
     for (const r of Object.values(rows)) {
@@ -323,7 +331,7 @@ Object.assign(Game, {
   suppliesNow() {
     const g = this.grossRates(), out = {};
     for (const k of RES_KEYS) {
-      out[k] = g[k] * BALANCE.suppliesSec;
+      out[k] = g[k] * this.suppliesSec();
       if (['food', 'wood', 'stone'].includes(k)) out[k] = Math.max(out[k], 30 * (1 + this.state.epoch));
     }
     return out;

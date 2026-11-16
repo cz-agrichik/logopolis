@@ -81,6 +81,11 @@ const Looks = {
     return this.icons(type, level, epoch).join() !== this.icons(type, level - 1, epoch).join();
   },
 
+  /** Описание обряда с числами, которые растут с эпохами ({min}, {supply}, {floor} в тексте). */
+  riteDesc(R) {
+    const m = n => `${n} ${plural(n, 'минуту', 'минуты', 'минут')}`;
+    return R.desc.replace('{min}', m(Math.round(Game.ritualDur(R) / 60))).replace('{supply}', m(Game.suppliesSec() / 60)).replace('{floor}', 30 * (1 + Game.state.epoch));
+  },
   /** Медальон знания и обряда. */
   techIcon(T) { return Art.svg('t_' + T.id); },
   riteIcon(R) { const k = 'r_' + R.id; return Art.has(k) ? Art.svg(k) : Lex.rite[R.id].icon; },

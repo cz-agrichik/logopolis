@@ -99,7 +99,7 @@ Object.assign(Game, {
   /** Благословения за λ до текущей эпохи: { logos: [цены в λ «сейчас»], minutes: [длительности] }. */
   blessingRanges() {
     const list = RITUALS.filter(R => R.buff && R.logos && R.epoch <= this.state.epoch);
-    return { logos: list.map(R => this.ritualLogos(R)), minutes: list.map(R => R.dur / 60) };
+    return { logos: list.map(R => this.ritualLogos(R)), minutes: list.map(R => this.ritualDur(R) / 60) };
   },
   /** «Золотые часы» святилищ, которые сейчас в ходу (сменённые новыми не в счёт). */
   goldenRites() { return RITUALS.filter(R => R.buff && R.buff.logos && R.epoch <= this.state.epoch && !this.ritualStatus(R).hidden); },

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Λόγος · балансер</title>
+<!-- Балансер: открывается прямо с диска. Считает движком игры (скрипты ниже — те же, что у игры), ничего не сохраняет в игру. -->
+<style>
+  :root { --parch: #f4ead3; --parch-2: #eadcbc; --parch-3: #dccaa2; --ink: #2a2017; --ink-2: #6b5a45; --accent: #8e3d1d; --good: #3f6a1f; --bad: #a3321f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--parch); color: var(--ink); font: 14px/1.45 'Noto Serif', Georgia, serif; }
+  header { padding: 16px 24px 8px; } h1 { margin: 0; font-size: 24px; color: var(--accent); }
+  header p { margin: 4px 0 0; color: var(--ink-2); max-width: 980px; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 8px 24px; background: var(--parch-2); box-shadow: 0 2px 6px rgba(60,35,10,.12); }
+  .bar a { color: var(--accent); text-decoration: none; font-weight: 600; } .bar .sp { flex: 1; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 4px 12px; background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  main { padding: 4px 24px 40px; max-width: 1400px; }
+  h2 { margin: 26px 0 6px; font-size: 19px; color: var(--accent); border-bottom: 2px solid var(--parch-3); padding-bottom: 3px; }
+  h3 { margin: 16px 0 4px; font-size: 16px; }
+  .note { color: var(--ink-2); margin: 4px 0 8px; max-width: 980px; }
+  table { border-collapse: collapse; margin: 6px 0 10px; background: #fff8; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 4px 10px; text-align: right; border-bottom: 1px solid var(--parch-3); vertical-align: top; }
+  th { background: var(--parch-2); font-weight: 600; font-size: 13px; }
+  td:first-child, th:first-child { text-align: left; }
+  td.l { text-align: left; } tr.sum td { font-weight: 700; border-top: 2px solid var(--parch-3); }
+  .dim { color: var(--ink-2); font-size: 12px; } .good { color: var(--good); } .bad { color: var(--bad); }
+  details { margin: 8px 0; } summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+  .plan input { width: 44px; font: inherit; text-align: right; border: 1px solid var(--parch-3); border-radius: 5px; background: #fff; padding: 1px 4px; }
+  .err { background: #f6d8cf; padding: 8px 12px; border-radius: 8px; }
+  .kpi { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+  .kpi div { background: #fff8; border-radius: 8px; padding: 6px 12px; } .kpi b { font-size: 17px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Λόγος · балансер</h1>
+  <p>Ожидаемый город на границах эпох и во что обходится каждая эпоха — в Логосе, в ресурсах, в зерне и во времени.
+  Считается движком игры прямо здесь: поменяли числа в игре — обновите страницу. Сколько производственных зданий стоит к концу эпохи —
+  допущение, его можно поправить в «Допущениях»; жилища, поля и склады балансер досчитывает сам.</p>
+</header>
+<div class="bar">
+  <label><input type="checkbox" id="peek"> + эллинский Кипр (первая треть)</label>
+  <a href="#sum">Сводка</a><a href="#city">Город</a><a href="#rates">Курсы</a><a href="#prod">Выпуск</a><a href="#costs">Цены эпох</a><a href="#coins">Монеты</a>
+  <span class="sp"></span><span id="status" class="dim"></span>
+</div>
+<main>
+  <details class="plan" id="planBox"><summary>Допущения: производственные здания к концу эпохи (все — на пределе уровня эпохи)</summary>
+    <div id="planTable"></div>
+    <p class="note">Жилищ — столько, чтобы мест хватило и на население перехода, и на всех работников; полей — чтобы зерна хватало всем;
+    складов — чтобы влезла самая большая цена эпохи «с умом». Запасы — 60% склада (переработчики работают, гавань продаёт амфоры).
+    Правки запоминаются в этом браузере.</p>
+    <button class="ghost" id="reset">Вернуть как было</button>
+  </details>
+  <div id="out">Считаю…</div>
+</main>
+
+<!-- ядро игры: тот же порядок, что ASSETS в index.html (новый файл ядра — допишите и сюда) -->
+<script src="../../content/ru/words.js"></script>
+<script src="../../core/util.js"></script>
+<script src="../../core/defs.js"></script>
+<script src="../../core/learning/greek.js"></script>
+<script src="../../core/learning/decks.js"></script>
+<script src="../../core/learning/srs.js"></script>
+<script src="../../core/learning/lesson.js"></script>
+<script src="../../core/learning/journal.js"></script>
+<script src="../../core/learning/learn.js"></script>
+<script src="../../core/city/state.js"></script>
+<script src="../../core/city/economy.js"></script>
+<script src="../../core/city/build.js"></script>
+<script src="../../core/city/research.js"></script>
+<script src="../../core/city/rituals.js"></script>
+<script src="../../core/city/epochs.js"></script>
+<script src="../../core/city/world.js"></script>
+<script src="../../core/city/ships.js"></script>
+<script src="../../core/city/changes.js"></script>
+<script src="../../core/city/facts.js"></script>
+<script src="../../content/ru/lexicon.js"></script>
+<script src="balancer-core.js"></script>
+<script>
+'use strict';
+(() => {
+  const $ = s => document.querySelector(s);
+  const KEY = 'greekgame.balancer.plan';
+  const nf = (x, d) => x.toLocaleString('ru-RU', { maximumFractionDigits: d, minimumFractionDigits: 0 });
+  const fmt = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? nf(Math.round(x), 0) : Math.abs(x) >= 10 ? nf(x, 1) : nf(x, 2);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const bn = t => (Lex.bld[t] && (Lex.bld[t].name)) || t;
+  const rn = k => (Lex.res[k] && Lex.res[k].name) || k;
+  const ri = k => (Lex.res[k] && Lex.res[k].icon) || k;
+  const tn = id => (Lex.tech[id] && Lex.tech[id].name) || id;
+  const en = e => (Lex.epochs[e] && Lex.epochs[e].name) || ('эпоха ' + e);
+  const cost = c => Object.entries(c || {}).filter(([, v]) => v).map(([k, v]) => `<span title="${esc(rn(k))}">${ri(k)}&nbsp;${fmt(v)}</span>`).join(' ') || '—';
+  const tbl = (head, rows, cls = '') => `<table class="${cls}"><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>${rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map((c, i) => `<td${i && typeof c === 'string' && c.startsWith('<span title=') ? ' class="l"' : ''}>${c}</td>`).join('')}</tr>`).join('')}</table>`;
+  const x = v => v == null ? '—' : '×' + nf(v, 2);
+  const hrs = s => s >= 3600 ? fmt(s / 3600) + ' ч' : fmt(s / 60) + ' мин';
+
+  // ---------- допущения ----------
+  const loadPlan = () => { try { const p = JSON.parse(localStorage.getItem(KEY)); if (p) return p; } catch (e) {} return JSON.parse(JSON.stringify(Balancer.PLAN)); };
+  const savePlan = p => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {} };
+  let plan = loadPlan();
+  const PLAN_TYPES = ['goatpen', 'lumber', 'quarry', 'workshop', 'mine', 'port', 'foundry', 'scribe', 'vineyard', 'olivegrove', 'forge'];
+  function drawPlan() {
+    const eps = [0, 1, 2, 3].filter(e => EPOCHS[e] && EPOCHS[e].maxLevel);
+    $('#planTable').innerHTML = tbl(['', ...eps.map(e => `${e} · ${esc(en(e))}<br><span class="dim">ур. ${EPOCHS[e].maxLevel}</span>`)],
+      PLAN_TYPES.map(t => [esc(bn(t)), ...eps.map(e => BUILDINGS[t].epoch > e ? '<span class="dim">—</span>'
+        : `<input type="number" min="0" max="20" data-e="${e}" data-t="${t}" value="${(plan[e] || {})[t] || 0}">`)]));
+  }
+  $('#planTable').addEventListener('change', ev => {
+    const i = ev.target.closest('input'); if (!i) return;
+    (plan[i.dataset.e] = plan[i.dataset.e] || {})[i.dataset.t] = Math.max(0, Math.min(20, +i.value || 0));
+    savePlan(plan); go();
+  });
+  $('#reset').addEventListener('click', () => { plan = JSON.parse(JSON.stringify(Balancer.PLAN)); savePlan(plan); drawPlan(); go(); });
+  $('#peek').addEventListener('change', go);
+
+  // ---------- отчёт ----------
+  function render(R) {
+    const S = R.stages, EP = R.epochs;
+    const colName = st => st.first ? 'начало игры' : `конец: ${esc(en(st.endOf))}`;
+    const cols = ['', ...S.map(colName)];
+    let h = '';
+
+    // сводка
+    h += `<h2 id="sum">Сводка по эпохам</h2>
+      <p class="note">Выпуск — средний за эпоху, в зерне по «трудовым» курсам. «С умом» — знания за λ и все чудеса; «ресурсами» — знания через силу,
+      без необязательных чудес за λ (λ всё равно нужен на уровни за λ, обязательные чудеса и переход). Время: λ — в раундах учёбы (λ за раунд с бонусами),
+      ресурсы — в часах выпуска всего города.</p>`;
+    h += tbl(['эпоха', 'выпуск, зерна/с', 'λ за раунд', '1 λ ≈ зерна', 'знания: λ «с умом» / силой', 'обязательно λ', 'постройки и уровни', 'итог «с умом»', 'итог «ресурсами»'],
+      EP.map(p => [`${p.e} · ${esc(en(p.e))}`, fmt(p.prod), Math.round(p.lpr), fmt(p.perL), `${p.tl} λ / ${hrs(p.tlab / p.prod)}`, p.mustL,
+        `${fmt(p.up.logos)} λ + ${hrs(p.up.w / p.prod)}`,
+        `<b>${fmt(p.scen.mind.logos)} λ</b> <span class="dim">(${fmt(p.scen.mind.logos / p.lpr)} р.)</span> + ${hrs(p.scen.mind.w / p.prod)}`,
+        `<b>${fmt(p.scen.labor.logos)} λ</b> <span class="dim">(${fmt(p.scen.labor.logos / p.lpr)} р.)</span> + ${hrs(p.scen.labor.w / p.prod)}`]));
+    if (EP.length > 1) h += `<p class="note">К прошлой эпохе: ${EP.slice(1).map((p, i) => { const a = EP[i];
+      return `${a.e}→${p.e}: выпуск ×${nf(p.prod / a.prod, 1)}, 1 λ в зерне ×${nf(p.perL / a.perL, 1)}, λ «с умом» ×${nf(p.scen.mind.logos / a.scen.mind.logos, 1)}, ресурсы «ресурсами» в часах ×${nf((p.scen.labor.w / p.prod) / (a.scen.labor.w / a.prod), 1)}`; }).join('; ')}.</p>`;
+
+    // 1–3. город
+    h += `<h2 id="city">Город</h2><p class="note">Столбцы — состояния города: начало игры и конец каждой эпохи (он же начало следующей).
+      (а) — без необязательных чудес за λ, (б) — с ними.</p>`;
+    const types = [...new Set(S.flatMap(st => Object.keys(st.a.counts)))];
+    h += `<h3>1. Здания (а): сколько × уровень</h3>` + tbl(cols, types.map(t => [esc(bn(t)), ...S.map(st => { const c = st.a.counts[t]; return c ? `${c.n} × ${[...new Set(c.levels)].join('/')}` : '<span class="dim">—</span>'; })]).concat([
+      ['чудеса (а)', ...S.map(st => `<span class="dim">${st.a.wonders.map(w => esc(bn(w))).join(', ') || '—'}</span>`)],
+      ['+ чудеса за λ (б)', ...S.map(st => `<span class="dim">${st.b.wonders.filter(w => !st.a.wonders.includes(w)).map(w => esc(bn(w))).join(', ') || '—'}</span>`)],
+      ['земля: равнина / лес / холмы', ...S.map(st => { const L = st.a.land; return `${L.use.plain}/${L.tiles.plain} · ${L.use.forest}/${L.tiles.forest} · ${L.use.hill}/${L.tiles.hill}${L.use.flex ? ` <span class="dim">+${L.use.flex} на выбор</span>` : ''}`; })],
+    ]));
+    h += `<h3>1. Бонус-множитель выпуска по ресурсам, (а) / (б)</h3>` + tbl(cols, RES_KEYS.filter(k => S.some(st => st.a.mult[k] != null))
+      .map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => st.a.mult[k] == null ? '<span class="dim">—</span>' : `${x(st.a.mult[k])} / ${x(st.b.mult[k])}`)]));
+    const tgt = st => { const t = st.target; if (!t || !t.what) return '—'; const w = t.what;
+      const what = w.kind === 'advance' ? 'переход' : w.kind === 'wonder' ? esc(bn(w.id)) : w.kind === 'tech' ? esc(tn(w.id)) : `${esc(bn(w.id))} до ${w.level}`;
+      return `<span class="dim">${what}: ${ri(t.res)} ${fmt(t.v)}</span>`; };
+    h += `<h3>2–3. Население, склады, Логос</h3>` + tbl(cols, [
+      ['мест для жителей, (а) / (б)', ...S.map(st => `${st.a.pop} / ${st.b.pop}`)],
+      ['работников нужно', ...S.map(st => st.a.workers)],
+      ['вместимость склада, (а) / (б)', ...S.map(st => `${fmt(st.a.storage)} / ${fmt(st.b.storage)}`)],
+      ['склад досчитан под', ...S.map(tgt)],
+      ['множитель λ, (а) / (б)', ...S.map(st => `${x(st.a.logos)} / ${x(st.b.logos)}`)],
+      ['λ за раунд, (а) / (б)', ...S.map(st => `${Math.round(R.round * st.a.logos)} / ${Math.round(R.round * st.b.logos)}`)],
+    ]);
+
+    // 4. курсы
+    h += `<h2 id="rates">4. Курсы ресурсов в зерне</h2><p class="note">«Трудовой» курс: сколько зерна дал бы на поле работник, пока делает единицу ресурса
+      (с бонусами города (а); сырьё — плюсом, попутный выпуск — минусом). Серым — ценник игры (BALANCE.worth) для сравнения.</p>`;
+    h += tbl(cols, RES_KEYS.map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => `${st.a.rates[k] == null ? '—' : fmt(st.a.rates[k])} <span class="dim">${R.worth[k] || ''}</span>`)]));
+
+    // 5. выпуск
+    h += `<h2 id="prod">5. Выпуск города</h2><p class="note">Чистый выпуск в секунду (после еды жителей и сырья переработчиков), (а).</p>`;
+    h += tbl(cols, RES_KEYS.filter(k => S.some(st => Math.abs(st.a.net[k]) > 1e-6)).map(k => [`${ri(k)} ${esc(rn(k))}`, ...S.map(st => Math.abs(st.a.net[k]) > 1e-6 ? `<span class="${st.a.net[k] < 0 ? 'bad' : ''}">${fmt(st.a.net[k])}</span>` : '<span class="dim">—</span>')]).concat([
+      { cls: 'sum', cells: ['всё в зерне: чистый / валовой', ...S.map(st => `${fmt(st.a.prod)} / ${fmt(st.a.prodGross)}`)] },
+      ['по ценнику игры, чистый', ...S.map(st => fmt(st.a.prodWorth))],
+      ['(б), в зерне', ...S.map(st => fmt(st.b.prod))],
+    ]));
+
+    // 6–10. цены эпох
+    h += `<h2 id="costs">6–10. Цены эпох</h2><p class="note">Ресурсы пересчитаны в зерно по курсам конца эпохи; «минут выпуска» — при средней производительности эпохи.</p>`;
+    for (const p of EP) {
+      const wh = c => Object.entries(c || {}).reduce((v, [k, n]) => v + n * (p.rates[k] != null ? p.rates[k] : (R.worth[k] || 1)), 0);
+      h += `<details ${p.e === EP.length - 1 ? 'open' : ''}><summary>Эпоха ${p.e} · ${esc(en(p.e))}</summary>
+        <div class="kpi"><div>выпуск <b>${fmt(p.prod)}</b> зерна/с</div><div>раунд <b>${Math.round(p.lpr)}</b> λ</div>
+        <div>1 λ ≈ <b>${fmt(p.perL)}</b> зерна = ${fmt(p.perL / p.prod)} с выпуска</div><div>раунд ≈ <b>${hrs(p.perL * p.lpr / p.prod)}</b> выпуска</div></div>`;
+      h += `<h3>6. Знания</h3>` + tbl(['знание', '«с умом»', 'ресурсы в зерне', '«через силу»', 'в зерне', 'это выпуска'],
+        p.techs.map(t => [esc(tn(t.id)), `λ ${t.logos} + ${cost(t.mind)}`, fmt(t.mindW), cost(t.labor), fmt(t.laborW), hrs(t.laborW / p.prod)])
+          .concat([{ cls: 'sum', cells: ['всего', `λ ${p.tl}`, fmt(p.tm), '', fmt(p.tlab), hrs(p.tlab / p.prod)] }]));
+      const KIND = { must: 'обязательное', logos: 'за λ', res: 'без λ' };
+      h += `<h3>7. Обязательно в λ: ${p.mustL}</h3><p class="note">Переход ${p.adv ? p.adv.logos : 0} λ + обязательные чудеса; без знаний и уровней за λ.
+        ${p.adv ? `Переход ещё просит ${cost(p.adv.res)} (${fmt(p.adv.w)} зерна).` : 'Перехода дальше пока нет.'}</p>`;
+      h += tbl(['чудо', 'вид', 'λ', 'ресурсы', 'в зерне', 'это выпуска'], p.wonders.map(w => [esc(bn(w.id)), KIND[w.kind], w.logos || '—', cost(w.cost), fmt(w.w), hrs(w.w / p.prod)]));
+      h += `<h3>8. Постройки и улучшения</h3><p class="note">Из города на начало эпохи в город на конец, (а): <b>${fmt(p.up.logos)} λ</b> и ${cost(p.up.res)}
+        = <b>${fmt(p.up.w)}</b> зерна (${hrs(p.up.w / p.prod)} выпуска).</p>`;
+      h += `<h3>9. Курс «λ ↔ ресурсы»</h3><p class="note">По знаниям (путь «через силу» минус ресурсы «с умом», делённое на λ): 1 λ ≈ <b>${fmt(p.perL)}</b> зерна.</p>`;
+      h += `<h3>10. Вся эпоха</h3>` + tbl(['сценарий', 'λ', 'раундов', 'ресурсы', 'в зерне', 'это выпуска'], [
+        ['по максимуму «с умом»', fmt(p.scen.mind.logos), fmt(p.scen.mind.logos / p.lpr), cost(p.scen.mind.res), fmt(p.scen.mind.w), hrs(p.scen.mind.w / p.prod)],
+        ['по максимуму ресурсами', fmt(p.scen.labor.logos), fmt(p.scen.labor.logos / p.lpr), cost(p.scen.labor.res), fmt(p.scen.labor.w), hrs(p.scen.labor.w / p.prod)],
+      ]) + `</details>`;
+    }
+
+    // 11. монеты
+    h += `<h2 id="coins">11. Серебро (монеты): мастерская, вино, медь</h2><p class="note">С одного здания уровня города, серебра в секунду; серым — на работника.
+      Вино и медь — через гавань: амфоры по торговой линии, медь по основной (её зерно пересчитано в серебро; руки гавани — по доле её меди).</p>`;
+    const cs = st => st.a.coins, c0 = st => st.a.coins0;
+    const cell = v => v ? `${fmt(v.v)} <span class="dim">${fmt(v.w)}</span>` : '<span class="dim">—</span>';
+    h += tbl(cols, [['мастерская', 'workshop'], ['виноградник → гавань', 'vineyard'], ['оливковая роща → гавань', 'olivegrove'], ['рудник → гавань (медь)', 'mine']]
+      .map(([n, k]) => [n, ...S.map(st => cell(cs(st)[k]))]).concat([
+        { cls: 'sum', cells: ['виноградник к мастерской', ...S.map(st => cs(st).vineyard && cs(st).workshop ? x(cs(st).vineyard.v / cs(st).workshop.v) : '—')] },
+        ['то же без чудес (только знания)', ...S.map(st => c0(st).vineyard && c0(st).workshop ? x(c0(st).vineyard.v / c0(st).workshop.v) : '—')],
+        ['рудник к мастерской, на работника', ...S.map(st => cs(st).mine && cs(st).workshop ? x(cs(st).mine.w / cs(st).workshop.w) : '—')],
+      ]));
+    return h;
+  }
+
+  function go() {
+    $('#status').textContent = 'считаю…';
+    setTimeout(() => {
+      const t0 = performance.now();
+      try {
+        const R = Balancer.run({ plan, last: $('#peek').checked ? 3 : 2 });
+        $('#out').innerHTML = render(R);
+        $('#status').textContent = `посчитано за ${Math.round(performance.now() - t0)} мс`;
+      } catch (e) {
+        $('#out').innerHTML = `<p class="err">Не посчиталось: ${esc(e.message)}. Проверьте допущения (например, «Вернуть как было»).</p>`;
+        $('#status').textContent = '';
+        console.error(e);
+      }
+    }, 20);
+  }
+  drawPlan();
+  go();
+})();
+</script>
+</body>
+</html>
