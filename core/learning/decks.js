@@ -5,7 +5,7 @@
 
 /** Подборки колод для вопроса «Что будем учить?»: decks — id колод, groups — целые группы ('start', 'A1', 'A2', 'B1', 'own'). */
 const LEARN_PLANS = {
-  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-adv', 'a1-conn', 'a1-adj', 'a1-omega1', 'a1-omega2'] },
+  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-num', 'a1-adv', 'a1-conn', 'a1-pron', 'a1-adj', 'a1-omega1', 'a1-omega2'] },
   a1:      { groups: ['start', 'A1'] },
   a2:      { groups: ['A2'] },
   b1:      { groups: ['B1'] },

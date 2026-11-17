@@ -43,7 +43,7 @@ def zrank(w):
 
 def cat(r):
     """Часть речи для колоды: masc/fem/neut — существительные по артиклю, omega/contr/mid — глаголы, adj, adv, plur, phrase, other."""
-    o, p, s = r['original'], r['pos'], r['subclass']
+    o, p, s = r['original'].replace(', o', ', ο'), r['pos'], r['subclass']   # в выгрузке бывает латинская «o» (άνθρωπος, o)
     if s == 'personal' or r['greek'][:1].isupper(): return None   # имена и названия
     if ', ο' in o and p == 'noun': return 'masc'
     if ', η' in o and p == 'noun': return 'fem'

@@ -637,10 +637,39 @@ test('колоды v4: большую колоду A1 поделили надв�
   assert.ok(s.progress[stay.id], 'прогресс оставшихся слов на месте');
   assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
   assert.ok(['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].every(id => s.decks.find(d => d.id === id).active), 'новые колоды A1 включены');
-  // колоды стали по 16–45 слов, в A1/A2/B1 прибавилось по 100
+  // колоды по 16–45 слов (глаголы A1 — до 70); в версии 5 — ещё по 100 новых слов (A1 — и 4 из A2, A2 — минус они и φθηνός)
   const lvl = l => s.decks.filter(d => D.levelOf(d) === l).reduce((t, d) => t + d.cards.length, 0);
-  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [485, 301, 263]);
-  assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length <= 70));
+  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [589, 401, 363]);
+  assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length >= 15 && d.cards.length <= 70));
+});
+
+test('колоды v5: числа ушли в свою колоду, ότι — из A2 в A1, φθηνός убран (есть φτηνός); прогресс идёт за словом', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  // сохранение v4: числа в «a1-adv», ότι в «a2-conn», φθηνός в «a2-adj», колод «a1-num» и «a1-pron» ещё нет
+  const card = (front, back, hint = '') => ({ front, back, hint });
+  const adv = s.decks.find(d => d.id === 'a1-adv'), conn2 = s.decks.find(d => d.id === 'a2-conn'), adj2 = s.decks.find(d => d.id === 'a2-adj');
+  const oldAdv = D.makeDeck('A1 · Числа и наречия места', [...adv.cards, card('δύο', 'два')], { id: 'a1-adv', builtin: true });
+  const oldConn = D.makeDeck('A2 · Связки и наречия', [...conn2.cards, card('ότι', 'что (союз)', 'ξέρω ότι…')], { id: 'a2-conn', builtin: true });
+  const oldAdj = D.makeDeck('A2 · Прилагательные', [...adj2.cards, card('φθηνός', 'дешёвый')], { id: 'a2-adj', builtin: true });
+  for (const d of [oldAdv, oldConn, oldAdj]) d.ver = 4;
+  oldConn.active = true;
+  const swap = { 'a1-adv': oldAdv, 'a2-conn': oldConn, 'a2-adj': oldAdj };
+  s.decks = s.decks.filter(d => !['a1-num', 'a1-pron'].includes(d.id)).map(d => swap[d.id] || d);
+  const two = oldAdv.cards.at(-1), oti = oldConn.cards.at(-1);
+  s.progress[two.id] = { step: 3, rev: 2, due: 0, right: 5, wrong: 1, built: true };
+  s.progress[oti.id] = { step: 2, rev: 1, due: 0, right: 3, wrong: 0, built: true };
+  assert.equal(D.ensureBuiltins(s), 2, 'добавились «Числа» и «Местоимения и вопросы»');
+  const num = s.decks.find(d => d.id === 'a1-num'), pron = s.decks.find(d => d.id === 'a1-pron');
+  assert.ok(num.active && pron.active, 'новые колоды A1 включены');
+  assert.deepEqual([...num.cards.slice(0, 3).map(c => c.front)], ['μηδέν', 'ένα', 'δύο'], 'числа — по порядку');
+  assert.equal(s.progress[num.cards.find(c => c.front === 'δύο').id].right, 5, 'прогресс «δύο» — в «Числах»');
+  const oti1 = s.decks.find(d => d.id === 'a1-conn').cards.find(c => c.front === 'ότι');
+  assert.equal(s.progress[oti1.id].right, 3, 'прогресс «ότι» — в A1');
+  assert.ok(!s.decks.find(d => d.id === 'a2-conn').cards.some(c => c.front === 'ότι'));
+  assert.ok(!s.decks.some(d => d.cards.some(c => c.front === 'φθηνός')), 'φθηνός — только как φτηνός в A1');
+  assert.equal(s.decks.find(d => d.id === 'a1-adv').name, 'A1 · Наречия места');
+  assert.ok(['a1-num', 'a1-pron'].every(id => C.get('LEARN_PLANS').a1start.decks.includes(id)), '«A1 · начинающий» — с числами и местоимениями');
 });
 
 test('сохранение: старое общее сохранение делится на город и обучение', () => {

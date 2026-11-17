@@ -4,7 +4,12 @@
     python3 tools/words/apply_decks.py tools/words/additions_v5.py           # только проверить
     python3 tools/words/apply_decks.py tools/words/additions_v5.py --write   # проверить и записать
 
-Файл добавлений — модуль Python с NEW, ADD, SPLIT, RENAME (см. additions_v4.py). Порядок: SPLIT → RENAME → ADD → NEW.
+Файл добавлений — модуль Python с NEW, ADD, SPLIT, RENAME, MOVE, EDIT (см. additions_v4.py, additions_v5.py).
+Порядок по умолчанию: SPLIT → RENAME → ADD → NEW → MOVE → EDIT; свой — списком ORDER (в v5: MOVE → ADD → NEW → SPLIT → RENAME → EDIT,
+чтобы новые слова легли в колоду до деления по алфавиту).
+  MOVE — перенести слово в другую колоду (и уровень): { слово: id колоды }; None — убрать слово из колод (повтор, вариант написания);
+  EDIT — поправить карточку: { слово: (перевод, подсказка) }, None — оставить как есть;
+  SPLIT — делит пополам по алфавиту; диапазон «: α–ζ» в старом названии заменяется новым.
 Проверки (при ошибке ничего не пишется):
   - греческое слово встречается в колодах A1–B1 один раз (варианты глагола -άω/-ώ — одно слово);
   - перевод внутри уровня не повторяется;
@@ -19,8 +24,9 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 W = os.path.join(ROOT, 'content/ru/words.js')
 if len(sys.argv) < 2: sys.exit(__doc__)
 spec = importlib.util.spec_from_file_location('additions', sys.argv[1]); A = importlib.util.module_from_spec(spec); spec.loader.exec_module(A)
-for k in ('NEW', 'ADD', 'SPLIT', 'RENAME'):
+for k in ('NEW', 'ADD', 'SPLIT', 'RENAME', 'MOVE', 'EDIT'):
     if not hasattr(A, k): setattr(A, k, [] if k == 'NEW' else {})
+ORDER = getattr(A, 'ORDER', ['SPLIT', 'RENAME', 'ADD', 'NEW', 'MOVE', 'EDIT'])
 
 src = open(W, encoding='utf-8').read()
 code = "const fs=require('fs');const s=fs.readFileSync(process.argv[1],'utf8');const r=new Function(s+';return {D:WORD_DECKS,S:SAMPLE_DECK,V:WORD_DECKS_VERSION};')();console.log(JSON.stringify(r))"
@@ -28,34 +34,57 @@ data = json.loads(subprocess.run(['node', '-e', code, W], capture_output=True, t
 D, S, V = data['D'], data['S'], data['V']
 
 def strip(s): return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
-def vkey(w): return re.sub(r'αω$', 'ω', strip(w))   # αγαπάω и αγαπώ — одно слово
+def vkey(w): return re.sub(r'άω$', 'ώ', unicodedata.normalize('NFC', w.lower()))   # αγαπάω и αγαπώ — одно слово
+def akey(w): return re.sub(r'αω$', 'ω', strip(w))   # без ударений: πότε / ποτέ — разные слова, но стоит взглянуть
 lvl = lambda id: id.split('-')[0]
 byid = {d['id']: d for d in D}
 
-for old, (nid, nname) in A.SPLIT.items():
-    d = byid[old]; cards = sorted(d['cards'], key=lambda c: strip(c[0]))
-    h = len(cards) // 2
-    while h < len(cards) and strip(cards[h][0])[0] == strip(cards[h - 1][0])[0]: h += 1   # одна буква — в одной колоде
-    a, b = cards[:h], cards[h:]
-    rng = lambda L: strip(L[0][0])[0] + '–' + strip(L[-1][0])[0]
-    base = nname.rsplit(' ', 1)[0] if nname else d['name']
-    d['cards'] = a; d['name'] = f"{d['name']}: {rng(a)}"
-    nd = {'id': nid, 'name': f"{base}: {rng(b)}", 'cards': b}
-    if d.get('off'): nd['off'] = True
-    D.insert(D.index(d) + 1, nd); byid[nid] = nd
-for k, v in A.RENAME.items(): byid[k]['name'] = v
-for k, cards in A.ADD.items(): byid[k]['cards'].extend([list(c) for c in cards])
-for nid, name, after, cards in A.NEW:
-    nd = {'id': nid, 'name': name, 'cards': [list(c) for c in cards]}
-    if not nid.startswith('a1'): nd['off'] = True
-    D.insert(D.index(byid[after]) + 1, nd); byid[nid] = nd
+def find(w):
+    for d in D:
+        for c in d['cards']:
+            if vkey(c[0]) == vkey(w): return d, c
+    sys.exit(f'нет слова {w}')
+def op_split():
+    for old, (nid, nname) in A.SPLIT.items():
+        d = byid[old]; cards = sorted(d['cards'], key=lambda c: strip(c[0]))
+        h = len(cards) // 2
+        while h < len(cards) and strip(cards[h][0])[0] == strip(cards[h - 1][0])[0]: h += 1   # одна буква — в одной колоде
+        a, b = cards[:h], cards[h:]
+        rng = lambda L: strip(L[0][0])[0] + '–' + strip(L[-1][0])[0]
+        name = re.sub(r': \S+–\S+$', '', d['name'])   # прежний диапазон букв уходит
+        base = nname.rsplit(' ', 1)[0] if nname else name
+        d['cards'] = a; d['name'] = f"{name}: {rng(a)}"
+        nd = {'id': nid, 'name': f"{base}: {rng(b)}", 'cards': b}
+        if d.get('off'): nd['off'] = True
+        D.insert(D.index(d) + 1, nd); byid[nid] = nd
+def op_rename():
+    for k, v in A.RENAME.items(): byid[k]['name'] = v
+def op_add():
+    for k, cards in A.ADD.items(): byid[k]['cards'].extend([list(c) for c in cards])
+def op_new():
+    for nid, name, after, cards in A.NEW:
+        nd = {'id': nid, 'name': name, 'cards': [list(c) for c in cards]}
+        if not nid.startswith('a1'): nd['off'] = True
+        D.insert(D.index(byid[after]) + 1, nd); byid[nid] = nd
+def op_move():
+    for w, to in A.MOVE.items():
+        d, c = find(w); d['cards'].remove(c)
+        if to: byid[to]['cards'].append(c)
+def op_edit():
+    for w, (tr, hint) in A.EDIT.items():
+        d, c = find(w)
+        if tr is not None: c[1] = tr
+        if hint is not None: c[2] = hint
+OPS = {'SPLIT': op_split, 'RENAME': op_rename, 'ADD': op_add, 'NEW': op_new, 'MOVE': op_move, 'EDIT': op_edit}
+for k in ORDER: OPS[k]()
 
-bad, seen = 0, {}
+bad, seen, seenA = 0, {}, {}
 for d in D:
     for c in d['cards']:
         k = vkey(c[0])
         if k in seen: print('ОШИБКА: слово дважды', c[0], seen[k], d['id']); bad += 1
-        seen[k] = d['id']
+        elif akey(c[0]) in seenA: print('заметка: отличаются только ударением', c[0], '/', seenA[akey(c[0])])
+        seen[k] = d['id']; seenA.setdefault(akey(c[0]), c[0])
 starter = {vkey(c[0]) for c in S['cards']}
 for d in D:
     for c in d['cards']:
