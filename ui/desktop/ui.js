@@ -99,7 +99,7 @@ const UI = {
 
     // λ — на почётном месте, сразу после названия эпохи
     const lm = Math.round((Game.logosMult() - 1) * 100);
-    $('#logosMedal').innerHTML = `<span class="lm-sign">λ</span><span class="lm-v"><b>${fmt(s.logos)}</b><small>${lm ? `Логос · +${lm}%` : 'Логос'}</small></span>`;
+    morph($('#logosMedal'), `<span class="lm-sign">λ</span><span class="lm-v"><b>${fmt(s.logos)}</b><small>${lm ? `Логос · +${lm}%` : 'Логос'}</small></span>`);
 
     // ресурсы: светлая плашка, фиксированные ячейки, полоска заполнения склада
     const buffed = Game.buffedRes();
@@ -112,14 +112,14 @@ const UI = {
         <span class="rs-ic">${Art.res(k)}</span><span class="rs-v"><b>${fmt(v)}</b><small class="${falling ? 'neg' : ''}">${Math.abs(r) > 0.05 ? (falling ? '▼ ' : '') + fmtRate(r) : '&nbsp;'}</small></span>
         <i class="rs-bar"><i style="width:${fill.toFixed(0)}%"></i></i></div>`;
     }
-    $('#resources').innerHTML = html;
+    morph($('#resources'), html);   // не пересоздаём ячейки: подсказка под мышью не мигает
 
     // жители и работники — отдельным блоком
     const { short, hands } = Game.labor();
-    $('#popbox').innerHTML = `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap}<span class="wide-only"> мест</span></small></div>
+    morph($('#popbox'), `<div title="Жители: ${s.pop}, мест в домах: ${Game.cap}. Жители прибывают, пока есть места и зерно."><span>👥</span><b>${s.pop}</b><small>/ ${Game.cap}<span class="wide-only"> мест</span></small></div>
       <div class="${short ? 'short' : ''}" title="${short ? `Не хватает работников! Зданиям нужно ${Game.need}, а рук ${hands}. Сначала руки идут на поля и загоны: зерно — ${Math.round(Game.effFood * 100)}%. Остальные здания работают на ${Math.round(Game.effOther * 100)}%. Нужны жилища и зерно — или «Всей семьёй».` : `Зданиям нужно ${Game.need} работников — рук хватает (${hands}).`}"><span>${short ? '⚠' : '⚒'}</span>${short
         ? `<b>${hands} / ${Game.need}</b><small class="wide-only">мало рук · ${Game.effFood < 0.999 ? `даже зерно ${Math.round(Game.effFood * 100)}%` : `прочее ${Math.round(Game.effOther * 100)}%`}</small>`
-        : `<b>${Game.need}</b><small class="wide-only">${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`;
+        : `<b>${Game.need}</b><small class="wide-only">${plural(Game.need, 'работник', 'работника', 'работников')}</small>`}</div>`);
 
     // благословения — полоса над картой: место под неё есть всегда, и она никогда не переносится на вторую строку
     const buffs = Object.entries(s.buffs || {}).filter(([id]) => Cat.rite[id]);
@@ -166,7 +166,7 @@ const UI = {
     if (bhtml !== this.lastBuffs) {
       this.lastBuffs = bhtml;
       bar.classList.remove('hidden', 'compact');
-      bar.innerHTML = bhtml;
+      morph(bar, bhtml);   // таймеры тикают каждую секунду: меняем только текст — подсказка у дани и благословений не мигает
       if (bar.scrollWidth > bar.clientWidth + 1) bar.classList.add('compact');   // тесно — только значки и таймеры
     }
 

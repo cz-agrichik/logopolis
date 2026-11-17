@@ -9,6 +9,33 @@ const fmt = n => n >= 10000 ? (n / 1000).toFixed(1) + 'k' : Math.floor(n).toStri
 const fmtRate = n => (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(1);
 const num = (n, d = 2) => (+n.toFixed(d)).toString();
 
+/** Привести содержимое el к разметке html, не пересоздавая совпадающие узлы: меняются только текст и атрибуты.
+ *  Для того, что перерисовывается каждую секунду (таймеры, запасы): узел под мышью остаётся тем же — подсказка (title)
+ *  не гаснет и не всплывает заново; её текст (title) у узла под мышью обновится, когда мышь уйдёт.
+ *  Если устройство разметки поменялось — узел просто заменяется. */
+function morph(el, html) {
+  const t = document.createElement('div');
+  t.innerHTML = html;
+  morphKids(el, t);
+}
+function morphKids(a, b) {
+  const an = [...a.childNodes], bn = [...b.childNodes];
+  bn.forEach((y, i) => {
+    const x = an[i];
+    if (!x) { a.appendChild(y); return; }
+    if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName) { a.replaceChild(y, x); return; }
+    if (x.nodeType !== 1) { if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
+    for (const { name } of [...x.attributes]) if (!y.hasAttribute(name)) x.removeAttribute(name);
+    for (const { name, value } of [...y.attributes]) {
+      if (x.getAttribute(name) === value) continue;
+      if (name === 'title' && x.matches(':hover')) continue;   // подсказку под мышью не трогаем: обновится, когда мышь уйдёт
+      x.setAttribute(name, value);
+    }
+    morphKids(x, y);
+  });
+  for (let i = an.length - 1; i >= bn.length; i--) a.removeChild(an[i]);
+}
+
 
 /** Короткое описание прогресса карточки для таблиц (HTML). */
 function progressHtml(state, id) {

@@ -313,7 +313,7 @@ test('железный век: святилища улучшаются на св
   s.techs.push('phoenicians', 'syllabary'); s.res.iron = 3000;
   for (const k of ['stone', 'copper']) s.res[k] = 4500;
   s.buildings.push({ id: 932, type: 'storehouse', level: 11, x: 11, y: 9 }, { id: 933, type: 'storehouse', level: 11, x: 12, y: 9 }); G.tick(0.001);
-  s.res.stone = 15000; s.res.copper = 5000; s.res.silver = 2000; s.res.cheese = 6000;   // Афродите — сыр (после «Виноградарства» — амфоры)
+  s.res.stone = 15000; s.res.copper = 5000; s.res.cheese = 9000;   // Афродите — сыр (после «Виноградарства» — амфоры) и медь, без серебра
   assert.ok(G.upgradeWonder('sp_aphrodite'));
   assert.equal(sh1.type, 'sp_aphrodite'); assert.deepEqual([sh1.x, sh1.y], [9, 9]);
   assert.equal(G.buildStatus('shrine1').hidden, true, 'старое святилище заново не строится');
@@ -840,7 +840,8 @@ test('справочные расчёты (facts): где добыть, на ч�
   const S = G.resourceUses('silver');
   assert.ok(['workshop', 'port'].every(t => S.from.some(x => x.type === t && x.via === 'prod')));
   assert.ok(S.from.some(x => x.type === 'port' && x.via === 'trade' && x.tech === 'viticulture'), 'гавань продаёт амфоры за серебро');
-  assert.ok(S.to.some(x => x.kind === 'building' && x.type === 'sp_aphrodite'), 'цена Афродиты в товарах — теперь в серебре');
+  assert.ok(!['sp_aphrodite', 'sp_salamis', 'sp_troodos2'].some(t => S.to.some(x => x.kind === 'building' && x.type === t)), 'серебра в чудесах царств нет: его забирает дань');
+  assert.ok(S.to.some(x => x.kind === 'tech' && x.id === 'pharaoh'), 'знания — с серебром');
   assert.ok(!S.to.some(x => x.kind === 'building' && x.type === 'sp_palace'), 'чудо прошлой эпохи уже не строят');
   assert.ok(S.to.some(x => x.kind === 'epoch' && x.epoch === 2));
   assert.equal(G.refProd('workshop').silver, 0.02);

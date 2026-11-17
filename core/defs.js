@@ -178,13 +178,15 @@ const BUILDINGS = {
   // Ум или сила: Афродита и гробницы — за λ, Аполлон и Троодос — без λ, но очень дорого. tech — после какого знания можно.
   // Улучшение сохраняет λ-бонус старого чуда (богиня +10%, Рогатый бог +20%) и добавляет своё.
   // Обязательные чудеса царств: Саламин, Святилища Афродиты и Аполлона — весомые в обычных ресурсах (Саламину λ поменьше);
-  // подношения Афродите заданы в сыре — после «Виноградарства» он сам становится амфорами
-  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 6000, silver: 1500, cheese: 6000 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
+  // подношения Афродите и Саламину заданы в сыре — после «Виноградарства» он сам становится амфорами (2 : 1).
+  // Серебра в чудесах царств нет: его забирает дань. Прежнее серебро пересчитано по цене вывоза — гавань платит за амфору
+  // ≈ 0.6–0.7 серебра (0.3 и бонусы), т. е. 1 серебро ≈ 1.5 амфоры = 3 сыра; где амфор вышло бы больше полсклада — медь и дерево по ценнику
+  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 6000, cheese: 9000, copper: 1500 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
   sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 10000, copper: 3000, iron: 1200 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
-  // Виноградные склоны — в 3.5 раза дороже прежнего (≈ 51 тыс. зерна, окупаются ≈ 2 ч), в дорогих ресурсах, чтобы влезать в склад
-  sp_troodos2: { special: true, epoch: 2, upgradeOf: 'sp_troodos', tech: 'viticulture', terrain: ['hill'], cost: { food: 10000, wood: 6000, amphora: 3000, silver: 600 }, logos: 0, effect: { bmult: { vineyard: 0.6, olivegrove: 0.6 }, goats: true } },
+  // Виноградные склоны — в 3.5 раза дороже прежнего (окупаются ≈ 2 ч), в дорогих ресурсах, чтобы влезать в склад; серебро 600 → амфоры +1000
+  sp_troodos2: { special: true, epoch: 2, upgradeOf: 'sp_troodos', tech: 'viticulture', terrain: ['hill'], cost: { food: 10000, wood: 6000, amphora: 4000 }, logos: 0, effect: { bmult: { vineyard: 0.6, olivegrove: 0.6 }, goats: true } },
   // новое чудо за λ — обязательное для перехода в следующую эпоху
-  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 10000, silver: 4000, iron: 2500 }, logos: 450, effect: { all: 0.1, mult: { silver: 0.2 } } },
+  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 10000, iron: 2500, cheese: 8000, wood: 10000, copper: 1500 }, logos: 450, effect: { all: 0.1, mult: { silver: 0.2 } } },
   // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
   // Эллинский Кипр. ships — корабли: every — множитель промежутка, wait — сколько ждут, choice — из скольких грузов выбрать
   sp_neapaphos: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 16000, wood: 8000, silver: 800 }, logos: 0,
