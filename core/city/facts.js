@@ -25,7 +25,7 @@ Object.assign(Game, {
   /** Устаревает ли тип здания: { tech, into: [типы] } — после какого знания и во что перестраивается; иначе null. */
   obsoleteAfter(type) {
     const T = TECHS.find(t => t.retire && t.retire.buildings && t.retire.buildings[type]);
-    if (!T) return null;
+    if (!T) { const S = TECHS.find(t => t.retire && t.retire.sunset && t.retire.sunset.includes(type)); return S ? { tech: S.id, into: [], sunset: true } : null; }
     const into = T.retire.buildings[type];
     return { tech: T.id, into: typeof into === 'string' ? [into] : Object.values(into) };
   },
@@ -34,8 +34,10 @@ Object.assign(Game, {
   resourceGone(k) {
     const T = TECHS.find(t => t.retire && t.retire.res && t.retire.res[k]);
     if (!T) return null;
-    const r = T.retire.res[k];
-    return { tech: T.id, into: r.into, rate: r.rate, stock: r.stock, prodToo: !!r.prodToo, done: this.hasTech(T.id) };
+    const r = T.retire.res[k], scale = (T.effect && T.effect.scale) || {};
+    // доживающие здания (retire.sunset) работают слабее: выпуск идёт по курсу × их scale (рудники после «Медной монеты» — 6 : 1)
+    const sunset = (T.retire.sunset || []).map(type => ({ type, rate: r.rate * (scale[type] == null ? 1 : scale[type]) }));
+    return { tech: T.id, epoch: T.epoch, into: r.into, rate: r.rate, stock: r.stock, prodToo: !!r.prodToo, sunset, done: this.hasTech(T.id) };
   },
 
   /**

@@ -26,6 +26,10 @@ const Balancer = (() => {
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
   const BUDGET = { 0: 100, 1: 300, 2: 1000, 3: 1200 };
+  // Цель пути «ресурсами» на всю эпоху (зерно) и какая часть эпохи уже описана в игре. Для недописанной эпохи цель части —
+  // доля по выпуску: части равны по времени, мощь растёт как в описанной части (геометрически), значит, на первую из n частей
+  // приходится (g − 1) / (gⁿ − 1), где g — во сколько раз вырос город за описанную часть.
+  const TARGET = { 3: { labor: 7e6, techs: 5e6, part: 1 / 3 } };   // labor — весь путь «ресурсами», techs — из него знания «через силу»
   // курс обрядов — BALANCE.riteRate медных λ за минуту выпуска на начало эпохи × BALANCE.logosInflation (дальше заданных — последняя)
   // payback — за сколько часов должно окупаться необязательное чудо; raidStock — какая доля склада в среднем лежит в запасах (для стен)
   const DEFAULTS = { last: 2, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
@@ -112,8 +116,9 @@ const Balancer = (() => {
       const fx = G.effects(false), need = storageNeed(e), advPop = E[e].advance ? E[e].advance.pop : 0;
       const rates = laborRates(fx);
       const fits = (b, l) => { const cap = G.storageCap(fx); return Object.values(G.upgradeCost(b.type, l).cost).every(v => v <= cap); };
-      const freeUp = b => { while (b.level < L && !isL(b.level + 1) && fits(b, b.level + 1)) b.level++; };   // уровни за ресурсы — до последнего
-      const canStep = b => !B[b.type].special && b.level < L && isL(b.level + 1);
+      const frozen = b => G.sunsetType(b.type) || G.obsoleteType(b.type);   // доживающее и устаревшее не улучшают
+      const freeUp = b => { while (!frozen(b) && b.level < L && !isL(b.level + 1) && fits(b, b.level + 1)) b.level++; };   // уровни за ресурсы — до последнего
+      const canStep = b => !B[b.type].special && !frozen(b) && b.level < L && isL(b.level + 1);
       const cost = b => G.upgradeCost(b.type, b.level + 1).logos;
       const step = b => { b.level++; freeUp(b); };
       const others = () => s.buildings.filter(b => !B[b.type].special);
@@ -188,6 +193,12 @@ const Balancer = (() => {
       };
       for (let pass = 0; pass < 3; pass++) for (const [t, k] of [['lumber', 'wood'], ['quarry', 'stone'], ['mine', 'copper'], ['workshop', 'goods'], ['workshop', 'silver'],
         ['goatpen', 'cheese'], ['foundry', 'bronze'], ['forge', 'iron'], ['vineyard', 'amphora'], ['olivegrove', 'amphora']]) solve(t, k);
+      // папирус не производится: корабль даёт его за пакет груза — курс по самому дешёвому пакету (за монеты — втрое-вчетверо дороже)
+      if (G.resVisible('papyrus') && BAL.ships) {
+        const per = BAL.ships.packs.map(pk => Object.entries(pk.want).every(([k]) => r[k] != null)
+          ? Object.entries(pk.want).reduce((v, [k, n]) => v + n * r[k], 0) / BAL.ships.give.papyrus : Infinity);
+        if (Math.min(...per) < Infinity) r.papyrus = Math.min(...per);
+      }
       return r;
     }
     /** Серебро (монеты) с одного здания уровня города: само, через гавань (амфоры — торговая линия, медь — основная). */
@@ -378,8 +389,13 @@ const Balancer = (() => {
       // твёрдый курс обрядов: 1 минута выпуска на начало = riteRate медных λ × инфляция λ эпохи → столько зерна в 1 номинальном λ
       const LI = BAL.logosInflation, infl = LI[e] != null ? LI[e] : LI[LI.length - 1], riteSet = LI[e] != null;
       const RR = BAL.riteRate, real = RR[e] != null ? RR[e] : RR[RR.length - 1], riteRate = real * infl, riteL = prod0 * 60 / riteRate;
+      // цель пути «ресурсами» (TARGET): на всю эпоху и на описанную часть — по доле выпуска
+      const T = TARGET[e], g = m1.prod / m0.prod, n = T ? 1 / T.part : 1;
+      const target = T ? { labor: T.labor, part: T.part, share: n > 1 ? (g - 1) / (Math.pow(g, n) - 1) : 1 } : null;
+      if (target) { target.want = target.labor * target.share; target.have = scen.labor.w;
+        if (T.techs) { target.techsWant = T.techs * target.share; target.techsThird = T.techs * T.part; target.techsHave = tlab; } }
       return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, riteReal: real, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
-        perL: tl ? (tlab - tm) / tl : null, scen };
+        perL: tl ? (tlab - tm) / tl : null, scen, target };
     });
     // ---------- окупаемость необязательных чудес ----------
     // Город конца эпохи со всеми чудесами; прибавка чуда — насколько падает чистый выпуск без него (по курсам этого города),
@@ -422,6 +438,6 @@ const Balancer = (() => {
     });
     return { stages, epochs, worth: W };
   }
-  return { run, PLAN, BUDGET, DEFAULTS };
+  return { run, PLAN, BUDGET, DEFAULTS, TARGET };
 })();
 if (typeof module !== 'undefined') module.exports = Balancer;

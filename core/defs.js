@@ -39,11 +39,12 @@ const BALANCE = {
   goatEvery: [102, 238], goatEveryFast: [60, 136],
   // Курс обрядов: 1 минута полного выпуска города стоит riteRate «настоящих» (медных) λ — по эпохам: 3 в меди и бронзе,
   // в царствах-городах — 3/1.3 (λ становится ценнее). logosInflation — сколько номинальных λ эпохи в одном медном
-  // (λ с эпохами дешевеет: в бронзе — на треть, в царствах ×1.7). Номинально выходит 3, 4 и ≈3.9 λ за минуту.
+  // (λ с эпохами дешевеет: в бронзе — на треть, в царствах ×1.7, в эллинском ×2). Номинально выходит 3, 4, ≈3.9 и 3.6 λ за минуту:
+  // в эллинском минута выпуска — 1.8 медных λ (×2 = 3.6 номинальных), при мощи ~190–220 зерна/с 1 λ ≈ 3200–3600 зерна.
   // По курсу стоит «Сбор припасов» (perMinute): минуты × 3 λ × инфляция = 3 × 3 = 9 λ в меди, 4 × 3 × 4/3 = 16 — в бронзе.
-  // Где инфляция не задана (железный век и дальше) — пока старый костыль: цена ×1.5 за эпоху.
-  riteRate: [3, 3, 3 / 1.3],
-  logosInflation: [1, 4 / 3, 1.7],
+  // Остальные обряды без logosAt — пока старый костыль: цена ×1.5 за эпоху.
+  riteRate: [3, 3, 3 / 1.3, 1.8],
+  logosInflation: [1, 4 / 3, 1.7, 2],
   suppliesMin: [3, 4, 5, 6],   // «Сбор припасов»: столько минут выпуска зданий (на минуту больше с каждой эпохой)
   raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
   raidLoot: [0.1, 0.5],    //   уносят 10–50% всех запасов (без Циклопических стен)        // «Сбор припасов»: столько секунд выпуска (без благословений)
@@ -238,13 +239,22 @@ const TECHS = [
   // reqWonder — чудо, без которого знание не изучить: флот снаряжают цари Саламина
   { id: 'fleet', epoch: 2, logos: 125, laborLogos: 280, cost: { wood: 3000, iron: 600 }, buy: { goods: 70 }, req: ['pharaoh'], reqWonder: 'sp_salamis', effect: { tributeCut: 0.25 } },
   { id: 'gifts', epoch: 2, logos: 170, laborLogos: 320, cost: { silver: 500, amphora: 2000 }, buy: { goods: 90 }, req: ['pharaoh', 'fleet'], fixTribute: true },
-  // Эллинский Кипр, первая треть. λ в полтора раза выше железного века, ресурсы вдвое; «через силу» — buy (λ заменяют монеты).
-  // coinage: серебро зовётся монетой, открыт 12-й уровень зданий (BALANCE.coinTech); piraeus: корабли и папирус (BALANCE.ships);
-  // alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
-  // coinage: гавань продаёт амфоры на 50% дороже (trade), рудники работают вполсилы (scale) — Кипр вывозит вино, а не медь
-  { id: 'coinage', epoch: 3, logos: 300, cost: { silver: 440, copper: 700 }, buy: true, effect: { trade: { port: 0.5 }, scale: { mine: 0.5 } } },
-  { id: 'piraeus', epoch: 3, logos: 320, cost: { food: 4000, wood: 2500, amphora: 600 }, req: ['coinage'], buy: true },
-  { id: 'alphabet', epoch: 3, logos: 340, cost: { papyrus: 20, silver: 200 }, req: ['piraeus'], buy: true },
+  // Эллинский Кипр, первая треть. «Через силу» — закупка за рубежом (buy — что платят за каждый λ прежней цены laborLogos):
+  // главным образом монеты, немного меди и железа (штемпели) у монет, зерна и амфор у кораблей, папирус у алфавита.
+  // Знания первой трети «через силу» — ≈1.3 млн зерна (балансер, TARGET: путь «ресурсами» эпохи — 7 млн, из них знания ≥5 млн);
+  // λ «с умом» — по курсу обрядов: (через силу − с умом) ÷ зерна в 1 λ (≈3600).
+  // coinage — «Серебряная монета»: серебро зовётся монетами, открыт 12-й уровень зданий (BALANCE.coinTech), монет +25%,
+  //   гавань продаёт амфоры на 25% дороже.
+  // coppercoin — «Медная монета»: медь уходит в монеты — запасы и цены 3 : 1, выпуск рудников вдвое хуже (rate 1/3 и рудники
+  //   вполсилы — 6 : 1); рудники доживают (sunset): работают, но новых не строят, не улучшают, можно продать как устаревшие.
+  //   Гавань больше не меняет медь на зерно и товары — только продаёт амфоры, ещё на 25% дороже (итого +50%). Монет ещё +25%.
+  // piraeus: корабли и папирус (BALANCE.ships); alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
+  { id: 'coinage', epoch: 3, logos: 75, laborLogos: 300, cost: { silver: 440, copper: 700, iron: 100 }, buy: { silver: 12, copper: 6 }, effect: { mult: { silver: 0.25 }, trade: { port: 0.25 } } },
+  { id: 'coppercoin', epoch: 3, logos: 85, laborLogos: 300, cost: { silver: 300, copper: 1500, iron: 150 }, buy: { silver: 13.5, copper: 4 }, req: ['coinage'],
+    effect: { mult: { silver: 0.25 }, trade: { port: 0.25 }, scale: { mine: 0.5 } },
+    retire: { res: { copper: { into: 'silver', rate: 1 / 3, prodToo: true } }, sunset: ['mine'] } },
+  { id: 'piraeus', epoch: 3, logos: 90, laborLogos: 320, cost: { food: 3000, wood: 2500, amphora: 600 }, buy: { silver: 17.5, amphora: 3 }, req: ['coinage'] },
+  { id: 'alphabet', epoch: 3, logos: 90, laborLogos: 340, cost: { papyrus: 10, silver: 200 }, buy: { silver: 17, papyrus: 0.04 }, req: ['piraeus'] },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
@@ -269,7 +279,9 @@ const RITUALS = [
   { id: 'herds', epoch: 0, logos: 10, logosAt: { 1: 10, 2: 10 }, buff: { bmult: { field: 1, goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
   { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50, 2: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true, until: 'sp_aphrodite' },
-  { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15 }, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 900 },
+  // рудокопы — по зданиям (рудники, литейни, кузницы), а не по ресурсам: после «Медной монеты» медь стала монетами,
+  //   и «медь ×2» удвоило бы все монеты города
+  { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15 }, cost: { goods: 100 }, buff: { bmult: { mine: 1, foundry: 1, forge: 1 } }, dur: 900 },
   // reqUntil — с этой эпохи чудо обряду не нужно: Святилище Слиткового бога в железном веке становится литейней,
   //   а торговля — делом всего острова. Удваивает основную работу гаваней (серебро и зерно — без лишней меди) и мастерских;
   //   вывоз амфор под благословением вдвое шире, но по той же цене (вместе с амфорами) — это не прибыль.

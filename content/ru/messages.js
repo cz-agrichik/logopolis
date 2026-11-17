@@ -43,7 +43,7 @@ const Msg = {
     if (p.lord === 'egypt') return `${L.icon} Дань ${L.to}: ${this.silverOf(5)} не хватило (${p.paid} из ${p.due}) — недостающее добрали грабежом, ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены — вдвое)' : ''}${tail}`;
     return `${L.icon} Дань ${L.to}: не хватило ${p.short} ${this.silverOf(p.short)} — недоимку взяли запасами по ценнику${tail}`;
   },
-  /** «серебра» или, после «Своей монеты», «монет» — к числу n. */
+  /** «серебра» или, после «Серебряной монеты», «монет» — к числу n. */
   silverOf(n) { const g = Lex.res.silver.name === Lex.res.silver.coin.name ? Lex.res.silver.coin.gen : Lex.res.silver.gen; return plural(n, ...g); },
   /** Груз корабля: { ресурс: сколько } → «🌾 2500 🍷 300». */
   wantList(want) { return Object.entries(want || {}).map(([k, v]) => `${Lex.res[k].icon} ${v}`).join(' '); },

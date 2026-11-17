@@ -271,6 +271,10 @@
       [ep(p), '«с умом»', `<b>${fmt(p.scen.mind.logos)}</b>`, real(p, p.scen.mind.logos), costW(p.scen.mind.res, p), fmt(p.scen.mind.w), pw(p, true), `<b>${secs(p.scen.mind.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.mind.w, p.prod1)}</b>`],
       ['', 'ресурсами', `<b>${fmt(p.scen.labor.logos)}</b>`, real(p, p.scen.labor.logos), costW(p.scen.labor.res, p), fmt(p.scen.labor.w), pw(p, true), `<b>${secs(p.scen.labor.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.labor.w, p.prod1)}</b>`],
     ]));
+    h += EP.filter(p => p.target).map(p => `<p class="note"><b>Цель пути «ресурсами»</b>, эпоха ${ep(p)}: ${fmt(p.target.labor)} зерна на всю эпоху (TARGET в balancer-core.js).
+      Описана ${fmt(p.target.part * 100)}% эпохи. Части считаем равными по времени, а город — растущим, как в описанной части (×${fmt(p.prod1 / p.prodStart)} за часть),
+      поэтому на неё по выпуску приходится ${fmt(p.target.share * 100)}% цели = <b>${fmt(p.target.want)}</b> зерна; сейчас — ${fmt(p.target.have)} (${fmt(p.target.have / p.target.want * 100)}%).
+      ${p.target.techsWant ? `Из пути — знания «через силу»: ${fmt(p.target.techsWant / p.target.share)} на эпоху; на описанную часть по выпуску <b>${fmt(p.target.techsWant)}</b>, ровно третью — ${fmt(p.target.techsThird)}; сейчас — <b>${fmt(p.target.techsHave)}</b>.` : ''}</p>`).join('');
     const PART = { techMind: 'знания «с умом» (раздел 6)', techLabor: 'знания «через силу» (раздел 6)', must: 'обязательные чудеса (раздел 7)',
       optLogos: 'необязательные чудеса за λ', resWonders: 'чудеса без λ', up: 'постройки и улучшения (раздел 8)', advance: 'переход (раздел 7)' };
     const yes = b => b ? '✓' : dim('—');

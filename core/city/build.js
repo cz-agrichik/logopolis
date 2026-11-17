@@ -65,7 +65,7 @@ Object.assign(Game, {
   buildStatus(type, mode = 'logos') {
     const B = BUILDINGS[type], s = this.state;
     if (s.epoch < B.epoch) return { ok: false, hidden: true };
-    if (this.obsoleteType(type)) return { ok: false, hidden: true };   // устарело: новые такие не строят
+    if (this.obsoleteType(type) || this.sunsetType(type)) return { ok: false, hidden: true };   // устарело или доживает: новые такие не строят
     if (B.tech && !this.hasTech(B.tech)) return { ok: false, locked: true, reason: { code: 'needTech', tech: B.tech } };
     if (B.special && this.upgradedFrom(type)) return { ok: false, hidden: true };   // чудо уже улучшено до другого
     if (B.special && this.retired(type)) {   // чудо прошлой эпохи: строить нельзя; со склада ставится уже обычным зданием
@@ -152,14 +152,14 @@ Object.assign(Game, {
   /** Сведения об улучшении до следующего уровня: цена, хватает ли, причина «нельзя» (кодом). */
   upgradeInfo(b) {
     const B = BUILDINGS[b.type];
-    if (B.special || this.obsoleteType(b.type)) return null;   // устаревшее не улучшают — перестраивают или продают
+    if (B.special || this.obsoleteType(b.type) || this.sunsetType(b.type)) return null;   // устаревшее и доживающее не улучшают — перестраивают или продают
     const target = b.level + 1, maxL = this.maxLevel();
     if (target > maxL) {
       const nextE = EPOCHS.findIndex(e => e.maxLevel > maxL);
       return { capped: true, target, reason: { code: 'levelCap', max: maxL, next: nextE > 0 ? nextE : null, nextMax: nextE > 0 ? EPOCHS[nextE].maxLevel : null } };
     }
     const { cost, logos } = this.upgradeCost(b.type, target);
-    // уровню нужно знание: с 12-го — «Своя монета» у всех зданий, плюс свои знания у здания (levelTech)
+    // уровню нужно знание: с 12-го — «Серебряная монета» у всех зданий, плюс свои знания у здания (levelTech)
     const need = (target >= BALANCE.coinFromLevel && !this.hasTech(BALANCE.coinTech) ? [0, BALANCE.coinTech] : null)
       || Object.entries(B.levelTech || {}).find(([L, t]) => target >= +L && !this.hasTech(t));
     if (need) return { target, cost, logos, ok: false, reason: { code: 'needTech', tech: need[1] } };

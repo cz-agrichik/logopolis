@@ -141,7 +141,7 @@ const UI = {
         const L = Cat.lords[lord], have = Math.floor(Game.state.res.silver), cut = (Game.fx || Game.effects()).tributeCut;
         const how = lord === 'egypt' ? `как средний ассирийский грабёж, но серебром: ${(BALANCE.raidLoot[0] + BALANCE.raidLoot[1]) / 2 * 100 / (shield ? 2 : 1)}% остальных запасов по ценнику — сумма растёт вместе с запасами` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
         const miss = lord === 'egypt' ? `недостающее доберут грабежом${shield ? ' (Циклопические стены — вдвое)' : ''}` : 'недоимку возьмут другими запасами ровно по ценнику';
-        const sv = Msg.silverOf(5), Sv = sv[0].toUpperCase() + sv.slice(1);   // «серебра» или, после «Своей монеты», «монет»
+        const sv = Msg.silverOf(5), Sv = sv[0].toUpperCase() + sv.slice(1);   // «серебра» или, после «Серебряной монеты», «монет»
         raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Дань ${L.to} через ${mm}: ${due} ${Msg.silverOf(due)} (${how}${cut ? `; «Флот царей» −${Math.round(cut * 100)}%` : ''}).
           ${have >= due ? `${Sv} хватает.` : `${Sv} пока ${have} — не хватит: ${miss}.`}">
           <i class="bf-ic">${L.icon}</i><b>Дань ${L.to}</b><small>${Art.res('silver', 'inl')} ${due} · ${mm}</small></span>`;
@@ -395,7 +395,7 @@ const UI = {
   pediaBtn(id) { return `<button class="q" data-pedia="${id}" title="Кипропедия">?</button>`; },
   /** Какое изученное знание сделало здание этого типа устаревшим. */
   retiringTechName(type) {
-    const T = TECHS.find(t => Game.hasTech(t.id) && t.retire && t.retire.buildings && t.retire.buildings[type]);
+    const T = Game.retiringTech(type);
     return T ? Cat.tech[T.id].name : '';
   },
 
@@ -671,6 +671,11 @@ const UI = {
           ${rb.reason ? `<div class="item-lock">${esc(Msg.reason(rb.reason))}</div>` : ''}
           <div class="mb-actions"><button class="btn gold" data-action="rebuild" ${rb.ok ? '' : 'disabled'}>Перестроить</button>
           <button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
+      } else if (sl) {   // доживает: работает, но не улучшается — можно продать
+        h += `<div class="upgrade obsolete"><div class="up-head"><b>⏳ Доживает</b></div>
+          <p class="small">После знания «${esc(this.retiringTechName(b.type))}» здание ещё работает, но слабее; новых таких не строят, а это не улучшается. Его можно продать.
+          <a href="#" data-pedia="a:changes">Как устроены перемены</a></p>
+          <div class="mb-actions"><button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
       }
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;

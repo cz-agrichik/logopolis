@@ -1164,6 +1164,14 @@ const Art = (() => {
       <circle cx="26" cy="38" r="13" fill="${SLV}" ${st(1.8)}/>` + coinRam(28, 38, .85) + `
       <path d="M40 10 L48 30" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/><path d="M34 12 L46 6 L48 11 L36 17Z" fill="#8e979e" ${st(1.4)}/>
       <path d="M46 34 l5 -3 M48 38 l6 -1" stroke="${C.fireL}" stroke-width="1.6" stroke-linecap="round"/>`,
+    // медная монета: медный слиток «воловья шкура» уходит в столбик медных монет; на большой — палица Геракла, как у Эвагора
+    t_coppercoin: tdisc + ingotShape(20, 44, .85) + `
+      <path d="M30 42 Q34 38 38 40" fill="none" stroke="${C.copperD}" stroke-width="1.6" stroke-linecap="round"/><path d="M36.5 37.5 L39 40.4 L35.4 41.2Z" fill="${C.copperD}"/>
+      <ellipse cx="47" cy="48" rx="8" ry="3" fill="${C.copperD}" ${st(1.3)}/><ellipse cx="47" cy="45" rx="8" ry="3" fill="${C.copper}" ${st(1.3)}/>
+      <ellipse cx="47" cy="42" rx="8" ry="3" fill="${C.copper}" ${st(1.3)}/>
+      <circle cx="30" cy="22" r="12" fill="${C.copper}" ${st(1.8)}/><circle cx="30" cy="22" r="9" fill="none" stroke="${C.copperD}" stroke-width="1"/>
+      <path d="M26 30 L33 15 Q35 13 36.4 14.6 Q37.4 16.4 35.4 18 L28.4 31Z" fill="${C.copperD}" ${st(1.1)}/>
+      <circle cx="34.2" cy="16.6" r=".9" fill="${C.copper}"/><circle cx="31.6" cy="21.6" r=".8" fill="${C.copper}"/>`,
     // корабли в Пирей: купеческий корабль под парусом и сова — знак Афин
     t_piraeus: tdisc + `<path d="M10 40 Q30 52 50 40 Q48 38 45 38 L15 38 Q12 38 10 40Z" fill="${C.wood}" ${st(1.7)}/>
       <path d="M50 40 Q55 35 52 29" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>

@@ -20,7 +20,7 @@ const Cat = (() => {
   }
   const techs = TECHS.map(t => m(t, Lex.tech[t.id]));
   const rites = RITUALS.map(r => m(r, Lex.rite[r.id]));
-  // «Своя монета»: серебро зовётся монетами, значок — монета с лежащим бараном. Ключ ресурса прежний (silver):
+  // «Серебряная монета»: серебро зовётся монетами, значок — монета с лежащим бараном. Ключ ресурса прежний (silver):
   // запасы, цены и дань не меняются, меняется только то, как ресурс называется и рисуется.
   const coined = () => !!(typeof Game !== 'undefined' && Game.state && Game.hasTech(BALANCE.coinTech));
   for (const o of [Lex.res.silver, res.silver]) {

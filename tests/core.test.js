@@ -930,14 +930,17 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
   assert.ok(Math.abs(G.storeMult(12) / G.storeMult(11) - 1.3) < 1e-9 && Math.abs(G.storeMult(13) / G.storeMult(12) - 1.6) < 1e-9);
 });
 
-test('эллинский Кипр: три знания по цепочке; «через силу» ×2.25 и λ-часть монетами', () => {
+test('эллинский Кипр: четыре знания; «через силу» — закупка монетами (медь и железо у монет, амфоры у кораблей, папирус у алфавита)', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
-  assert.deepEqual(['coinage', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3]);
-  assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 3480, copper: 4730 });
-  assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 27000, wood: 16880, amphora: 4050, silver: 540 });
-  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 140, silver: 1930 });
-  assert.ok(G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
-  assert.ok(G.research('coinage')); assert.ok(!G.techStatus(T.piraeus).locked, 'после монеты — открыто');
+  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3, 3]);
+  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [75, 85, 90, 90], 'λ «с умом» — по курсу обрядов');
+  assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 11070, copper: 8780, iron: 680 });
+  assert.deepEqual({ ...G.techPrice(T.coppercoin, 'labor').cost }, { silver: 11140, copper: 12830, iron: 1020 });
+  assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 20250, wood: 16880, amphora: 6210, silver: 12600 });
+  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 100, silver: 14360 });
+  assert.ok(G.techStatus(T.coppercoin).locked && G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
+  assert.ok(G.research('coinage'));
+  assert.ok(!G.techStatus(T.piraeus).locked && !G.techStatus(T.coppercoin).locked, 'после Серебряной монеты — и корабли, и медная монета');
 });
 
 test('корабли: приходят только после «Кораблей в Пирей» и при гавани; груз за папирус, покупка впятеро дороже, отпустить без штрафа', () => {
@@ -1036,8 +1039,8 @@ test('обряды: «Всей семьёй» не дорожает с эпох�
   assert.equal(r.minutes, 45); assert.equal(s.buffs.settlers, 45 * 60, 'продление — до своей длины, не до 30 минут');
 });
 
-test('вино вместо меди: после «Своей монеты» гавань продаёт амфоры на 50% дороже, а рудники работают вполсилы', () => {
-  const C = fresh(), G = hellenic(C), s = G.state;
+test('монеты: Серебряная — монет +25%, амфоры на 25% дороже; Медная — медь в монеты 3 : 1, рудники доживают (6 : 1), гавань только продаёт амфоры', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, T = C.get('TECH_BY_ID');
   const port = addPort(G), mine = { id: 990, type: 'mine', level: 11, x: 1, y: 1 }; s.buildings.push(mine); G.tick(0.001);
   const t0 = G.tradeOf(port, G.effects()), m0 = G.prodOf(mine, G.effects()), p0 = G.prodOf(port, G.effects());
   assert.ok(Math.abs(t0.silver / -t0.amphora - 0.35) < 1e-9, 'твёрдая цена — 0.07 серебра за 0.2 амфоры: бонусы её не поднимают');
@@ -1047,14 +1050,36 @@ test('вино вместо меди: после «Своей монеты» г�
   const tb = G.tradeOf(port, G.effects());
   assert.ok(tb.amphora < t0.amphora * 1.2 && Math.abs(tb.silver / -tb.amphora - 0.35) < 1e-9, 'под благословением — больше амфор, цена та же');
   delete s.buffs.ingot; G.tick(0.001);
+  // Серебряная монета: амфоры на 25% дороже, монет +25% (бонусы складываются), рудники как были
+  const sv0 = G.bonusMult('workshop', 'silver');
   s.techs.push('coinage'); G.tick(0.001);
-  const t1 = G.tradeOf(port, G.effects()), m1 = G.prodOf(mine, G.effects()), p1 = G.prodOf(port, G.effects());
-  assert.ok(Math.abs(t1.silver / t0.silver - 1.5) < 1e-9 && t1.amphora === t0.amphora, 'амфоры — те же, монет на 50% больше');
-  assert.ok(Math.abs(m1.copper / m0.copper - 0.5) < 1e-9, 'рудник — вполсилы');
-  assert.deepEqual(JSON.stringify(p1), JSON.stringify(p0), 'основная работа гавани не меняется');
-  // «Хозяйство в цифрах» показывает это отдельным множителем, и сумма сходится с тактом
-  const I = G.incomeBreakdown(), row = I.res.copper.rows.find(r => r.type === 'mine');
+  const t1 = G.tradeOf(port, G.effects()), m1 = G.prodOf(mine, G.effects());
+  assert.ok(Math.abs(t1.silver / -t1.amphora / 0.35 - 1.25) < 1e-9, 'амфоры — на 25% дороже');
+  assert.ok(Math.abs(G.bonusMult('workshop', 'silver') - sv0 - 0.25) < 1e-9, 'монет +25%');
+  assert.deepEqual(JSON.stringify(m1), JSON.stringify(m0), 'рудник — как был');
+  assert.ok(p0.food > 0 && p0.copper < 0, 'гавань меняет медь на зерно и товары');
+  // Медная монета: медь уходит в монеты 3 : 1 (запас), рудник даёт монеты по 6 : 1, гавань больше не меняет медь на зерно
+  s.logos = 5000;
+  for (const [k, v] of Object.entries(G.techPrice(T.coppercoin).cost)) s.res[k] = v;
+  s.res.copper = 4500;
+  assert.ok(G.research('coppercoin'));
+  assert.equal(s.res.silver, 1000, 'медь 4500 − 1500 (цена знания) = 3000 → 1000 монет');
+  assert.equal(G.resVisible('copper'), false, 'меди больше нет');
+  const fx = G.effects(), m2 = G.prodOf(mine, fx), p2 = G.prodOf(port, fx), t2 = G.tradeOf(port, fx);
+  assert.ok(!m2.copper && Math.abs(m2.silver - 0.15 / 6 * G.levelMult(11) * G.bonusMult('mine', 'silver', fx)) < 1e-9, 'рудник чеканит монеты — 6 меди за монету');
+  assert.equal(JSON.stringify(p2), '{}', 'гавань больше не меняет медь на зерно и товары');
+  assert.ok(Math.abs(t2.silver / -t2.amphora / 0.35 - 1.5) < 1e-9, 'амфоры — уже на 50% дороже');
+  // рудник доживает: работает, не строится, не улучшается, продаётся
+  assert.ok(G.workersOf(mine) > 0, 'рудник работает');
+  assert.equal(G.buildStatus('mine').hidden, true); assert.equal(G.upgradeInfo(mine), null);
+  assert.ok(G.sellInfo(mine) && G.sellInfo(mine).logos > 0);
+  // «Хозяйство в цифрах»: «вполсилы» — отдельным множителем
+  const I = G.incomeBreakdown(), row = I.res.silver.rows.find(r => r.type === 'mine');
   assert.ok(row && Math.abs(row.extra - 0.5) < 1e-9);
+  // обряд рудокопов — по зданиям: монеты мастерских не удваивает, рудников — удваивает
+  s.buffs.bullmask = 600; G.tick(0.001);
+  assert.equal(G.bonusMult('workshop', 'silver'), G.bonusMult('workshop', 'silver', G.effects(false)));
+  assert.ok(Math.abs(G.bonusMult('mine', 'silver') / G.bonusMult('mine', 'silver', G.effects(false)) - 2) < 1e-9);
 });
 
 test('медно-каменный век: λ знаний «с умом» по курсу обрядов, путь «через силу» прежний; благословение полей и стад', () => {

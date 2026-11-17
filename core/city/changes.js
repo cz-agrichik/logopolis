@@ -43,6 +43,15 @@ Object.assign(Game, {
   },
   /** Тип здания устарел: новые такие не строятся. */
   obsoleteType(type) { return !!this.successorOf(type, null); },
+  /** Здание доживает (retire.sunset у знания): работает, но новых не строят, не улучшают, можно продать как устаревшее.
+   *  Рудники после «Медной монеты»: медь стала монетами, рудник чеканит их вдвое хуже. */
+  sunsetType(type) {
+    return this.state.techs.some(id => { const r = TECH_BY_ID[id] && TECH_BY_ID[id].retire; return !!(r && r.sunset && r.sunset.includes(type)); });
+  },
+  /** Знание, после которого здание устарело или доживает. */
+  retiringTech(type) {
+    return this.state.techs.map(id => TECH_BY_ID[id]).find(T => T && T.retire && ((T.retire.buildings && T.retire.buildings[type]) || (T.retire.sunset && T.retire.sunset.includes(type)))) || null;
+  },
 
   /** Перестроить устаревшее здание в новое того же уровня: цена — постройка нового (без наценки за количество). */
   rebuildInfo(b) {
@@ -65,7 +74,7 @@ Object.assign(Game, {
   },
   /** Продать устаревшее здание: вернуть весь λ его уровней за Логос и половину цены постройки. */
   sellInfo(b) {
-    if (!this.successorOf(b.type, this.tile(b.x, b.y))) return null;
+    if (!this.successorOf(b.type, this.tile(b.x, b.y)) && !this.sunsetType(b.type)) return null;
     let logos = 0;
     for (let L = 2; L <= b.level; L++) logos += this.upgradeLogos(b.type, L);
     const cost = {};

@@ -89,7 +89,8 @@ Object.assign(Game, {
       if (B.prodTech && B.prodTech[k0] && !this.hasTech(B.prodTech[k0])) continue;
       let k = k0, v = v0;
       const r = this.retiredRes(k0);
-      if (r) { if (v0 < 0 || !r.prodToo) continue; k = r.into; v = v0 * r.rate; }   // ушедший ресурс: либо не делается, либо делается новый
+      if (r && v0 < 0) return {};   // сырьё ушло — основная работа стоит (гавань после «Медной монеты» меди на зерно не меняет)
+      if (r) { if (!r.prodToo) continue; k = r.into; v = v0 * r.rate; }   // ушедший ресурс: либо не делается, либо делается новый
       out[k] = (out[k] || 0) + v;
     }
     // переработчик, у которого не осталось выхода (литейня без бронзы), стоит и сырьё не тратит
@@ -101,9 +102,9 @@ Object.assign(Game, {
     for (const [k, v] of Object.entries(this.baseProd(b.type))) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) : v * lm;
     return out;
   },
-  /** Во сколько раз здание работает слабее или сильнее поверх бонусов (effect.scale: рудники после «Своей монеты» — вполсилы). */
+  /** Во сколько раз здание работает слабее или сильнее поверх бонусов (effect.scale: рудники после «Медной монеты» — вполсилы). */
   scaleOf(type, fx = this.fx || this.effects()) { const v = (fx.scale || {})[type]; return v == null ? 1 : v; },
-  /** Наценка торговой линии здания (effect.trade): гавань после «Своей монеты» продаёт амфоры дороже. */
+  /** Наценка торговой линии здания (effect.trade): гавань после «Серебряной монеты» (и ещё — после «Медной») продаёт амфоры дороже. */
   tradeBonus(type, fx = this.fx || this.effects()) { return 1 + ((fx.trade || {})[type] || 0); },
   /** Торговая линия здания (гавань продаёт амфоры за серебро) на 1-м уровне без бонусов или null. */
   baseTrade(type) {
@@ -119,7 +120,7 @@ Object.assign(Game, {
    *   - переработка (железные орудия у лесорубов): как основная работа — бонусы растят выход, сырьё идёт по базе;
    *   - продажа (trade.sell: гавань продаёт амфоры): это обмен излишков на более ёмкий ресурс, а не заработок. Бонусы здания
    *     (и благословения) растят объём — сколько амфор уходит и сколько серебра приходит, — а цена остаётся той, что в trade;
-   *     наценку даёт только effect.trade (tradeBonus, «Своя монета»). */
+   *     наценку даёт только effect.trade (tradeBonus, «Серебряная» и «Медная монета»). */
   tradeOf(b, fx = this.fx || this.effects(), level = b.level) {
     const base = this.baseTrade(b.type);
     if (!base) return null;
@@ -170,7 +171,7 @@ Object.assign(Game, {
       const b = (RITUAL_BY_ID[id] || {}).buff || {};
       if (b.all) RES_KEYS.forEach(k => out.add(k));
       Object.keys(b.mult || {}).forEach(k => out.add(this.liveKey(k)));
-      for (const t of Object.keys(b.bmult || {})) Object.entries(BUILDINGS[t].prod || {}).forEach(([k, v]) => v > 0 && out.add(k));
+      for (const t of Object.keys(b.bmult || {})) Object.entries(this.baseProd(t)).forEach(([k, v]) => v > 0 && out.add(k));
     }
     return out;
   },
