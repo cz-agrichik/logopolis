@@ -251,12 +251,14 @@ const TECHS = [
   //   вполсилы — 6 : 1); рудники доживают (sunset): работают, но новых не строят, не улучшают, можно продать как устаревшие.
   //   Гавань больше не меняет медь на зерно и товары — только продаёт амфоры, ещё на 25% дороже (итого +50%). Монет ещё +25%.
   // piraeus: корабли и папирус (BALANCE.ships); alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
+  //   «Через силу» алфавит — 120 папируса (три полных корабля по 4 сделки) и монеты, всего ≈300 тыс. зерна (папирус по 50 монет);
+  //   λ «с умом» по курсу — 80, дешевле кораблей: знание лёгкое, тяжесть — в самих кораблях.
   { id: 'coinage', epoch: 3, logos: 75, laborLogos: 300, cost: { silver: 440, copper: 700, iron: 100 }, buy: { silver: 12, copper: 6 }, effect: { mult: { silver: 0.25 }, trade: { port: 0.25 } } },
   { id: 'coppercoin', epoch: 3, logos: 85, laborLogos: 300, cost: { silver: 300, copper: 1500, iron: 150 }, buy: { silver: 13.5, copper: 4 }, req: ['coinage'],
     effect: { mult: { silver: 0.25 }, trade: { port: 0.25 }, scale: { mine: 0.5 } },
     retire: { res: { copper: { into: 'silver', rate: 1 / 3, prodToo: true } }, sunset: ['mine'] } },
   { id: 'piraeus', epoch: 3, logos: 90, laborLogos: 320, cost: { food: 3000, wood: 2500, amphora: 600 }, buy: { silver: 17.5, amphora: 3 }, req: ['coinage'] },
-  { id: 'alphabet', epoch: 3, logos: 90, laborLogos: 340, cost: { papyrus: 10, silver: 200 }, buy: { silver: 17, papyrus: 0.04 }, req: ['piraeus'] },
+  { id: 'alphabet', epoch: 3, logos: 80, laborLogos: 340, cost: { papyrus: 10, silver: 200 }, buy: { silver: 11, papyrus: 0.068 }, req: ['piraeus'] },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 

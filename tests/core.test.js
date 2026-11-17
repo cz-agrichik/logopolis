@@ -933,11 +933,11 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
 test('эллинский Кипр: четыре знания; «через силу» — закупка монетами (медь и железо у монет, амфоры у кораблей, папирус у алфавита)', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
   assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3, 3]);
-  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [75, 85, 90, 90], 'λ «с умом» — по курсу обрядов');
+  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [75, 85, 90, 80], 'λ «с умом» — по курсу обрядов');
   assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 11070, copper: 8780, iron: 680 });
   assert.deepEqual({ ...G.techPrice(T.coppercoin, 'labor').cost }, { silver: 11140, copper: 12830, iron: 1020 });
   assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 20250, wood: 16880, amphora: 6210, silver: 12600 });
-  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 100, silver: 14360 });
+  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 120, silver: 9770 }, 'три полных корабля папируса');
   assert.ok(G.techStatus(T.coppercoin).locked && G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
   assert.ok(G.research('coinage'));
   assert.ok(!G.techStatus(T.piraeus).locked && !G.techStatus(T.coppercoin).locked, 'после Серебряной монеты — и корабли, и медная монета');
