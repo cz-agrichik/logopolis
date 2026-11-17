@@ -676,6 +676,8 @@ const UI = {
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
       if (b.rest === 'full') h += `<p class="rest">Отдыхает: всё, что здание даёт, уже не помещается в склады — сырьё не тратится.</p>`;
       if (b.rest === 'part') h += `<p class="rest">Часть того, что здание даёт, уже не помещается в склады — сырья уходит меньше.</p>`;
+      if (b.rest === 'wait') { const B = BUILDINGS[b.type], ins = Object.keys(Game.baseProd(b.type)).filter(k => Game.baseProd(b.type)[k] < 0);
+        h += `<p class="rest">Ждёт излишка: ${esc(ins.map(k => Cat.res[k].name.toLowerCase()).join(', '))} берёт, только пока на складе больше ${Math.round(B.inKeep * 100)}% вместимости.</p>`; }
       h += '</div><div class="mb-col">';
       const up = rb ? null : Game.upgradeInfo(b);
       if (up) {

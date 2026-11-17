@@ -148,10 +148,13 @@ const BUILDINGS = {
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 110, stone: 80 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
   // гавань: работник даёт столько же чистой ценности, сколько в поле или мастерской (с «Кожаными слитками» +25%); товары — в основном мастерские
-  // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой);
-  //   вывоз широкий (0.2 амфоры/с на 1-м уровне): гавани продают почти все амфоры виноградников и рощ, поэтому амфора стоит
-  //   своей продажной цены (0.3 серебра и бонусы), а не только труда — и уровни виноградников окупаются серебром
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, trade: { tech: 'viticulture', in: { amphora: 0.2 }, out: { silver: 0.06 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
+  // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой).
+  //   sell — это продажа излишков, а не заработок: цена твёрдая — 0.35 серебра за амфору (≈ труд амфоры: по курсам балансера
+  //   0.28 со склонами Троодоса, 0.42 без них), бонусы гавани и «Обряд торговли» растят объём (и амфоры, и серебро), а не цену.
+  //   Поэтому вывоз можно держать широким: 0.2 амфоры/с на 1-м уровне × бонусы — гавани продают всё, что сверх полсклада.
+  // inKeep — основная работа тоже вывоз излишка: медь гавань берёт, только пока её запас больше половины склада
+  //   (и, как у всех переработчиков, только если купленному — товарам/серебру и зерну — есть место). Иначе гавань ждёт.
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, inKeep: 0.5, trade: { tech: 'viticulture', in: { amphora: 0.2 }, out: { silver: 0.07 }, keep: 0.5, sell: true }, lp: 14, forms: [null, {}, {}, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 100, copper: 40 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
   vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}, {}] },
   olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}, {}] },
@@ -179,8 +182,9 @@ const BUILDINGS = {
   // Улучшение сохраняет λ-бонус старого чуда (богиня +10%, Рогатый бог +20%) и добавляет своё.
   // Обязательные чудеса царств: Саламин, Святилища Афродиты и Аполлона — весомые в обычных ресурсах (Саламину λ поменьше);
   // подношения Афродите и Саламину заданы в сыре — после «Виноградарства» он сам становится амфорами (2 : 1).
-  // Серебра в чудесах царств нет: его забирает дань. Прежнее серебро пересчитано по цене вывоза — гавань платит за амфору
-  // ≈ 0.6–0.7 серебра (0.3 и бонусы), т. е. 1 серебро ≈ 1.5 амфоры = 3 сыра; где амфор вышло бы больше полсклада — медь и дерево по ценнику
+  // Серебра в чудесах царств нет: его забирает дань. Прежнее серебро пересчитано по тогдашней цене вывоза — ≈ 0.65 серебра
+  // за амфору (0.3 и бонусы), т. е. 1 серебро ≈ 1.5 амфоры = 3 сыра; где амфор вышло бы больше полсклада — медь и дерево по ценнику.
+  // С твёрдой ценой вывоза (0.35) эти чудеса по труду вышли на ~35–40% легче прежнего серебра
   sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 6000, cheese: 9000, copper: 1500 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
   sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 10000, copper: 3000, iron: 1200 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
   // Виноградные склоны — в 3.5 раза дороже прежнего (окупаются ≈ 2 ч), в дорогих ресурсах, чтобы влезать в склад; серебро 600 → амфоры +1000
@@ -266,7 +270,12 @@ const RITUALS = [
   { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50, 2: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true, until: 'sp_aphrodite' },
   { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15 }, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 900 },
-  { id: 'ingot', epoch: 1, logos: 16, cost: { copper: 150 }, req: 'sp_ingot', buff: { bmult: { port: 1, workshop: 1 } }, dur: 1200 },
+  // reqUntil — с этой эпохи чудо обряду не нужно: Святилище Слиткового бога в железном веке становится литейней,
+  //   а торговля — делом всего острова. Удваивает основную работу гаваней (серебро и зерно — без лишней меди) и мастерских;
+  //   вывоз амфор под благословением вдвое шире, но по той же цене (вместе с амфорами) — это не прибыль.
+  //   По курсу это 7 минут выпуска города всю эпоху (доля гаваней и мастерских ≈ 36%, зерно вполцены) = 28 λ; в бронзе — тоже
+  //   ≈ 28 λ, но там обряд — подарок Святилища Слиткового бога (16 λ)
+  { id: 'ingot', epoch: 1, logos: 16, logosAt: { 2: 28 }, cost: { copper: 150 }, req: 'sp_ingot', reqUntil: 2, buff: { bmult: { port: 1, workshop: 1 } }, dur: 1200 },
   { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.75 }, dur: 900, cooldown: 8 * 3600, realTime: true, until: 'sp_apollo' },
   // Царства-города. untilTech / until — обряд уходит после знания / улучшения святилища; tech — появляется после знания.
   { id: 'vintage', epoch: 2, logos: 12, cost: { food: 60 }, tech: 'viticulture', buff: { bmult: { vineyard: 1, olivegrove: 1 } }, dur: 600, goat: true, cooldown: 60 },

@@ -290,7 +290,7 @@ test('железный век: гавань продаёт амфоры за с�
   const coast = G.map.find(t => t.coast && t.t === 'plain' && !G.buildingAt(t.x, t.y));
   const port = { id: 920, type: 'port', level: 1, x: coast.x, y: coast.y }; s.buildings.push(port);
   for (const k of Object.keys(s.res)) s.res[k] = 500;
-  s.res.amphora = 0; G.tick(1);
+  s.res.amphora = 0; G.tick(1); s.res.copper = G.storageCap(G.effects()) * 0.6;   // медь — сверх полсклада: гавань вывозит
   const fx = G.effects(), noAmph = G.production(fx, 100, 1).rates;
   const cap = G.storageCap(fx);
   s.res.amphora = Math.floor(cap * 0.5) - 1;
@@ -301,6 +301,14 @@ test('железный век: гавань продаёт амфоры за с�
   assert.ok(withAmph.silver > noAmph.silver, 'сверх половины — серебра больше');
   assert.ok(withAmph.amphora < noAmph.amphora, 'амфоры уходят');
   assert.ok(noAmph.silver > 0 && noAmph.copper < 0, 'без амфор гавань работает как обычно');
+  // медь гавань тоже берёт только сверх половины склада: меньше — ждёт (и зерна с серебром не даёт), а амфоры продаёт всё равно
+  s.res.copper = Math.floor(cap * 0.5) - 1;
+  const lowCu = G.production(fx, 100, 1, true).rates;
+  assert.equal(lowCu.copper, 0, 'меди меньше половины склада — гавань её не трогает');
+  assert.equal(port.rest, 'wait'); assert.ok(!port.idle, 'это ожидание, а не простой без сырья');
+  assert.ok(lowCu.silver > 0 && lowCu.amphora < 0, 'амфоры продаются и без меди');
+  s.res.copper = Math.floor(cap * 0.5) + 50;
+  assert.ok(G.production(fx, 100, 1, true).rates.copper < 0 && !port.rest, 'сверх половины — снова вывозит медь');
 });
 
 test('железный век: святилища улучшаются на своём месте, «золотые часы» сменяются', () => {
@@ -1016,6 +1024,13 @@ test('обряды: «Всей семьёй» не дорожает с эпох�
   s.epoch = 1; assert.deepEqual(['hearth', 'herds', 'festival', 'bullmask', 'ingot'].map(id => G.ritualLogos(R[id])), [18, 10, 50, 15, 16]);
   assert.equal(G.ritualDur(R.bullmask), 900); assert.deepEqual({ ...R.ingot.buff.bmult }, { port: 1, workshop: 1 });
   s.epoch = 2; assert.deepEqual(['hearth', 'herds', 'harvest', 'festival', 'bullmask', 'vintage'].map(id => G.ritualLogos(R[id])), [18, 10, 12, 50, 15, 12], 'царства — прежние цены');
+  // «Обряд торговли»: в бронзе — только со Святилищем Слиткового бога, в царствах (святилище стало литейней) — у всех, 28 λ (по курсу)
+  assert.equal(G.ritualLogos(R.ingot), 28);
+  s.epoch = 1; s.buildings = s.buildings.filter(b => b.type !== 'sp_ingot');
+  assert.equal(G.ritualStatus(R.ingot).reason.code, 'needBuilding');
+  s.epoch = 2; s.buildings.push({ id: 977, type: 'foundry', level: 9, x: 1, y: 1, from: 'sp_ingot' });
+  const st = G.ritualStatus(R.ingot);
+  assert.ok(!st.hidden && !st.locked && st.logos === 28, 'в царствах обряд торговли есть и без святилища');
   s.epoch = 3;
   s.logos = 1000; G.tick(0.001); const r = G.perform('settlers');
   assert.equal(r.minutes, 45); assert.equal(s.buffs.settlers, 45 * 60, 'продление — до своей длины, не до 30 минут');
@@ -1025,7 +1040,13 @@ test('вино вместо меди: после «Своей монеты» г�
   const C = fresh(), G = hellenic(C), s = G.state;
   const port = addPort(G), mine = { id: 990, type: 'mine', level: 11, x: 1, y: 1 }; s.buildings.push(mine); G.tick(0.001);
   const t0 = G.tradeOf(port, G.effects()), m0 = G.prodOf(mine, G.effects()), p0 = G.prodOf(port, G.effects());
-  assert.ok(Math.abs(t0.silver / -t0.amphora - 0.3 * G.bonusMult('port', 'silver')) < 1e-9, 'базовая цена — 0.06 серебра за 0.2 амфоры');
+  assert.ok(Math.abs(t0.silver / -t0.amphora - 0.35) < 1e-9, 'твёрдая цена — 0.07 серебра за 0.2 амфоры: бонусы её не поднимают');
+  assert.ok(Math.abs(-t0.amphora - 0.2 * G.levelMult(port.level) * G.bonusMult('port', 'silver')) < 1e-9, 'бонусы гавани — объём продажи');
+  // «Обряд торговли» удваивает продажу вместе с амфорами — цена та же
+  s.buffs.ingot = 600; G.tick(0.001);
+  const tb = G.tradeOf(port, G.effects());
+  assert.ok(tb.amphora < t0.amphora * 1.2 && Math.abs(tb.silver / -tb.amphora - 0.35) < 1e-9, 'под благословением — больше амфор, цена та же');
+  delete s.buffs.ingot; G.tick(0.001);
   s.techs.push('coinage'); G.tick(0.001);
   const t1 = G.tradeOf(port, G.effects()), m1 = G.prodOf(mine, G.effects()), p1 = G.prodOf(port, G.effects());
   assert.ok(Math.abs(t1.silver / t0.silver - 1.5) < 1e-9 && t1.amphora === t0.amphora, 'амфоры — те же, монет на 50% больше');

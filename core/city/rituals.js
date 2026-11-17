@@ -34,8 +34,9 @@ Object.assign(Game, {
     if (R.tech && !this.hasTech(R.tech)) return { hidden: true };            // обряд нового знания (праздник сбора винограда)
     if (R.untilTech && this.hasTech(R.untilTech)) return { hidden: true };   // уступил место новому
     if (R.until && this.hasWonder(R.until)) return { hidden: true };         // святилище улучшено — обряд сменился
-    if (R.req && this.retired(R.req)) return { hidden: true };               // чудо прошлой эпохи стало обычным зданием
-    if (R.req && !this.hasWonder(R.req)) return { locked: true, reason: { code: 'needBuilding', type: R.req } };
+    const req = R.req && !(R.reqUntil != null && s.epoch >= R.reqUntil) ? R.req : null;   // reqUntil: с этой эпохи чудо не нужно
+    if (req && this.retired(req)) return { hidden: true };               // чудо прошлой эпохи стало обычным зданием
+    if (req && !this.hasWonder(req)) return { locked: true, reason: { code: 'needBuilding', type: req } };
     const cost = this.liveCost(R.cost), logos = this.ritualLogos(R);
     const cd = this.ritualWait(R);
     if (cd > 0) return { cost, logos, cd, reason: { code: 'cooldown', sec: Math.ceil(cd) } };

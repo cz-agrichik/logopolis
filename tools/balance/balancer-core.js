@@ -208,9 +208,25 @@ const Balancer = (() => {
       }
       return out;
     }
+    /** Вывоз излишков в долгую: продажа амфор (trade.sell) и основная работа гаваней (inKeep — медь только сверх полсклада)
+     *  берут не больше, чем приходит, — запас стоит на «полскладе». Если на снимке такие здания уводят сырьё в минус,
+     *  урезаем их работу (и сырьё, и выход) до нуля по сырью. */
+    function steady(fx, pop) {
+      const log = [], P = G.production(fx, pop, 0.001, false, log);
+      const groups = [l => l.trade && B[l.b.type].trade && B[l.b.type].trade.sell, l => !l.trade && B[l.b.type].inKeep];
+      for (const g of groups) {
+        const sum = {};
+        for (const l of log) if (l.k && g(l)) sum[l.k] = (sum[l.k] || 0) + l.v;
+        for (const k of Object.keys(sum)) if (sum[k] < 0 && P.rates[k] < 0) {
+          const cut = Math.min(1, P.rates[k] / sum[k]);
+          for (const [kk, v] of Object.entries(sum)) P.rates[kk] -= v * cut;
+        }
+      }
+      return P;
+    }
     function measure(city) {
       const s = load(city), fx = G.effects(false), fx0 = neutralFx();
-      const pop = G.popCap(fx), storage = G.storageCap(fx), P = G.production(fx, pop, 0.001), gross = G.grossRates();
+      const pop = G.popCap(fx), storage = G.storageCap(fx), P = steady(fx, pop), gross = G.grossRates();
       const mult = {};
       for (const k of RES_KEYS) {
         let a = 0, b0 = 0;

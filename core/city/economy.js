@@ -114,11 +114,21 @@ Object.assign(Game, {
     for (const [k, v] of Object.entries(T.out)) out[k] = v;
     return out;
   },
-  /** Торговая линия здания в секунду: тратит сырьё, только если оно есть — основная работа здания от неё не зависит. */
+  /** Торговая линия здания в секунду: тратит сырьё, только если оно есть — основная работа здания от неё не зависит.
+   *  Две породы линий:
+   *   - переработка (железные орудия у лесорубов): как основная работа — бонусы растят выход, сырьё идёт по базе;
+   *   - продажа (trade.sell: гавань продаёт амфоры): это обмен излишков на более ёмкий ресурс, а не заработок. Бонусы здания
+   *     (и благословения) растят объём — сколько амфор уходит и сколько серебра приходит, — а цена остаётся той, что в trade;
+   *     наценку даёт только effect.trade (tradeBonus, «Своя монета»). */
   tradeOf(b, fx = this.fx || this.effects(), level = b.level) {
     const base = this.baseTrade(b.type);
     if (!base) return null;
-    const out = {}, lm = this.levelMult(level);
+    const T = BUILDINGS[b.type].trade, out = {}, lm = this.levelMult(level);
+    if (T.sell) {
+      const m = lm * this.bonusMult(b.type, Object.keys(T.out)[0], fx), tb = this.tradeBonus(b.type, fx);
+      for (const [k, v] of Object.entries(base)) out[k] = v > 0 ? v * m * tb : v * m;
+      return out;
+    }
     for (const [k, v] of Object.entries(base)) out[k] = v > 0 ? v * lm * this.bonusMult(b.type, k, fx) * this.tradeBonus(b.type, fx) : v * lm;
     return out;
   },
@@ -203,18 +213,22 @@ Object.assign(Game, {
       let share = 1;
       if (ins.length && outs.length) share = outs.filter(k => s.res[k] < storage - 0.01).length / outs.length;
       if (mark) b.rest = ins.length && share < 1 ? (share === 0 ? 'full' : 'part') : null;
-      if (share === 0) { if (mark) b.idle = false; if (log) log.push({ b, skip: 'full' }); continue; }
       const e = this.foodFirst(b) ? effFood : effOther;
-      let ok = true;
-      for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
-      if (mark) b.idle = !ok;
-      if (!ok) { if (log) log.push({ b, skip: 'idle' }); continue; }
-      for (const [k, v] of Object.entries(p)) {
-        const x = v * e * (v < 0 ? share : 1);
-        rates[k] += x;
-        if (log) log.push({ b, k, v: x, e, share: v < 0 ? share : 1 });
+      if (share === 0) { if (mark) b.idle = false; if (log) log.push({ b, skip: 'full' }); }
+      else {
+        // inKeep (гавань): сырьё — только излишек сверх этой доли склада; меньше — здание ждёт, а не «простаивает без сырья»
+        const keepIn = (BUILDINGS[b.type].inKeep || 0) * storage, wait = keepIn > 0 && ins.some(k => s.res[k] <= keepIn);
+        let ok = !wait;
+        for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
+        if (mark) { b.idle = !ok && !wait; if (wait) b.rest = 'wait'; }
+        if (!ok) { if (log) log.push({ b, skip: wait ? 'wait' : 'idle' }); }
+        else for (const [k, v] of Object.entries(p)) {
+          const x = v * e * (v < 0 ? share : 1);
+          rates[k] += x;
+          if (log) log.push({ b, k, v: x, e, share: v < 0 ? share : 1 });
+        }
       }
-      // торговая линия: есть сырьё и место — работает, нет — просто молчит
+      // торговая линия: есть сырьё и место — работает, нет — просто молчит; от основной работы не зависит (гавань ждёт меди — амфоры всё равно продаёт)
       const t = this.tradeOf(b, fx);
       if (t) {
         const tin = Object.keys(t).filter(k => t[k] < 0), tout = Object.keys(t).filter(k => t[k] > 0);
@@ -269,14 +283,16 @@ Object.assign(Game, {
       const key = x.k + '|' + t + '|' + L + '|' + x.e + '|' + x.share + '|' + !!x.trade;
       const base = (x.trade ? this.baseTrade(t) : this.baseProd(t))[x.k];
       const extra = (x.trade ? 1 : this.scaleOf(t, fx)) * (x.trade && base > 0 ? this.tradeBonus(t, fx) : 1);   // вполсилы / наценка — отдельным множителем
-      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base, lm: this.levelMult(L), extra, eff: x.e, share: x.share, trade: !!x.trade };
+      const sell = !!(x.trade && BUILDINGS[t].trade.sell);   // продажа: бонусы — объём, и у сырья тоже
+      const r = rows[key] = rows[key] || { k: x.k, type: t, level: L, n: 0, perOne: x.v, total: 0, base, lm: this.levelMult(L), extra, eff: x.e, share: x.share, trade: !!x.trade, sell };
       r.n++; r.total += x.v;
     }
     for (const r of Object.values(rows)) {
       if (r.skip) { res[r.k].skipped.push(r); continue; }
-      if (r.base > 0) {
-        r.perm = 1 + fx.bonus[r.k] + (fx.bbonus[r.type] || 0);
-        r.buff = 1 + fx.buff[r.k] + (fx.bbuff[r.type] || 0);
+      if (r.base > 0 || r.sell) {
+        const k = r.sell ? Object.keys(BUILDINGS[r.type].trade.out)[0] : r.k;
+        r.perm = 1 + fx.bonus[k] + (fx.bbonus[r.type] || 0);
+        r.buff = 1 + fx.buff[k] + (fx.bbuff[r.type] || 0);
       }
       res[r.k].rows.push(r);
     }
