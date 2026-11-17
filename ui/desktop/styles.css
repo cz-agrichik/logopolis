@@ -481,6 +481,12 @@ table.pt.levels td.look { white-space: nowrap; }
 table.pt.levels th small { font-weight: 400; color: var(--ink-2); }
 .photos { margin-top: 18px; padding: 10px 12px; background: #fff8; border-radius: 8px; font-size: 13.5px; line-height: 1.8; }
 .photos a.ext { white-space: nowrap; }
+/* источники при тематической статье: выписка и ссылки */
+.sources { margin-top: 18px; padding: 10px 12px; background: #fff8; border-radius: 8px; font-size: 13.5px; line-height: 1.55; }
+.sources ul { margin: 6px 0 0; padding-left: 18px; }
+.sources li { margin-bottom: 6px; }
+.sources a.ext { white-space: nowrap; }
+.sources + .photos { margin-top: 8px; }
 .formula { background: #fffdf7; border: 1px solid var(--parch-3); border-radius: 8px; padding: 8px 12px; font-weight: 600; }
 
 /* ---------- v6: развилка знаний ---------- */

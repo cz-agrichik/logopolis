@@ -667,7 +667,7 @@ const UI = {
       if (rb) {
         h += `<div class="upgrade obsolete"><div class="up-head"><b>🔄 Устарело</b></div>
           <p class="small">После знания «${esc(this.retiringTechName(b.type))}» это здание больше не работает. Перестройте его — уровень сохранится — или продайте.
-          <a href="#" data-pedia="a:changes">Как устроены перемены</a></p>
+          <a href="#" data-pedia="a:epochs">Как устроены перемены</a></p>
           <div class="up-cost"><span class="dim">Перестроить в «${esc(Msg.formName(rb.into, Game.state.epoch))}» ${b.level}-го уровня</span> <span class="chips">${this.costHtml(rb.cost, 0)}</span></div>
           ${rb.reason ? `<div class="item-lock">${esc(Msg.reason(rb.reason))}</div>` : ''}
           <div class="mb-actions"><button class="btn gold" data-action="rebuild" ${rb.ok ? '' : 'disabled'}>Перестроить</button>
@@ -675,7 +675,7 @@ const UI = {
       } else if (sl) {   // доживает: работает, но не улучшается — можно продать
         h += `<div class="upgrade obsolete"><div class="up-head"><b>⏳ Доживает</b></div>
           <p class="small">После знания «${esc(this.retiringTechName(b.type))}» здание ещё работает, но слабее; новых таких не строят, а это не улучшается. Его можно продать.
-          <a href="#" data-pedia="a:changes">Как устроены перемены</a></p>
+          <a href="#" data-pedia="a:epochs">Как устроены перемены</a></p>
           <div class="mb-actions"><button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
       }
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
@@ -792,7 +792,7 @@ const UI = {
       13-й, как и 11-й, — за λ. 12-й уровень просит монет: сначала нужно знание «${esc(Cat.tech[BALANCE.coinTech].name)}».
       После «${esc(Cat.tech.piraeus.name)}» в гавань начнут заходить корабли: они просят груз и платят папирусом. Дань царю царей Кипр платит по-прежнему.</p>`;
     else if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо, а на 9-м и 11-м у зданий железный облик.
-      Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:changes">как это устроено</a>'}).
+      Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:epochs">как это устроено</a>'}).
       «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до Рима. Спасибо!</p>`;
     h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
