@@ -26,19 +26,23 @@ Object.assign(Game, {
     this.state.logos -= logos;
   },
 
-  /** Сколько зданий типа можно иметь сейчас (max — число или { эпоха: число } — с этой эпохи); null — без ограничения. */
+  /** Сколько зданий типа можно иметь сейчас: max — число или { эпоха: число } (с этой эпохи), maxTech — { знание: число } (больше после знания);
+   *  null — без ограничения. */
   maxCount(type) {
-    const m = BUILDINGS[type].max;
-    if (m == null || typeof m === 'number') return m || null;
-    let v = null;
-    for (const [e, n] of Object.entries(m)) if (+e <= this.state.epoch) v = n;
-    return v;
+    const B = BUILDINGS[type], m = B.max;
+    let v = m == null ? null : typeof m === 'number' ? m : null;
+    if (m && typeof m === 'object') for (const [e, n] of Object.entries(m)) if (+e <= this.state.epoch) v = n;
+    for (const [t, n] of Object.entries(B.maxTech || {})) if (this.hasTech(t) && (v == null || n > v)) v = n;
+    return v || null;
   },
   /** Цена «трудом» — без λ, но с горой обычных ресурсов. */
   laborCost(cost, logos, epoch, mult, buy = false) {
     const out = {};
     for (const [k, v] of Object.entries(cost || {})) out[k] = v * mult;
-    if (buy) {
+    if (buy && typeof buy === 'object') {
+      // «закупка за рубежом» (царства-города): за каждый λ — свой набор ресурсов; товары после «Финикийцев» сами становятся серебром
+      for (const [k, per] of Object.entries(buy)) out[k] = (out[k] || 0) + logos * per;
+    } else if (buy) {
       // «купить у чужеземцев»: вместо λ — серебро (по ценнику столько же, сколько обычная замена λ ресурсами)
       out.silver = (out.silver || 0) + logos * BALANCE.laborSilverPerLogos;
     } else {

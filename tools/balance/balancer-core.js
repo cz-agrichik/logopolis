@@ -21,8 +21,8 @@ const Balancer = (() => {
   const PLAN = {
     0: { house: 9, field: 3, goatpen: 4, lumber: 5, quarry: 5, workshop: 4, storehouse: 3 },
     1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
-    2: { house: 12, field: 4, lumber: 12, quarry: 6, workshop: 10, storehouse: 4, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
-    3: { house: 14, field: 4, lumber: 12, quarry: 6, workshop: 12, storehouse: 5, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 10, forge: 4 },
+    2: { house: 12, field: 4, lumber: 10, quarry: 6, workshop: 10, storehouse: 6, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
+    3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
   const BUDGET = { 0: 100, 1: 300, 2: 1000, 3: 1200 };
@@ -58,13 +58,21 @@ const Balancer = (() => {
       G.fx = G.effects();
       return s;
     }
-    /** Самая большая цена эпохи «с умом», которая должна влезать в склад: переход, чудеса, знания. */
+    /** Самая большая цена эпохи, которая должна влезать в склад: переход, чудеса, знания — и «с умом», и «через силу» (закупка).
+     *  Знания — по порядку, как их изучают (до «Финикийцев» цены в товарах, после — в серебре). */
     function storageNeed(e) {
       let best = { v: 0, what: null };
       const see = (cost, what) => { for (const [k, v] of Object.entries(G.liveCost(cost))) if (v > best.v) best = { v, res: k, what }; };
       if (E[e].advance) see(E[e].advance.res, { kind: 'advance' });
       for (const t of Object.keys(B).filter(t => B[t].special && B[t].epoch === e)) see(B[t].cost, { kind: 'wonder', id: t });
-      for (const t of T.filter(t => t.epoch === e)) see(t.cost, { kind: 'tech', id: t.id });
+      const saved = G.state.techs;
+      G.state.techs = T.filter(t => t.epoch < e).map(t => t.id);
+      for (const t of T.filter(t => t.epoch === e)) {
+        see(t.cost, { kind: 'tech', id: t.id });
+        see(G.techPrice(t, 'labor').cost, { kind: 'tech', id: t.id, labor: true });
+        G.state.techs.push(t.id);
+      }
+      G.state.techs = saved;
       return best;
     }
     const succ = {};   // устаревшие → во что перестраиваются (загон → виноградник/роща, литейня → кузница)
@@ -353,8 +361,8 @@ const Balancer = (() => {
       const startAssumed = e === 0, prodStart = m0.prod, prod0 = startAssumed ? m1.prod / 3 : Math.pow(m0.prod, 0.75) * Math.pow(m1.prod, 0.25);
       // твёрдый курс обрядов: 1 минута выпуска на начало = riteRate медных λ × инфляция λ эпохи → столько зерна в 1 номинальном λ
       const LI = BAL.logosInflation, infl = LI[e] != null ? LI[e] : LI[LI.length - 1], riteSet = LI[e] != null;
-      const riteRate = BAL.riteRate * infl, riteL = prod0 * 60 / riteRate;
-      return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
+      const RR = BAL.riteRate, real = RR[e] != null ? RR[e] : RR[RR.length - 1], riteRate = real * infl, riteL = prod0 * 60 / riteRate;
+      return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, riteReal: real, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
         perL: tl ? (tlab - tm) / tl : null, scen };
     });
     // ---------- окупаемость необязательных чудес ----------

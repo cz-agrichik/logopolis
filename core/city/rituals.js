@@ -9,12 +9,17 @@ Object.assign(Game, {
    *  logosAt — своя цена эпохи; иначе обряд прошлой эпохи в новой ×1.5 за каждую эпоху (кроме fixedPrice). */
   ritualLogos(R) {
     const e = this.state.epoch, infl = BALANCE.logosInflation[e];
-    if (R.perMinute && infl != null) return Math.round(BALANCE.riteRate * infl * this.suppliesSec() / 60);
+    if (R.perMinute && infl != null) return Math.round(this.riteRate() * this.suppliesSec() / 60);
     if (R.logosAt && R.logosAt[e] != null) return R.logosAt[e];
     return R.fixedPrice ? R.logos : Math.ceil(R.logos * Math.pow(1.5, Math.max(0, this.state.epoch - R.epoch)));
   },
   /** Сколько секунд длится благословение: у durPerEpoch — дольше с каждой эпохой. */
   ritualDur(R) { return (R.dur || 0) + (R.durPerEpoch || 0) * Math.max(0, this.state.epoch - R.epoch); },
+  /** Курс обрядов эпохи: сколько номинальных λ стоит минута выпуска (медные λ эпохи × инфляция λ); null — курс не задан. */
+  riteRate() {
+    const e = this.state.epoch, infl = BALANCE.logosInflation[e], rr = BALANCE.riteRate;
+    return infl == null ? null : (rr[e] != null ? rr[e] : rr[rr.length - 1]) * infl;
+  },
   /** «Сбор припасов»: сколько секунд выпуска зданий даёт сейчас (BALANCE.suppliesMin по эпохам). */
   suppliesSec() { const m = BALANCE.suppliesMin; return 60 * (m[this.state.epoch] != null ? m[this.state.epoch] : m[m.length - 1]); },
   /** Сколько секунд ждать до следующего раза. realTime — по настоящим часам (переживает уход из игры), иначе — игровое время. */

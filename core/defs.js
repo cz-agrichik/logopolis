@@ -37,12 +37,13 @@ const BALANCE = {
   // беглые козы: следующая — через столько секунд (пока коза на карте, отсчёт стоит); ловить каждую — около +30% к выпуску,
   // с Троодосом (чаще и щедрее на 60%) — около +85%
   goatEvery: [102, 238], goatEveryFast: [60, 136],
-  // Курс обрядов: 1 минута полного выпуска города стоит riteRate «настоящих» (медных) λ — это базовое правило.
-  // logosInflation — сколько номинальных λ эпохи в одном медном (λ с эпохами дешевеет: в бронзе — на треть).
+  // Курс обрядов: 1 минута полного выпуска города стоит riteRate «настоящих» (медных) λ — по эпохам: 3 в меди и бронзе,
+  // в царствах-городах — 3/1.3 (λ становится ценнее). logosInflation — сколько номинальных λ эпохи в одном медном
+  // (λ с эпохами дешевеет: в бронзе — на треть, в царствах ×1.7). Номинально выходит 3, 4 и ≈3.9 λ за минуту.
   // По курсу стоит «Сбор припасов» (perMinute): минуты × 3 λ × инфляция = 3 × 3 = 9 λ в меди, 4 × 3 × 4/3 = 16 — в бронзе.
   // Где инфляция не задана (железный век и дальше) — пока старый костыль: цена ×1.5 за эпоху.
-  riteRate: 3,
-  logosInflation: [1, 4 / 3],
+  riteRate: [3, 3, 3 / 1.3],
+  logosInflation: [1, 4 / 3, 1.7],
   suppliesMin: [3, 4, 5, 6],   // «Сбор припасов»: столько минут выпуска зданий (на минуту больше с каждой эпохой)
   raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
   raidLoot: [0.1, 0.5],    //   уносят 10–50% всех запасов (без Циклопических стен)        // «Сбор припасов»: столько секунд выпуска (без благословений)
@@ -119,7 +120,7 @@ const MAP_W = 18, MAP_H = MAP_ROWS.length;
 const EPOCHS = [
   { maxLevel: 5, advance: { pop: 50, specials: ['shrine1'], allTechs: true, logos: 120, res: { stone: 3000, goods: 800, cheese: 400 } } },
   { maxLevel: 9, advance: { pop: 100, specials: ['shrine2', 'sp_palace'], allTechs: true, logos: 200, res: { copper: 3000, bronze: 800, goods: 2000 } } },
-  { maxLevel: 11, advance: { pop: 150, specials: ['sp_salamis'], allTechs: true, logos: 400, res: { silver: 2500, iron: 1500, stone: 10000 } } },
+  { maxLevel: 11, advance: { pop: 150, specials: ['sp_salamis', 'sp_aphrodite', 'sp_apollo'], allTechs: true, logos: 400, res: { silver: 2500, iron: 1500, stone: 10000 } } },
   { maxLevel: 13 },   // эллинский Кипр: первая треть — продолжение и переход дальше ещё не описаны
   { locked: true },
 ];
@@ -131,7 +132,7 @@ const EPOCHS = [
 //  lp — цена в λ 5-го уровня (уровня за Логос); 9-й — lp × 3. 3-й и 7-й — малые: одна цена для всех (3 и 9 λ).
 //  Цена улучшений — от цены постройки. Рудник, гавань и литейня построены так, чтобы их улучшения окупались в 1.5 раза
 //  (литейня — в 2 раза) дольше, чем у мастерской.
-//  max — не больше стольких зданий; { эпоха: число } — с этой эпохи (дома писцов: в бронзовом веке один, с железного — два).
+//  max — не больше стольких зданий ({ эпоха: число } — с этой эпохи); maxTech — больше после знания (дом писцов: один, после «Кипрского слогового письма» — два).
 //  special — чудо древнего Кипра: одно на игру, одна цена (logos — λ), effect — постоянный бонус.
 //  retire — чудо эпохи: с эпохи retire.epoch оно становится обычным зданием into уровня level (бонус чуда пропадает).
 // ------------------------------------------------------------
@@ -147,14 +148,17 @@ const BUILDINGS = {
   storehouse: { terrain: ['plain'], epoch: 0, cost: { wood: 80, stone: 60 }, workers: 1, storage: 400, lp: 14, forms: [{}, {}, {}, {}] },
   mine: { terrain: ['hill'], epoch: 1, tech: 'smelting', cost: { wood: 110, stone: 80 }, workers: 3, prod: { copper: 0.15 }, lp: 14, forms: [null, {}, {}] },
   // гавань: работник даёт столько же чистой ценности, сколько в поле или мастерской (с «Кожаными слитками» +25%); товары — в основном мастерские
-  // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой)
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, trade: { tech: 'viticulture', in: { amphora: 0.1 }, out: { silver: 0.03 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
+  // trade — вторая, необязательная линия: если есть амфоры, гавань продаёт их финикийцам за серебро (той же рабочей силой);
+  //   вывоз широкий (0.2 амфоры/с на 1-м уровне): гавани продают почти все амфоры виноградников и рощ, поэтому амфора стоит
+  //   своей продажной цены (0.3 серебра и бонусы), а не только труда — и уровни виноградников окупаются серебром
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, trade: { tech: 'viticulture', in: { amphora: 0.2 }, out: { silver: 0.06 }, keep: 0.5 }, lp: 14, forms: [null, {}, {}, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 100, copper: 40 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 14, forms: [null, {}] },
   vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 12, forms: [null, null, {}, {}] },
   olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 12, forms: [null, null, {}, {}] },
-  forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 350, copper: 150 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}, {}] },
+  forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 100, copper: 40 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}, {}] },
   // levelTech — уровни, для которых нужно знание (писцам 10-й и выше — кипрское слоговое письмо)
-  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: { 1: 1, 2: 2 }, cost: { wood: 250, stone: 250, goods: 150 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
+  // дом писцов: дерева и камня вчетверо меньше, вместо них товары (столько же в зерне) — улучшения просят товары, а потом серебро
+  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: 1, maxTech: { syllabary: 2 }, cost: { wood: 60, stone: 60, goods: 270 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
   sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 40, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
@@ -173,16 +177,19 @@ const BUILDINGS = {
   // Царства-города: upgradeOf — чудо не строится заново, а улучшает старое на том же месте
   // Ум или сила: Афродита и гробницы — за λ, Аполлон и Троодос — без λ, но очень дорого. tech — после какого знания можно.
   // Улучшение сохраняет λ-бонус старого чуда (богиня +10%, Рогатый бог +20%) и добавляет своё.
-  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 2000, goods: 1000 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
-  sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 12000, copper: 2000, iron: 650 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
-  sp_troodos2: { special: true, epoch: 2, upgradeOf: 'sp_troodos', tech: 'viticulture', terrain: ['hill'], cost: { food: 8000, wood: 4000 }, logos: 0, effect: { bmult: { vineyard: 0.6, olivegrove: 0.6 }, goats: true } },
+  // Обязательные чудеса царств: Саламин, Святилища Афродиты и Аполлона — весомые в обычных ресурсах (Саламину λ поменьше);
+  // подношения Афродите заданы в сыре — после «Виноградарства» он сам становится амфорами
+  sp_aphrodite: { special: true, epoch: 2, upgradeOf: 'shrine1', tech: 'phoenicians', terrain: ['plain'], cost: { stone: 6000, silver: 1500, cheese: 6000 }, logos: 600, effect: { mult: { food: 0.3 }, growth: 0.75, logos: 0.1 } },
+  sp_apollo: { special: true, epoch: 2, upgradeOf: 'shrine2', tech: 'syllabary', terrain: ['plain'], cost: { stone: 10000, copper: 3000, iron: 1200 }, logos: 0, effect: { logos: 0.2, all: 0.15 } },
+  // Виноградные склоны — в 3.5 раза дороже прежнего (≈ 51 тыс. зерна, окупаются ≈ 2 ч), в дорогих ресурсах, чтобы влезать в склад
+  sp_troodos2: { special: true, epoch: 2, upgradeOf: 'sp_troodos', tech: 'viticulture', terrain: ['hill'], cost: { food: 10000, wood: 6000, amphora: 3000, silver: 600 }, logos: 0, effect: { bmult: { vineyard: 0.6, olivegrove: 0.6 }, goats: true } },
   // новое чудо за λ — обязательное для перехода в следующую эпоху
-  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 1500, goods: 600, iron: 120 }, logos: 650, effect: { all: 0.1, mult: { silver: 0.2 } } },
+  sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 10000, silver: 4000, iron: 2500 }, logos: 450, effect: { all: 0.1, mult: { silver: 0.2 } } },
   // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
   // Эллинский Кипр. ships — корабли: every — множитель промежутка, wait — сколько ждут, choice — из скольких грузов выбрать
   sp_neapaphos: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 16000, wood: 8000, silver: 800 }, logos: 0,
     effect: { bmult: { port: 0.25 }, ships: { every: 0.5, wait: 480, choice: 2 } } },
-  sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
+  sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill', 'plain'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
 };
 
 // Знания: λ + ресурсы (путь «с умом») или только ресурсы (путь «через силу»). effect — постоянный бонус.
@@ -208,20 +215,23 @@ const TECHS = [
   // Царства-города. retire — перемены: цены со старым ресурсом пересчитываются в новый (rate — по ценнику труда),
   // запасы переходят в новый по курсу stock (по умолчанию = rate; 0 — запасы просто пропадают),
   // здания, которые его делали, устаревают — их можно перестроить в новые (уровень сохраняется) или продать (λ уровней возвращается).
-  { id: 'iron', epoch: 2, logos: 200, cost: { copper: 1200 }, retire: { res: { bronze: { into: 'iron', rate: 1, stock: 0 } }, buildings: { foundry: 'forge' } } },   // бронзу в железо не перекуёшь: запасы пропадают
-  { id: 'syllabary', epoch: 2, logos: 200, cost: { stone: 2000 } },   // открывает писцам 10-й и 11-й уровни и Святилище Аполлона
+  // Царства-города: «через силу» — закупка за рубежом (buy — что платят за каждый λ прежней цены laborLogos): до «Финикийцев» — медью
+  // и товарами, после — серебром (товары в ценах сами становятся серебром); лес и камень — там, где к месту (печи, террасы, рукояти, корабли).
+  // Путь «ресурсами» эпохи — ×2.7 к прежнему; λ «с умом» — по курсу обрядов (1 λ ≈ 1680 зерна: оба пути стоят одинаково). Железо — в печи, орудия, флот, чудеса.
+  { id: 'iron', epoch: 2, logos: 60, laborLogos: 200, cost: { copper: 1200, wood: 2000, stone: 1500 }, buy: { goods: 15, copper: 10 }, retire: { res: { bronze: { into: 'iron', rate: 1, stock: 0 } }, buildings: { foundry: 'forge' } } },   // бронзу в железо не перекуёшь: запасы пропадают
+  { id: 'syllabary', epoch: 2, logos: 55, laborLogos: 200, cost: { goods: 1200, stone: 1500 }, buy: { goods: 15, copper: 10 } },   // второй дом писцов, писцам 10-й и 11-й уровни, Святилище Аполлона
   // финикийцы: товары уходят в серебро 5 : 1 — и запасы, и цены, и выпуск мастерских и гаваней (prodToo); серебро +50%
-  { id: 'phoenicians', epoch: 2, logos: 260, cost: { copper: 1500 }, effect: { mult: { silver: 0.5 } }, retire: { res: { goods: { into: 'silver', rate: 0.2, prodToo: true } } } },
+  { id: 'phoenicians', epoch: 2, logos: 70, laborLogos: 260, cost: { copper: 1300, goods: 1000 }, buy: { goods: 15, copper: 12 }, effect: { mult: { silver: 0.5 } }, retire: { res: { goods: { into: 'silver', rate: 0.2, prodToo: true } } } },
   // виноградарство: сыр уходит в амфоры, загоны на холмах — в виноградники, в лесу — в оливковые рощи
-  { id: 'viticulture', epoch: 2, logos: 240, cost: { food: 4000, wood: 2000 }, req: ['phoenicians'], retire: { res: { cheese: { into: 'amphora', rate: 0.5 } }, buildings: { goatpen: { hill: 'vineyard', forest: 'olivegrove' } } } },
-  // Вторая половина: серебро и железо. buy — путь «через силу» покупает знание у чужеземцев: λ-часть — серебром.
+  { id: 'viticulture', epoch: 2, logos: 95, laborLogos: 240, cost: { food: 2000, wood: 2000, stone: 2500 }, buy: { goods: 70 }, req: ['phoenicians'], retire: { res: { cheese: { into: 'amphora', rate: 0.5 } }, buildings: { goatpen: { hill: 'vineyard', forest: 'olivegrove' } } } },
+  // Вторая половина: серебро и железо.
   // Дань: «Дань фараону» — Египет вместо Ассирии (серебро с жителя), «Дары царю царей» — Персия (твёрдая сумма с присяги, fixTribute).
-  { id: 'pharaoh', epoch: 2, logos: 260, cost: { amphora: 600, stone: 1200, silver: 40 }, req: ['phoenicians'], buy: true },
-  { id: 'irontools', epoch: 2, logos: 240, cost: { iron: 160, wood: 1000 }, req: ['iron', 'phoenicians'], buy: true },   // лесорубы и каменоломни: линия железо → +30%
-  { id: 'doctors', epoch: 2, logos: 280, cost: { silver: 140, amphora: 500 }, req: ['phoenicians'], buy: true, effect: { houseCap: 2, growth: 0.5 } },
+  { id: 'pharaoh', epoch: 2, logos: 115, laborLogos: 260, cost: { amphora: 1500, silver: 300, stone: 1500 }, buy: { goods: 70 }, req: ['phoenicians'] },
+  { id: 'irontools', epoch: 2, logos: 105, laborLogos: 240, cost: { iron: 500, wood: 3000 }, buy: { goods: 70 }, req: ['iron', 'phoenicians'] },   // лесорубы и каменоломни: линия железо → +30%
+  { id: 'doctors', epoch: 2, logos: 125, laborLogos: 280, cost: { silver: 400, amphora: 1200 }, buy: { goods: 80 }, req: ['phoenicians'], effect: { houseCap: 2, growth: 0.5 } },
   // reqWonder — чудо, без которого знание не изучить: флот снаряжают цари Саламина
-  { id: 'fleet', epoch: 2, logos: 280, cost: { wood: 2500, iron: 100 }, req: ['pharaoh'], reqWonder: 'sp_salamis', buy: true, effect: { tributeCut: 0.25 } },
-  { id: 'gifts', epoch: 2, logos: 320, cost: { silver: 160, amphora: 800 }, req: ['pharaoh', 'fleet'], buy: true, fixTribute: true },
+  { id: 'fleet', epoch: 2, logos: 125, laborLogos: 280, cost: { wood: 3000, iron: 600 }, buy: { goods: 70 }, req: ['pharaoh'], reqWonder: 'sp_salamis', effect: { tributeCut: 0.25 } },
+  { id: 'gifts', epoch: 2, logos: 170, laborLogos: 320, cost: { silver: 500, amphora: 2000 }, buy: { goods: 90 }, req: ['pharaoh', 'fleet'], fixTribute: true },
   // Эллинский Кипр, первая треть. λ в полтора раза выше железного века, ресурсы вдвое; «через силу» — buy (λ заменяют монеты).
   // coinage: серебро зовётся монетой, открыт 12-й уровень зданий (BALANCE.coinTech); piraeus: корабли и папирус (BALANCE.ships);
   // alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
@@ -237,22 +247,23 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 // Благословения переводятся на этот курс по очереди: на один ресурс, зато дольше (10–30 минут) — цена = сколько минут выпуска они дают.
 // λ-благословения святилищ — «золотой час»: 15 минут, потом перерыв в настоящих часах (realTime — по часам, а не по игровому времени).
 // instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
-// logosAt — своя цена в λ по эпохам (по курсу обрядов); где не задана — старое правило ×1.5 за эпоху.
+// logosAt — своя цена в λ по эпохам (по курсу обрядов); где не задана — старое правило ×1.5 за эпоху (пока — в эллинском Кипре).
 const RITUALS = [
   { id: 'elders', epoch: 0, logos: 9, perMinute: true, instant: 'elders', cooldown: 120 },
   // fixedPrice — цена в λ не растёт с эпохами; durPerEpoch — с каждой эпохой обряд длится дольше (30, 35, 40, 45 минут)
   { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800, fixedPrice: true, durPerEpoch: 300 },
   // «Обряд урожая» (зерно ×2) появляется после «Виноградарства», когда загоны уходят, а с ними и «Благословение полей и стад»
-  { id: 'harvest', epoch: 0, logos: 12, cost: { food: 20 }, tech: 'viticulture', buff: { mult: { food: 1 } }, dur: 600 },
+  { id: 'harvest', epoch: 0, logos: 12, logosAt: { 2: 12 }, cost: { food: 20 }, tech: 'viticulture', buff: { mult: { food: 1 } }, dur: 600 },
+  // Царства-города (≈3.9 λ за минуту, 1 λ ≈ 1650 зерна): цены прежние — по курсу они худо-бедно годятся (труда и рудокопы чуть дороже, урожай — заметно).
   // Бронза (курс 4 λ за минуту, 1 λ ≈ 410 зерна): обряд труда и поля со стадами — по медным ценам (в курсе или чуть щедрее),
   // праздник — 50, рудокопы — 15 минут, торговля — гавани и мастерские (бронзу литеен удваивают только рудокопы).
   // по курсу обрядов: 10 минут дерева и камня ×2 — около 6 минут выпуска города (дерево и камень — главные траты эпохи)
-  { id: 'hearth', epoch: 0, logos: 18, logosAt: { 1: 18 }, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
+  { id: 'hearth', epoch: 0, logos: 18, logosAt: { 1: 18, 2: 18 }, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
   // поля и загоны ×2 и беглая коза: по курсу около 14 λ, но зерно и сыр в основном лишние (≈8% трат эпохи) — половина благословения + коза
-  { id: 'herds', epoch: 0, logos: 10, logosAt: { 1: 10 }, buff: { bmult: { field: 1, goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
-  { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
+  { id: 'herds', epoch: 0, logos: 10, logosAt: { 1: 10, 2: 10 }, buff: { bmult: { field: 1, goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
+  { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50, 2: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true, until: 'sp_aphrodite' },
-  { id: 'bullmask', epoch: 1, logos: 15, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 900 },
+  { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15 }, cost: { goods: 100 }, buff: { mult: { copper: 1, bronze: 1 } }, dur: 900 },
   { id: 'ingot', epoch: 1, logos: 16, cost: { copper: 150 }, req: 'sp_ingot', buff: { bmult: { port: 1, workshop: 1 } }, dur: 1200 },
   { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.75 }, dur: 900, cooldown: 8 * 3600, realTime: true, until: 'sp_apollo' },
   // Царства-города. untilTech / until — обряд уходит после знания / улучшения святилища; tech — появляется после знания.

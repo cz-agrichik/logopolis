@@ -243,9 +243,9 @@ test('железный век: «Финикийцы» — ремёсла ухо�
   const C = fresh(), G = ironAge(C), s = G.state;
   const ws = { id: 900, type: 'workshop', level: 1, x: 8, y: 9 }; s.buildings.push(ws);
   const goodsBefore = G.prodOf(ws).goods;
-  s.res.goods = 1000; s.res.silver = 0;
-  assert.ok(G.research('phoenicians'));
-  assert.equal(s.res.goods, 0); assert.equal(s.res.silver, 200, '1000 ремёсел → 200 серебра');
+  s.res.goods = 3000; s.res.silver = 0;
+  assert.ok(G.research('phoenicians'));   // «с умом» — 1000 ремёсел из 3000
+  assert.equal(s.res.goods, 0); assert.equal(s.res.silver, 400, 'оставшиеся 2000 ремёсел → 400 серебра');
   assert.equal(G.resVisible('goods'), false);
   const bb = G.effects().bbonus.workshop || 0;
   assert.ok(Math.abs(G.prodOf(ws).silver - 0.1 / 5 * (1 + 0.5 + bb)) < 1e-9, 'мастерская: серебро = ремёсла / 5, и +50% от финикийцев');
@@ -313,7 +313,7 @@ test('железный век: святилища улучшаются на св
   s.techs.push('phoenicians', 'syllabary'); s.res.iron = 3000;
   for (const k of ['stone', 'copper']) s.res[k] = 4500;
   s.buildings.push({ id: 932, type: 'storehouse', level: 11, x: 11, y: 9 }, { id: 933, type: 'storehouse', level: 11, x: 12, y: 9 }); G.tick(0.001);
-  s.res.stone = 15000; s.res.copper = 5000; s.res.silver = 500;
+  s.res.stone = 15000; s.res.copper = 5000; s.res.silver = 2000; s.res.cheese = 6000;   // Афродите — сыр (после «Виноградарства» — амфоры)
   assert.ok(G.upgradeWonder('sp_aphrodite'));
   assert.equal(sh1.type, 'sp_aphrodite'); assert.deepEqual([sh1.x, sh1.y], [9, 9]);
   assert.equal(G.buildStatus('shrine1').hidden, true, 'старое святилище заново не строится');
@@ -750,13 +750,15 @@ test('дань: Ассирия грабит, Египет — как средн�
   assert.ok(Math.abs(value - r.short * W.silver) < 100, `взяли по ценнику: ${value} ≈ ${r.short * W.silver}`);
 });
 
-test('вторая половина железного века: «через силу» — купить у чужеземцев за серебро; топоры и кирки; врачи; ваза Амафунта; переход', () => {
+test('железный век: «через силу» — закупка за рубежом (после «Финикийцев» — серебром); топоры и кирки; врачи; ваза Амафунта; переход', () => {
   const C = fresh(), G = ironAge(C), s = G.state, BAL = C.get('BALANCE'), T = C.get('TECH_BY_ID'), B = C.get('BUILDINGS');
-  // путь «через силу»: λ-часть — серебром, без дерева и камня за λ
+  // путь «через силу» — закупка: ресурсы «с умом» ×3 и за каждый прежний λ — ремёсла (buy), всё ×1.5; ремёсла после «Финикийцев» — серебро
+  assert.deepEqual(Object.keys(G.techPrice(T.iron, 'labor').cost).sort(), ['copper', 'goods', 'stone', 'wood'], 'до «Финикийцев» — медь и ремёсла, к месту — лес и камень');
+  s.techs.push('phoenicians');
   const lab = G.techPrice(T.doctors, 'labor').cost;
-  assert.equal(lab.silver, Math.ceil((140 * 3 + 280 * BAL.laborSilverPerLogos) * BAL.laborEpochMult[2] / 10) * 10, 'в железном веке путь «через силу» ×1.5');
-  assert.equal(lab.wood, undefined); assert.equal(lab.stone, undefined);
-  for (const id of ['pharaoh', 'irontools', 'doctors', 'fleet', 'gifts']) assert.ok(T[id].buy && T[id].epoch === 2, id);
+  assert.equal(lab.silver, 400 * 3 * BAL.laborEpochMult[2] + 280 * T.doctors.buy.goods * BAL.laborEpochMult[2] / 5);
+  assert.equal(lab.goods, undefined); assert.equal(lab.wood, undefined); assert.equal(lab.stone, undefined);
+  for (const id of ['iron', 'syllabary', 'phoenicians', 'viticulture', 'pharaoh', 'irontools', 'doctors', 'fleet', 'gifts']) assert.ok(typeof T[id].buy === 'object' && T[id].epoch === 2, id);
   // топоры и кирки: пока есть железо, лесорубы и каменоломни дают +30% и тратят железо
   const lj = { id: 950, type: 'lumber', level: 9, x: 1, y: 1 }; s.buildings.push(lj);
   assert.equal(G.tradeOf(lj), null);
@@ -774,9 +776,9 @@ test('вторая половина железного века: «через с
   assert.equal(B.sp_amathus.tech, 'irontools'); assert.equal(B.sp_amathus.logos, 0);
   const cap = G.storageCap(); s.buildings.push({ id: 952, type: 'sp_amathus', level: 1, x: 3, y: 1 }); G.tick(0.001);
   assert.ok(G.storageCap() > cap);
-  // переход: нужны гробницы Саламина и все знания эпохи
+  // переход: нужны гробницы Саламина, святилища Афродиты и Аполлона и все знания эпохи
   const reqs = G.epochReqs();
-  assert.ok(reqs.some(q => q.kind === 'special' && q.type === 'sp_salamis' && !q.ok));
+  for (const w of ['sp_salamis', 'sp_aphrodite', 'sp_apollo']) assert.ok(reqs.some(q => q.kind === 'special' && q.type === w && !q.ok), w);
   assert.ok(reqs.some(q => q.kind === 'techs' && q.need === C.get('TECHS').filter(x => x.epoch === 2).length));
   assert.ok(reqs.some(q => q.kind === 'res' && q.res === 'silver') && reqs.some(q => q.kind === 'res' && q.res === 'iron'));
 });
@@ -784,7 +786,8 @@ test('вторая половина железного века: «через с
 test('«Флот царей» требует Царские гробницы Саламина (reqWonder)', () => {
   const C = fresh(), G = ironAge(C), s = G.state, T = C.get('TECH_BY_ID').fleet;
   s.techs.push('iron', 'phoenicians', 'viticulture', 'pharaoh');
-  for (const k of Object.keys(s.res)) s.res[k] = 30000; s.logos = 5000; G.tick(0.001);
+  s.buildings.push({ id: 872, type: 'storehouse', level: 9, x: 7, y: 7 }, { id: 873, type: 'storehouse', level: 9, x: 8, y: 7 });   // флоту нужно 6000 дерева
+  G.tick(0.001); for (const k of Object.keys(s.res)) s.res[k] = 30000; s.logos = 5000;   // после такта — склад не обрезает
   let st = G.techStatus(T);
   assert.ok(st.locked && st.reason.code === 'needBuilding' && st.reason.type === 'sp_salamis');
   assert.equal(G.research('fleet'), false);
@@ -822,7 +825,7 @@ test('справочные расчёты (facts): где добыть, на ч�
   assert.deepEqual([...G.obsoleteAfter('goatpen').into].sort(), ['olivegrove', 'vineyard']);
   assert.equal(G.obsoleteAfter('house'), null);
   assert.deepEqual([...G.techLinks('iron').opens].sort(), ['forge', 'sp_salamis']);
-  assert.ok(G.logosPrices('techs').includes(320) && G.advanceWonders().includes('sp_salamis'));
+  assert.ok(G.logosPrices('techs').includes(170) && ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].every(w => G.advanceWonders().includes(w)));
 });
 
 test('с 4-го уровня улучшения просят товары (как медь с 6-го); после «Финикийцев» — серебром', () => {
@@ -857,8 +860,10 @@ test('переход из железного века ведёт в эллинс
   const C = fresh(), G = ironAge(C), s = G.state, E = C.get('EPOCHS');
   assert.equal(E[3].maxLevel, 13); assert.ok(!E[3].locked && !E[3].advance && E[4].locked);
   s.techs.push(...C.get('TECHS').filter(t => t.epoch === 2).map(t => t.id));
-  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_salamis', t));
-  s.buildings.push({ id: 990, type: 'sp_salamis', level: 1, x: t.x, y: t.y });
+  for (const [i, w] of ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].entries()) {   // обязательные чудеса царств
+    const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(w, t));
+    s.buildings.push({ id: 990 + i, type: w, level: 1, x: t.x, y: t.y });
+  }
   s.pop = 200; s.res.silver = 2600; s.res.iron = 1600; s.res.stone = 10000;
   s.buildings.push({ id: 873, type: 'storehouse', level: 11, x: 4, y: 7 }); G.tick(0.001); s.pop = 200;
   assert.ok(G.advanceEpoch());
@@ -976,11 +981,11 @@ test('обряды: «Всей семьёй» не дорожает с эпох�
   // «Сбор припасов» — по курсу обрядов: 3 медных λ за минуту × инфляция λ (бронза — 4/3); дальше — пока ×1.5
   s.epoch = 0; assert.equal(G.ritualLogos(R.elders), 9);
   s.epoch = 1; assert.equal(G.ritualLogos(R.elders), 16);
-  s.epoch = 2; assert.equal(G.ritualLogos(R.elders), Math.ceil(9 * 1.5 ** 2));
+  s.epoch = 2; assert.equal(G.ritualLogos(R.elders), Math.round(3 / 1.3 * 1.7 * 5), 'царства: 3/1.3 медных λ × 1.7 за минуту, 5 минут');
   // в бронзе у медных обрядов свои цены (logosAt), в железе — снова ×1.5 от медной
   s.epoch = 1; assert.deepEqual(['hearth', 'herds', 'festival', 'bullmask', 'ingot'].map(id => G.ritualLogos(R[id])), [18, 10, 50, 15, 16]);
   assert.equal(G.ritualDur(R.bullmask), 900); assert.deepEqual({ ...R.ingot.buff.bmult }, { port: 1, workshop: 1 });
-  s.epoch = 2; assert.equal(G.ritualLogos(R.festival), Math.ceil(40 * 1.5 ** 2));
+  s.epoch = 2; assert.deepEqual(['hearth', 'herds', 'harvest', 'festival', 'bullmask', 'vintage'].map(id => G.ritualLogos(R[id])), [18, 10, 12, 50, 15, 12], 'царства — прежние цены');
   s.epoch = 3;
   s.logos = 1000; G.tick(0.001); const r = G.perform('settlers');
   assert.equal(r.minutes, 45); assert.equal(s.buffs.settlers, 45 * 60, 'продление — до своей длины, не до 30 минут');
@@ -990,7 +995,7 @@ test('вино вместо меди: после «Своей монеты» г�
   const C = fresh(), G = hellenic(C), s = G.state;
   const port = addPort(G), mine = { id: 990, type: 'mine', level: 11, x: 1, y: 1 }; s.buildings.push(mine); G.tick(0.001);
   const t0 = G.tradeOf(port, G.effects()), m0 = G.prodOf(mine, G.effects()), p0 = G.prodOf(port, G.effects());
-  assert.ok(Math.abs(t0.silver / -t0.amphora - 0.3 * G.bonusMult('port', 'silver')) < 1e-9, 'базовая цена — 0.03 серебра за 0.1 амфоры');
+  assert.ok(Math.abs(t0.silver / -t0.amphora - 0.3 * G.bonusMult('port', 'silver')) < 1e-9, 'базовая цена — 0.06 серебра за 0.2 амфоры');
   s.techs.push('coinage'); G.tick(0.001);
   const t1 = G.tradeOf(port, G.effects()), m1 = G.prodOf(mine, G.effects()), p1 = G.prodOf(port, G.effects());
   assert.ok(Math.abs(t1.silver / t0.silver - 1.5) < 1e-9 && t1.amphora === t0.amphora, 'амфоры — те же, монет на 50% больше');
@@ -1023,14 +1028,15 @@ test('медно-каменный век: λ знаний «с умом» по �
   assert.equal(s.timers.goat, 0, 'коза — сразу');
 });
 
-test('дома писцов: в бронзовом веке один, с железного — два', () => {
+test('дома писцов: один, после «Кипрского слогового письма» (железный век) — два', () => {
   const C = fresh(), G = C.get('Game'), s = G.state;
   s.epoch = 1; s.techs.push('writing');
   assert.equal(G.maxCount('scribe'), 1); assert.equal(G.maxCount('house'), null);
   const t = G.map.find(t => t.t === 'plain' && !G.buildingAt(t.x, t.y));
   s.buildings.push({ id: 960, type: 'scribe', level: 1, x: t.x, y: t.y });
   assert.equal(G.buildStatus('scribe').reason.code, 'maxCount');
-  s.epoch = 2; assert.equal(G.maxCount('scribe'), 2);
+  s.epoch = 2; assert.equal(G.maxCount('scribe'), 1, 'в железном веке — ещё один, пока нет знания');
+  s.techs.push('syllabary'); assert.equal(G.maxCount('scribe'), 2);
   assert.notEqual((G.buildStatus('scribe').reason || {}).code, 'maxCount');
 });
 

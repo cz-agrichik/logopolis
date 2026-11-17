@@ -28,6 +28,7 @@
   details { margin: 8px 0; } summary { cursor: pointer; font-weight: 700; color: var(--accent); }
   td input[data-budget] { width: 76px; }
   #payback { width: 56px; }
+  .nw { white-space: nowrap; }
   td input { width: 46px; font: inherit; text-align: right; border: 1px solid var(--parch-3); border-radius: 5px; background: #fff; padding: 1px 4px; }
   .err { background: #f6d8cf; padding: 8px 12px; border-radius: 8px; }
   details.extra { margin-top: 30px; } th .dim { font-weight: 400; }
@@ -73,7 +74,7 @@
 'use strict';
 (() => {
   const $ = s => document.querySelector(s);
-  const KEY = 'greekgame.balancer.plan3';
+  const KEY = 'greekgame.balancer.plan6';
   const nf = (x, d) => x.toLocaleString('ru-RU', { maximumFractionDigits: d, minimumFractionDigits: 0 });
   const fmt = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? nf(Math.round(x), 0) : Math.abs(x) >= 10 ? nf(x, 1) : nf(x, 2);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -246,33 +247,36 @@
       EP.map(p => [ep(p), fmt(p.tlab), fmt(p.tm), p.tl, `<b>${fmt(p.perL)}</b>`, `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''} → ${fmt(p.prod1)}`,
         `${fmt(p.perL / p.prod0)} → ${fmt(p.perL / p.prod1)}`]));
     h += `<p class="note">В зерно всё переведено по курсам конца эпохи (раздел 4): ${EP.map(p => `<br>${p.e}: ${rateList(p)}`).join('')}</p>`;
-    h += `<h3>Твёрдый курс обрядов</h3><p class="note">Базовое правило: 1 минута полного выпуска города на начало эпохи стоит ${BALANCE.riteRate} «настоящих» (медных) λ.
+    h += `<h3>Твёрдый курс обрядов</h3><p class="note">Базовое правило: 1 минута полного выпуска города на начало эпохи стоит столько «настоящих» (медных) λ: ${BALANCE.riteRate.map((r, e) => `${esc(en(e))} — ${fmt(r)}`).join(', ')}.
       λ с эпохами дешевеет — инфляция λ (BALANCE.logosInflation: сколько номинальных λ эпохи в одном медном): ${BALANCE.logosInflation.map((f, e) => `${esc(en(e))} — ×${fmt(f)}`).join(', ')};
-      где не задана — взята последняя. По курсу стоит «Сбор припасов»: ${BALANCE.suppliesMin[0]} минуты × ${BALANCE.riteRate} λ × инфляция (он даёт выпуск без вычета еды жителей — чуть больше чистого).
+      где не задана — взята последняя. По курсу стоит «Сбор припасов»: его минуты × медные λ за минуту × инфляция (он даёт выпуск без вычета еды жителей — чуть больше чистого).
       «Начало» эпохи — не сам переход, а чуть позже: четверть пути от перехода к концу эпохи (геометрически); для медно-каменного века — треть от конца (*).</p>`;
-    h += tbl(['эпоха', 'инфляция λ', 'λ за минуту выпуска', 'мощь при переходе → «начало», зерна/с', '1 минута выпуска, зерна', '1 λ ≈ зерна', 'курс по знаниям (выше), 1 λ ≈ зерна', 'по знаниям λ дешевле в'],
-      EP.map(p => [ep(p), '×' + fmt(p.infl) + (p.riteSet ? '' : dim(' (не задана)')), fmt(p.riteRate), p.prod0Assumed ? `${fmt(p.prod0)}*` : `${fmt(p.prodStart)} → ${fmt(p.prod0)}`, fmt(p.prod0 * 60), `<b>${fmt(p.riteL)}</b>`, fmt(p.perL),
+    h += tbl(['эпоха', 'медных λ за минуту', 'инфляция λ', 'номинальных λ за минуту', 'мощь при переходе → «начало», зерна/с', '1 минута выпуска, зерна', '1 λ ≈ зерна', 'курс по знаниям (выше), 1 λ ≈ зерна', 'по знаниям λ дешевле в'],
+      EP.map(p => [ep(p), fmt(p.riteReal), '×' + fmt(p.infl) + (p.riteSet ? '' : dim(' (не задана)')), fmt(p.riteRate), p.prod0Assumed ? `${fmt(p.prod0)}*` : `${fmt(p.prodStart)} → ${fmt(p.prod0)}`, fmt(p.prod0 * 60), `<b>${fmt(p.riteL)}</b>`, fmt(p.perL),
         p.perL ? `${fmt(p.riteL / p.perL)} раза` : dim('—')]));
 
     h += `<h2 id="s10">10. Полные затраты эпохи: два сценария</h2><p class="note"><b>По максимуму «с умом»</b> — знания за λ, все чудеса (и за λ, и без λ).
       <b>По максимуму ресурсами</b> — знания «через силу», чудеса только обязательные и без λ; λ всё равно нужен на обязательное (раздел 7) и на уровни за λ (раздел 8).
-      Ресурсы складываются как есть, потом переводятся в зерно по курсам конца эпохи (раздел 4). Дальше — две оценки, сколько это работы города:
+      Ресурсы складываются как есть, потом переводятся в зерно по курсам конца эпохи (раздел 4); в скобках у каждого — сколько это зерна. Дальше — две оценки, сколько это работы города:
       при мощи города <b>на начало эпохи</b> и <b>на конец эпохи</b> (выпуск в зерне в секунду, раздел 5): часы = зерно ÷ мощь ÷ 3600.
       «Начало» — не сам переход, а чуть позже: четверть пути от перехода к концу эпохи (геометрически). В начале игры город почти ноль,
       поэтому для медно-каменного века мощь на начало взята как треть от конца эпохи (*) — легко достижимое состояние.
       λ — в двух видах: <b>номинал</b> (λ эпохи, как в ценах) и <b>реальные</b> — в медных λ: номинал ÷ инфляция λ (раздел 9: ${BALANCE.logosInflation.map((f, e) => `${esc(en(e))} ×${fmt(f)}`).join(', ')}; где не задана — последняя).</p>`;
     const real = (p, v) => `${fmt(v / p.infl)}${p.riteSet ? '' : dim('*')}`;
+    // ресурсы с пшеничным эквивалентом в скобках (по курсам конца эпохи) — чтобы видно было, что много, а что мало
+    const costW = (c, p) => L(Object.entries(c || {}).filter(([, v]) => v).map(([k, v]) => { const r = p.rates[k] != null ? p.rates[k] : (R.worth[k] || 1);
+      return `<span title="${esc(rn(k))}" class="nw">${ri(k)}&nbsp;${fmt(v)}&nbsp;${dim('(' + fmt(v * r) + ')')}</span>`; }).join(' ') || '—');
     const pw = (p, start) => start ? `${fmt(p.prod0)}${p.prod0Assumed ? '*' : ''}` : fmt(p.prod1);
     h += tbl(['эпоха', 'сценарий', 'λ номинал', 'λ реальные', L('ресурсы'), 'в зерне', 'мощь на начало, зерна/с', '= часов работы', 'мощь на конец, зерна/с', '= часов работы'], EP.flatMap(p => [
-      [ep(p), '«с умом»', `<b>${fmt(p.scen.mind.logos)}</b>`, real(p, p.scen.mind.logos), cost(p.scen.mind.res), fmt(p.scen.mind.w), pw(p, true), `<b>${secs(p.scen.mind.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.mind.w, p.prod1)}</b>`],
-      ['', 'ресурсами', `<b>${fmt(p.scen.labor.logos)}</b>`, real(p, p.scen.labor.logos), cost(p.scen.labor.res), fmt(p.scen.labor.w), pw(p, true), `<b>${secs(p.scen.labor.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.labor.w, p.prod1)}</b>`],
+      [ep(p), '«с умом»', `<b>${fmt(p.scen.mind.logos)}</b>`, real(p, p.scen.mind.logos), costW(p.scen.mind.res, p), fmt(p.scen.mind.w), pw(p, true), `<b>${secs(p.scen.mind.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.mind.w, p.prod1)}</b>`],
+      ['', 'ресурсами', `<b>${fmt(p.scen.labor.logos)}</b>`, real(p, p.scen.labor.logos), costW(p.scen.labor.res, p), fmt(p.scen.labor.w), pw(p, true), `<b>${secs(p.scen.labor.w, p.prod0)}</b>`, pw(p, false), `<b>${secs(p.scen.labor.w, p.prod1)}</b>`],
     ]));
     const PART = { techMind: 'знания «с умом» (раздел 6)', techLabor: 'знания «через силу» (раздел 6)', must: 'обязательные чудеса (раздел 7)',
       optLogos: 'необязательные чудеса за λ', resWonders: 'чудеса без λ', up: 'постройки и улучшения (раздел 8)', advance: 'переход (раздел 7)' };
     const yes = b => b ? '✓' : dim('—');
     h += EP.map(p => { const sumL = f => p.parts.filter(f).reduce((a, x) => a + x.logos, 0), sumW = f => p.parts.filter(f).reduce((a, x) => a + x.w, 0);
       return `<details open><summary>из чего сложено: эпоха ${ep(p)}</summary>` + tbl(['слагаемое', 'λ номинал', 'λ реальные', L('ресурсы'), 'в зерне', '«с умом»', 'ресурсами'],
-        p.parts.filter(x => x.logos || Object.keys(x.res).length).map(x => [PART[x.key], x.logos ? fmt(x.logos) : dim('—'), x.logos ? real(p, x.logos) : dim('—'), cost(x.res), fmt(x.w), yes(x.mind), yes(x.labor)]).concat([
+        p.parts.filter(x => x.logos || Object.keys(x.res).length).map(x => [PART[x.key], x.logos ? fmt(x.logos) : dim('—'), x.logos ? real(p, x.logos) : dim('—'), costW(x.res, p), fmt(x.w), yes(x.mind), yes(x.labor)]).concat([
           { cls: 'sum', cells: ['итого «с умом»', fmt(sumL(x => x.mind)), real(p, sumL(x => x.mind)), '', fmt(sumW(x => x.mind)), '✓', ''] },
           { cls: 'sum', cells: ['итого ресурсами', fmt(sumL(x => x.labor)), real(p, sumL(x => x.labor)), '', fmt(sumW(x => x.labor)), '', '✓'] },
         ])) + `<p class="note">Мощь города: на начало эпохи ${fmt(p.prod0)} зерна/с${p.prod0Assumed ? ' (треть от конца — начало игры почти ноль)' : ''}, на конец ${fmt(p.prod1)} (раздел 5).
