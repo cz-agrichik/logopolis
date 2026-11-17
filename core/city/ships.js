@@ -1,87 +1,91 @@
 'use strict';
 // ============================================================
-//  Корабли (эллинский Кипр): после знания «Корабли в Пирей» в гавань время от времени приходит корабль.
-//  Он просит пакет товаров и даёт за него папирус; то же можно купить за монеты — впятеро дороже.
-//  Не отгрузили — корабль уходит без штрафа. Числа — BALANCE.ships; тексты — content/ru.
-//  Чаще корабли ходят к гаваням 13-го уровня (BALANCE.ships.portLevel) и при чуде с effect.ships
-//  (Гавань Нового Пафоса: вдвое чаще, ждут дольше, выбор из двух грузов).
-//  state.ship: null | { pack, want: { ресурс: сколько }, alt?: { pack, want }, give, left } — корабль у причала
-//  (alt — второй груз на выбор) и сколько секунд он ещё ждёт; state.timers.ship — сколько секунд игры до следующего.
+//  Корабли (эллинский Кипр): после знания «Корабли в Пирей» в гавань приходит купеческий корабль —
+//  ровно через BALANCE.ships.every секунд после того, как ушёл прежний (время идёт и без игрока).
+//  Корабль ждёт сколько угодно. Он просит один пакет груза (с Гаванью Нового Пафоса — два на выбор);
+//  за пакет даёт 10 папируса, те же 10 папируса можно купить за монеты. Сделок за стоянку — до BALANCE.ships.deals
+//  (с чудом — больше); последняя сделка — и корабль отчаливает сам, раньше — по кнопке «Отправление».
+//  Числа — BALANCE.ships; тексты — content/ru.
+//  state.ship: null | { pack, want: { ресурс: сколько }, alt?: { pack, want }, give, deals } — корабль у причала
+//  (alt — второй груз на выбор, deals — сколько сделок уже сделано); state.timers.ship — сколько секунд до следующего.
 // ============================================================
 
 Object.assign(Game, {
   /** Ходят ли корабли: знание изучено и есть хоть одна гавань. */
   shipsOpen() { return this.hasTech('piraeus') && this.state.buildings.some(b => b.type === 'port'); },
-  /** Корабли чудес: { every, wait, choice } — множитель промежутка, сколько ждут, из скольких грузов выбрать. */
+  /** Правила стоянки: { deals, choice } — сколько сделок и из скольких грузов выбрать (чудо с effect.ships). */
   shipRules() {
     const S = BALANCE.ships, w = (this.fx || this.effects()).ships || {};
-    const ports = this.state.buildings.filter(b => b.type === 'port' && b.level >= S.portLevel).length;
-    const portMult = Math.max(S.portMin, 1 - S.portCut * ports);
-    return { every: portMult * (w.every || 1), wait: w.wait || S.wait, choice: w.choice || 1, ports, portMult };
+    return { deals: w.deals || S.deals, choice: w.choice || 1 };
   },
-  nextShipIn() { const [a, b] = BALANCE.ships.every; return rand(a, b) * this.shipRules().every; },
+  nextShipIn() { return BALANCE.ships.every; },
 
-  /** Такт кораблей (из events): корабль ждёт и уходит, следующий — приходит. Возвращает true, если что-то поменялось на карте. */
-  shipTick(dt) {
-    const s = this.state;
-    if (!this.shipsOpen()) { if (s.ship) { s.ship = null; return true; } return false; }
-    if (s.ship) {
-      s.ship.left -= dt;
-      if (s.ship.left > 0) return false;
-      this.log('shipGone', { pack: s.ship.pack });
-      s.ship = null; s.timers.ship = this.nextShipIn();
-      return true;
-    }
-    if (s.timers.ship == null) s.timers.ship = this.nextShipIn();
-    s.timers.ship -= dt;
-    if (s.timers.ship > 0) return false;
-    // грузы: один случайный, а при выборе — два разных
-    const R = this.shipRules(), packs = BALANCE.ships.packs.slice(), pick = () => packs.splice(Math.floor(Math.random() * packs.length), 1)[0];
+  /** Корабль приходит: один случайный груз, а при выборе — два разных. */
+  shipArrive() {
+    const s = this.state, R = this.shipRules(), packs = BALANCE.ships.packs.slice();
+    const pick = () => packs.splice(Math.floor(Math.random() * packs.length), 1)[0];
     const P = pick(), Q = R.choice > 1 ? pick() : null;
-    s.ship = { pack: P.id, want: this.liveCost(P.want), give: { ...BALANCE.ships.give }, left: R.wait };
+    s.ship = { pack: P.id, want: this.liveCost(P.want), give: { ...BALANCE.ships.give }, deals: 0 };
     if (Q) s.ship.alt = { pack: Q.id, want: this.liveCost(Q.want) };
     s.timers.ship = null;
     this.log('shipCame', { pack: P.id, want: s.ship.want, give: s.ship.give, alt: Q ? Q.id : null });
     Bus.emit('ship', s.ship);
+  },
+  /** Такт кораблей (из events и catchUp): корабль у причала ждёт, следующий — приходит в срок. Возвращает true, если что-то поменялось на карте. */
+  shipTick(dt) {
+    const s = this.state;
+    if (!this.shipsOpen()) { if (s.ship) { s.ship = null; return true; } return false; }
+    if (s.ship) return false;
+    if (s.timers.ship == null) s.timers.ship = this.nextShipIn();
+    s.timers.ship -= dt;
+    if (s.timers.ship > 0) return false;
+    this.shipArrive();
     return true;
   },
 
-  /** Корабль у причала: { ship, ok, reason (чего не хватает для отгрузки), alt: { ok, reason } | null, buy: { cost, ok, reason } } или null. */
+  /** Корабль у причала: { ship, deals: { done, max, left }, ok, reason (чего не хватает для отгрузки),
+   *  alt: { ok, reason } | null, buy: { cost, ok, reason } } или null. */
   shipStatus() {
-    const ship = this.state.ship;
+    const s = this.state, ship = s.ship;
     if (!ship) return null;
-    const reason = this.lackReason(ship.want, 0), cost = this.liveCost(BALANCE.ships.buy), buyReason = this.lackReason(cost, 0);
-    const altReason = ship.alt ? this.lackReason(ship.alt.want, 0) : null;
-    return { ship, ok: !reason, reason, alt: ship.alt ? { ok: !altReason, reason: altReason } : null, buy: { cost, ok: !buyReason, reason: buyReason } };
+    const max = this.shipRules().deals, deals = { done: ship.deals || 0, max, left: Math.max(0, max - (ship.deals || 0)) };
+    const full = Object.keys(ship.give).every(k => (s.res[k] || 0) >= this.storageCap()) ? { code: 'shipFull' } : null;
+    const why = cost => full || this.lackReason(cost, 0);
+    const reason = why(ship.want), cost = this.liveCost(BALANCE.ships.buy), buyReason = why(cost);
+    const altReason = ship.alt ? why(ship.alt.want) : null;
+    return { ship, deals, ok: !reason, reason, alt: ship.alt ? { ok: !altReason, reason: altReason } : null, buy: { cost, ok: !buyReason, reason: buyReason } };
   },
-  /** Корабль ушёл с товаром или с монетами: привезённое — на склад, следующий — через nextShipIn. */
-  shipDone(how, cost, pack) {
+  /** Сделка: заплатить грузом или монетами, получить папирус. Последняя сделка — корабль отчаливает сам. */
+  shipDeal(how, cost, pack) {
     const s = this.state, ship = s.ship, cap = this.storageCap(), got = [];
     this.pay(cost, 0);
     for (const [k, v] of Object.entries(ship.give)) { const g = Math.floor(Math.min(v, cap - (s.res[k] || 0))); s.res[k] = (s.res[k] || 0) + g; got.push([k, g]); }
+    ship.deals = (ship.deals || 0) + 1;
     s.stats.ships = (s.stats.ships || 0) + 1;
     this.log('shipLoaded', { pack, how, got });
-    s.ship = null; s.timers.ship = this.nextShipIn();
-    this.save();
-    return { how, got, pack };
+    const left = this.shipRules().deals - ship.deals, sailed = left <= 0;
+    if (sailed) this.shipDepart();
+    else this.save();
+    return { how, got, pack, left: Math.max(0, left), sailed };
   },
   /** Отгрузить груз (alt — второй, если корабль дал выбор): товар уходит, папирус приходит. */
   shipLoad(alt = false) {
     const st = this.shipStatus();
     if (!st) return null;
-    if (alt) return st.alt && st.alt.ok ? this.shipDone('load', st.ship.alt.want, st.ship.alt.pack) : null;
-    return st.ok ? this.shipDone('load', st.ship.want, st.ship.pack) : null;
+    if (alt) return st.alt && st.alt.ok ? this.shipDeal('load', st.ship.alt.want, st.ship.alt.pack) : null;
+    return st.ok ? this.shipDeal('load', st.ship.want, st.ship.pack) : null;
   },
-  /** Купить привезённое за монеты (впятеро дороже, чем товаром). */
+  /** Купить папирус у кормчего за монеты. */
   shipBuy() {
     const st = this.shipStatus();
-    return st && st.buy.ok ? this.shipDone('buy', st.buy.cost, st.ship.pack) : null;
+    return st && st.buy.ok ? this.shipDeal('buy', st.buy.cost, st.ship.pack) : null;
   },
-  /** Отпустить корабль без груза: без штрафа, следующий придёт как обычно. */
-  shipDismiss() {
+  /** «Отправление»: корабль уходит (без сделок — без штрафа), следующий придёт через BALANCE.ships.every. */
+  shipDepart() {
     const s = this.state;
     if (!s.ship) return false;
-    this.log('shipGone', { pack: s.ship.pack });
+    const deals = s.ship.deals || 0;
+    this.log(deals ? 'shipSailed' : 'shipGone', { pack: s.ship.pack, deals });
     s.ship = null; s.timers.ship = this.nextShipIn();
     this.save();
     return true;
@@ -98,6 +102,6 @@ Object.assign(Game, {
     }
     return null;
   },
-  /** Сколько секунд корабль ещё ждёт (null — корабля нет). */
-  shipLeft() { return this.state.ship ? Math.max(0, this.state.ship.left) : null; },
+  /** Через сколько секунд придёт следующий корабль; null — корабли не ходят или корабль уже у причала. */
+  shipIn() { const s = this.state; return this.shipsOpen() && !s.ship && s.timers.ship != null ? Math.max(0, s.timers.ship) : null; },
 });

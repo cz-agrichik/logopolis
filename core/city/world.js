@@ -145,7 +145,7 @@ Object.assign(Game, {
    * Время идёт по-настоящему: благословения и перерывы обрядов истекают, как при игроке.
    * Выпуск и рост — первые BALANCE.offlineFullSec в полную силу, дальше вполовину; всё упирается в склады.
    * Набег: если его срок наступил, пока игрока не было, он случается ровно один раз — в конце, по накопленному;
-   * после возвращения отсчёт до следующего набега начинается заново.
+   * после возвращения отсчёт до следующего набега начинается заново. Корабль приходит, если вышел его срок, и ждёт игрока.
    */
   catchUp() {
     const s = this.state;
@@ -169,13 +169,12 @@ Object.assign(Game, {
       if (left <= away) { raid = this.raid(true); s.timers.raid = this.nextRaidIn(); }
       else s.timers.raid = left - away;
     }
-    // корабли без игрока не грузят: тот, что ждал, ушёл (если его срок вышел), следующий придёт уже при игроке
-    if (s.ship) { s.ship.left -= away; if (s.ship.left <= 0) { this.log('shipGone', { pack: s.ship.pack }); s.ship = null; s.timers.ship = this.nextShipIn(); } }
-    else if (s.timers.ship != null) s.timers.ship = Math.max(30, s.timers.ship - away);
+    // корабли ходят и без игрока: срок вышел — корабль ждёт у причала (сколько угодно); сделки — уже при игроке
+    const ship = this.shipTick(away) && !!s.ship;
     s.lastSave = Date.now();
     return {
       seconds: away, gained, pop: s.pop - popBefore, halved: away > BALANCE.offlineFullSec,
-      ended: buffsBefore.filter(id => !s.buffs[id]), raid,
+      ended: buffsBefore.filter(id => !s.buffs[id]), raid, ship,
     };
   },
 });

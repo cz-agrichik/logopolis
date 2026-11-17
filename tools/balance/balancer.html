@@ -275,6 +275,8 @@
       Описана ${fmt(p.target.part * 100)}% эпохи. Части считаем равными по времени, а город — растущим, как в описанной части (×${fmt(p.prod1 / p.prodStart)} за часть),
       поэтому на неё по выпуску приходится ${fmt(p.target.share * 100)}% цели = <b>${fmt(p.target.want)}</b> зерна; сейчас — ${fmt(p.target.have)} (${fmt(p.target.have / p.target.want * 100)}%).
       ${p.target.techsWant ? `Из пути — знания «через силу»: ${fmt(p.target.techsWant / p.target.share)} на эпоху; на описанную часть по выпуску <b>${fmt(p.target.techsWant)}</b>, ровно третью — ${fmt(p.target.techsThird)}; сейчас — <b>${fmt(p.target.techsHave)}</b>.` : ''}</p>`).join('');
+    h += EP.filter(p => p.ships).map(p => `<p class="note"><b>Корабли</b>, эпоха ${ep(p)}: папирус по курсу — ${fmt(BALANCE.ships.price)} монет за лист (BALANCE.ships.price);
+      пакеты груза — ${p.ships.map(x => `${esc(x.id)} <b>${x.coins.toFixed(1)}</b>`).join(', ')} монет за лист (цель ≈40), за монеты — ${fmt(BALANCE.ships.buy.silver / BALANCE.ships.give.papyrus)}.</p>`).join('');
     const PART = { techMind: 'знания «с умом» (раздел 6)', techLabor: 'знания «через силу» (раздел 6)', must: 'обязательные чудеса (раздел 7)',
       optLogos: 'необязательные чудеса за λ', resWonders: 'чудеса без λ', up: 'постройки и улучшения (раздел 8)', advance: 'переход (раздел 7)' };
     const yes = b => b ? '✓' : dim('—');

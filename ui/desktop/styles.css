@@ -687,6 +687,7 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .bf.ship small { color: #1e4a66; }
 .bf.ship .bf-ic { font-style: normal; font-size: 16px; line-height: 1; padding-left: 4px; }
 .bf.ship.ready { animation: shipPulse 1.6s ease-in-out infinite; }
+.bf.ship.wait { cursor: default; background: #eef5f9; box-shadow: inset 0 0 0 1px #9bbdd2; opacity: .85; }
 @keyframes shipPulse { 50% { box-shadow: inset 0 0 0 2px #2c6e95, 0 0 16px rgba(44, 110, 149, .7); } }
 .tile.ship-here { z-index: 2; cursor: pointer; }
 .tile.ship-here .ship-ic { display: flex; pointer-events: none; filter: drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation: shipBob 2.4s ease-in-out infinite; }

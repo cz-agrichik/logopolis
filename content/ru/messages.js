@@ -57,6 +57,7 @@ const Msg = {
     switch (r.code) {
       case 'needTech': return `Нужно знание «${Lex.tech[r.tech].name}»`;
       case 'builtAlready': return 'Уже построено';
+      case 'shipFull': return 'Склады полны — папирус некуда положить';
       case 'maxCount': return `Не больше ${r.max}`;
       case 'overStorage': return `Цена ${r.res.map(k => Lex.res[k].icon).join('')} больше вместимости складов (${r.cap}) — постройте или улучшите склад`;
       case 'lack': return `Не хватает: ${r.items.map(([k, d]) => `${Lex.res[k].icon} ${d}`).concat(r.logos ? [`λ ${r.logos}`] : []).join(', ')}`;
@@ -120,6 +121,7 @@ const Msg = {
       case 'hintLogos': return 'λ Логос даётся только за карточки — кнопка «📜 Учиться».';
       case 'shipCame': return `${Lex.ship.icon} В гавань пришёл корабль: «${Lex.ship.packs[p.pack][0]}» — ${this.wantList(p.want)}${p.alt ? ` или «${Lex.ship.packs[p.alt][0]}»` : ''} за ${this.wantList(p.give)}`;
       case 'shipGone': return `${Lex.ship.icon} Корабль ушёл без груза`;
+      case 'shipSailed': return `${Lex.ship.icon} Корабль отчалил: ${p.deals} ${plural(p.deals, 'сделка', 'сделки', 'сделок')} за стоянку`;
       case 'shipLoaded': return p.how === 'buy' ? `${Lex.ship.icon} Папирус куплен у кормчего: ${this.resList(p.got)}` : `${Lex.ship.icon} Корабль загружен («${Lex.ship.packs[p.pack][0]}»): ${this.resList(p.got)}`;
       case 'newGameKept': return '📚 Новая игра: выученные слова и колоды остались с вами.';
     }

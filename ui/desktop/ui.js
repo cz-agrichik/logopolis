@@ -63,7 +63,7 @@ const UI = {
       : r.tribute ? Msg.tributeLine(r) + '.'
       : `⚔️ Набег «народов моря»! Унесли ${Math.round(r.pct * 100)}% всех запасов. Защитят только Циклопические стены.`));
     // корабль эллинского Кипра: пришёл — тост; плашка над картой и сам корабль у гавани открывают окно
-    Bus.on('ship', sh => this.toast(`${Cat.ship.icon} В гавань пришёл корабль: «${esc(Cat.ship.packs[sh.pack][0])}»${sh.alt ? ` или «${esc(Cat.ship.packs[sh.alt.pack][0])}»` : ''}. Ждёт ${Math.round(sh.left / 60)} минут — нажмите на него.`));
+    Bus.on('ship', sh => this.toast(`${Cat.ship.icon} В гавань пришёл корабль: «${esc(Cat.ship.packs[sh.pack][0])}»${sh.alt ? ` или «${esc(Cat.ship.packs[sh.alt.pack][0])}»` : ''}. Ждёт, пока не отправите, — нажмите на него.`));
     $('#buffbar').addEventListener('click', e => { if (e.target.closest('[data-ship]')) this.showShip(); });
     this.renderMap();
     this.renderAll();
@@ -157,11 +157,12 @@ const UI = {
       }
     }
     // корабль у причала (эллинский Кипр): сколько ещё ждёт; нажать — окно корабля
-    const shipLeft = Game.shipLeft(), ship = shipLeft == null ? '' : (() => {
-      const st = Game.shipStatus(), mm = `${Math.floor(shipLeft / 60)}:${String(Math.floor(shipLeft % 60)).padStart(2, '0')}`;
-      return `<span class="bf ship ${st.ok || (st.alt && st.alt.ok) ? 'ready' : ''}" data-ship title="${esc(Cat.ship.name)} ждёт ещё ${mm}: просит «${esc(Cat.ship.packs[st.ship.pack][0])}» (${esc(Msg.wantList(st.ship.want))})${st.ship.alt ? ` или «${esc(Cat.ship.packs[st.ship.alt.pack][0])}» (${esc(Msg.wantList(st.ship.alt.want))})` : ''} за ${esc(Msg.wantList(st.ship.give))}. Нажмите — отгрузить, купить или отпустить.">
-        <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>${Art.res('papyrus', 'inl')} ${st.ship.give.papyrus} · ${mm}</small></span>`;
-    })();
+    // корабль эллинского Кипра: у причала — сколько сделок осталось (нажать — окно корабля); в пути — через сколько придёт
+    const shipIn = Game.shipIn(), st = Game.shipStatus(), mmss = x => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+    const ship = st ? `<span class="bf ship ${st.ok || (st.alt && st.alt.ok) || st.buy.ok ? 'ready' : ''}" data-ship title="${esc(Cat.ship.name)} у причала и ждёт, пока не отправите: просит «${esc(Cat.ship.packs[st.ship.pack][0])}» (${esc(Msg.wantList(st.ship.want))})${st.ship.alt ? ` или «${esc(Cat.ship.packs[st.ship.alt.pack][0])}» (${esc(Msg.wantList(st.ship.alt.want))})` : ''} за ${esc(Msg.wantList(st.ship.give))}; то же — за ${esc(Msg.wantList(st.buy.cost))}. Сделок осталось ${st.deals.left} из ${st.deals.max}. Нажмите — торговать или отправить.">
+        <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>${Art.res('papyrus', 'inl')} ${st.ship.give.papyrus} · ${st.deals.left}/${st.deals.max}</small></span>`
+      : shipIn == null ? '' : `<span class="bf ship wait" title="Следующий корабль придёт через ${mmss(shipIn)} — корабли приходят через ${BALANCE.ships.every / 60} минут после того, как ушёл прежний (время идёт и без вас).">
+        <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>через ${mmss(shipIn)}</small></span>`;
     const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + ship + raid;
     if (bhtml !== this.lastBuffs) {
       this.lastBuffs = bhtml;
@@ -737,6 +738,7 @@ const UI = {
       <p>Вас не было ${dur}. Поселение продолжало работать${a.halved ? ': первые 5 минут — в полную силу, потом — вполовину' : ''}.</p>
       ${list ? `<div class="chips away">${list}</div>` : '<p class="dim">Ничего не прибавилось: склады полны или производить пока нечему.</p>'}
       ${a.pop > 0 ? `<p>👥 Пришло жителей: ${a.pop}</p>` : ''}
+      ${Game.state.ship ? `<p>${Cat.ship.icon} У причала ждёт ${a.ship ? 'пришедший без вас ' : ''}купеческий корабль — нажмите на него на карте.</p>` : ''}
       ${a.ended && a.ended.length ? `<p class="dim">✨ Закончились благословения: ${a.ended.map(id => esc(Cat.rite[id] ? Cat.rite[id].name : id)).join(', ')}.</p>` : ''}
       ${a.raid ? (a.raid.shielded ? '<p class="how">🧱 Пока вас не было, налетели «народы моря», но Циклопические стены их отбили.</p>'
         : `<p class="how">${a.raid.tribute ? `Под конец: ${Msg.tributeLine(a.raid, false)}${a.raid.lost.length ? ':' : '.'}`
@@ -745,28 +747,30 @@ const UI = {
       <div class="em-actions"><button class="btn gold" data-action="close">Продолжить</button></div></div>`);
   },
 
-  /** Окно корабля: что просит, что даёт; отгрузить, купить папирус за монеты или отпустить. */
+  /** Окно корабля: что просит, что даёт; сделки (груз или монеты) — до shipRules().deals за стоянку, «Отправление». */
   showShip() {
     const st = Game.shipStatus();
     if (!st) return this.toast('Корабль уже ушёл');
-    const sh = st.ship, left = Math.ceil(Game.shipLeft() / 60), R = Game.shipRules();
-    const give = Object.entries(sh.give).map(([k, v]) => `<span class="chip good"><i>${Art.res(k)}</i>+${fmt(v)}</span>`).join('');
-    // груз (или два на выбор — с Гаванью Нового Пафоса): своя строка и своя кнопка «Отгрузить»
+    const sh = st.ship, give = Object.entries(sh.give).map(([k, v]) => `<span class="chip good"><i>${Art.res(k)}</i>+${fmt(v)}</span>`).join('');
+    const lock = (ok, reason) => ok ? '' : `<div class="item-lock">${esc(Msg.reason(reason))}</div>`;
+    // груз (или два на выбор — с Гаванью Нового Пафоса) и монеты: у каждого своя строка и своя кнопка
     const deal = (pack, want, ok, reason, alt) => { const P = Cat.ship.packs[pack]; return `<div class="ship-pack">
         <div class="sp-name"><b>${esc(P[0])}</b><span class="dim">${esc(P[1])}.</span></div>
         <div class="ship-deal"><span class="chips">${this.costHtml(want)}</span><span class="arrow">→</span><span class="chips">${give}</span>
           <button class="btn gold small" data-action="ship-load" ${alt ? 'data-alt="1"' : ''} ${ok ? '' : 'disabled'}>Отгрузить</button></div>
-        ${ok ? '' : `<div class="item-lock">${esc(Msg.reason(reason))}</div>`}</div>`; };
-    const [a, b] = BALANCE.ships.every.map(x => Math.round(x * R.every / 60 * 10) / 10);
+        ${lock(ok, reason)}</div>`; };
+    const n = st.deals.left, done = st.deals.done;
     this.showModal(`<div class="ship-modal"><div class="dim">Гавань · ${esc(Cat.ship.name)}</div>
       <h2>${Art.svg('ship', 'inl')} ${sh.alt ? 'Два груза на выбор' : esc(Cat.ship.packs[sh.pack][0])}</h2>
-      <p>Кормчий идёт в Пирей и ждёт ещё ${left} ${plural(left, 'минуту', 'минуты', 'минут')}. Просит груз — и платит папирусом:
-        папирус на Кипре не делают, его везут из Египта.</p>
+      <p>Кормчий платит папирусом — его на Кипре не делают, его везут из Египта. Ждёт, пока не отправите.
+        Сделок осталось: <b>${n} из ${st.deals.max}</b>${done ? ` (уже ${done})` : ''} — после последней корабль отчалит сам.</p>
       ${deal(sh.pack, sh.want, st.ok, st.reason, false)}${sh.alt ? deal(sh.alt.pack, sh.alt.want, st.alt.ok, st.alt.reason, true) : ''}
-      <div class="em-actions">
-        <button class="btn" data-action="ship-buy" ${st.buy.ok ? '' : 'disabled'} title="${st.buy.ok ? '' : esc(Msg.reason(st.buy.reason))}">Купить за <span class="chips">${this.costHtml(st.buy.cost)}</span></button>
-        <button class="btn ghost" data-action="ship-off">Отпустить</button></div>
-      <div class="hint dim">Отпустить — без штрафа: следующий корабль придёт через ${String(a).replace('.', ',')}–${String(b).replace('.', ',')} минут. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
+      <div class="ship-pack"><div class="sp-name"><b>Купить у кормчего</b><span class="dim">те же ${fmt(sh.give.papyrus)} папируса — за монеты.</span></div>
+        <div class="ship-deal"><span class="chips">${this.costHtml(st.buy.cost)}</span><span class="arrow">→</span><span class="chips">${give}</span>
+          <button class="btn small" data-action="ship-buy" ${st.buy.ok ? '' : 'disabled'}>Купить</button></div>
+        ${lock(st.buy.ok, st.buy.reason)}</div>
+      <div class="em-actions"><button class="btn ${done ? 'gold' : 'ghost'}" data-action="ship-off">⛵ Отправление</button></div>
+      <div class="hint dim">${done ? '' : 'Отправить без сделок — без штрафа. '}Следующий корабль придёт через ${BALANCE.ships.every / 60} минут после отправления. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
   },
 
   showEpoch(first = false) {
@@ -855,12 +859,14 @@ const UI = {
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }
     if (act === 'ship-load' || act === 'ship-buy') {
       const r = act === 'ship-load' ? Game.shipLoad(!!a.dataset.alt) : Game.shipBuy();
-      this.closeModal();
-      if (r) { this.toast(`${Cat.ship.icon} ${r.how === 'buy' ? 'Папирус куплен' : 'Корабль загружен'}: <b>${Msg.resList(r.got) || 'склады полны'}</b>`); this.renderMap(); this.renderAll(); }
-      else this.toast(Game.state.ship ? 'Не хватает ресурсов' : 'Корабль уже ушёл');
+      if (r) {
+        this.toast(`${Cat.ship.icon} ${r.how === 'buy' ? 'Папирус куплен' : 'Корабль загружен'}: <b>${Msg.resList(r.got) || 'склады полны'}</b>${r.sailed ? ' — трюм полон, корабль отчалил' : ''}`);
+        this.renderMap(); this.renderAll();
+        if (r.sailed) this.closeModal(); else this.showShip();   // ещё есть сделки — окно остаётся
+      } else { this.closeModal(); this.toast(Game.state.ship ? 'Не хватает ресурсов' : 'Корабль уже ушёл'); }
       return;
     }
-    if (act === 'ship-off') { Game.shipDismiss(); this.closeModal(); this.renderMap(); this.renderAll(); return; }
+    if (act === 'ship-off') { Game.shipDepart(); this.closeModal(); this.renderMap(); this.renderAll(); return; }
     const b = this.modalBuilding;
     if (act === 'upgrade' && b) { if (Game.upgrade(b)) { this.renderMap(); this.renderAll(); this.showBuilding(b); } }
     if (act === 'wonder-up') { if (Game.upgradeWonder(a.dataset.type)) { this.closeModal(); this.renderMap(); this.renderAll(); this.toast(`✨ ${esc(Cat.bld[a.dataset.type].name)}!`); } return; }

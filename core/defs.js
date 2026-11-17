@@ -59,19 +59,21 @@ const BALANCE = {
   // (середина raidLoot от ценности остальных запасов, стены — вдвое), но без случайности; Персия — твёрдую сумму с присяги: persia серебра с жителя.
   tribute: { persia: 4 },
   // Ценник труда (README, «Ценник ресурсов»): сколько стоит единица ресурса в секундах работы, в пересчёте на зерно.
-  // Персия берёт недоимку ровно по нему.
-  worth: { food: 1, wood: 1.4, stone: 2, cheese: 1, goods: 5, copper: 5, bronze: 29, iron: 24, silver: 25, amphora: 3.3, papyrus: 350 },
-  // Корабли (эллинский Кипр, знание «Корабли в Пирей»): раз в every секунд игры в гавань приходит корабль и ждёт wait секунд.
-  // Он просит один из пакетов (packs) и даёт за него give; то же можно купить за buy — впятеро дороже, чем товаром по ценнику.
-  // Не отгрузили — корабль уходит без штрафа. Папирус не производится: его привозят только корабли.
+  // Персия берёт недоимку ровно по нему. Папирус — по своей «настоящей» цене: ships.price монет (50 × 25).
+  worth: { food: 1, wood: 1.4, stone: 2, cheese: 1, goods: 5, copper: 5, bronze: 29, iron: 24, silver: 25, amphora: 3.3, papyrus: 1250 },
+  // Корабли (эллинский Кипр, знание «Корабли в Пирей»): через every секунд после ухода прежнего в гавань приходит корабль
+  // (время идёт и без игрока) и ждёт сколько угодно. Он просит один из пакетов (packs) и даёт за него give; give можно и купить за buy.
+  // Сделок за стоянку — deals (Гавань Нового Пафоса: больше и два пакета на выбор); после последней корабль отчаливает сам.
+  // Папирус не производится: его привозят только корабли. «Настоящая» цена листа — price монет (по ней считает балансер);
+  // пакет — по курсу эллинского Кипра ≈ 400 монет (≈40 за лист, проверяет балансер), за монеты — 600 (60 за лист).
   ships: {
-    every: [360, 720], wait: 300, give: { papyrus: 10 }, buy: { silver: 700 },
-    // гавани 13-го уровня: каждая — корабли на portCut чаще, все вместе — не больше чем вдвое (portMin)
-    portLevel: 13, portCut: 0.2, portMin: 0.5,
+    every: 300, deals: 4, give: { papyrus: 10 }, buy: { silver: 600 }, price: 50,
     packs: [
-      { id: 'grain', want: { food: 2500, amphora: 300 } },
-      { id: 'wine', want: { amphora: 800, silver: 30 } },
-      { id: 'iron', want: { iron: 60, food: 1200, amphora: 250 } },
+      { id: 'grain', want: { food: 5000, amphora: 400 } },
+      { id: 'wine', want: { amphora: 900, food: 1700 } },
+      { id: 'iron', want: { iron: 200, food: 2500 } },
+      { id: 'timber', want: { wood: 3000, amphora: 400 } },
+      { id: 'stone', want: { stone: 2000, wood: 1600 } },
     ],
   },
 };
@@ -162,7 +164,7 @@ const BUILDINGS = {
   forge: { terrain: ['plain'], epoch: 2, tech: 'iron', cost: { stone: 100, copper: 40 }, workers: 3, prod: { wood: -0.5, iron: 0.06 }, lp: 16, forms: [null, null, {}, {}] },
   // levelTech — уровни, для которых нужно знание (писцам 10-й и выше — кипрское слоговое письмо)
   // дом писцов: дерева и камня вчетверо меньше, вместо них товары (столько же в зерне) — улучшения просят товары, а потом серебро
-  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: 1, maxTech: { syllabary: 2 }, cost: { wood: 60, stone: 60, goods: 270 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
+  scribe: { terrain: ['plain'], epoch: 1, tech: 'writing', levelTech: { 10: 'syllabary', 12: 'alphabet' }, max: 1, maxTech: { syllabary: 2, alphabet: 3 }, cost: { wood: 60, stone: 60, goods: 270 }, workers: 1, logosBonus: 0.08, logosBonusPerLevel: 0.02, lp: 14, forms: [null, {}, {}, {}] },
 
   // ---------------- Чудеса древнего Кипра ----------------
   sp_lemba: { special: true, epoch: 0, terrain: ['plain'], cost: { wood: 300, stone: 200 }, logos: 40, effect: { all: 0.15, cap: 5 }, retire: { epoch: 1, into: 'house', level: 5 } },
@@ -193,9 +195,9 @@ const BUILDINGS = {
   // новое чудо за λ — обязательное для перехода в следующую эпоху
   sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 10000, iron: 2500, cheese: 8000, wood: 10000, copper: 1500 }, logos: 450, effect: { all: 0.1, mult: { silver: 0.2 } } },
   // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
-  // Эллинский Кипр. ships — корабли: every — множитель промежутка, wait — сколько ждут, choice — из скольких грузов выбрать
+  // Эллинский Кипр. ships — корабли: deals — сделок за стоянку, choice — из скольких грузов выбрать
   sp_neapaphos: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 16000, wood: 8000, silver: 800 }, logos: 0,
-    effect: { bmult: { port: 0.25 }, ships: { every: 0.5, wait: 480, choice: 2 } } },
+    effect: { bmult: { port: 0.25 }, ships: { deals: 6, choice: 2 } } },
   sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill', 'plain'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
 };
 
@@ -263,34 +265,35 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 // Благословения переводятся на этот курс по очереди: на один ресурс, зато дольше (10–30 минут) — цена = сколько минут выпуска они дают.
 // λ-благословения святилищ — «золотой час»: 15 минут, потом перерыв в настоящих часах (realTime — по часам, а не по игровому времени).
 // instant — мгновенный эффект, buff/dur — благословение на время (сек), cooldown — перерыв (сек), req — нужное чудо.
-// logosAt — своя цена в λ по эпохам (по курсу обрядов); где не задана — старое правило ×1.5 за эпоху (пока — в эллинском Кипре).
+// logosAt — своя цена в λ по эпохам (по курсу обрядов); где не задана — старое правило ×1.5 за эпоху.
+// Эллинский Кипр (≈3.6 λ за минуту, 1 λ ≈ 3500 зерна): пока цены царств — по курсу урожай и виноград дешевле, торговля дороже.
 const RITUALS = [
   { id: 'elders', epoch: 0, logos: 9, perMinute: true, instant: 'elders', cooldown: 120 },
   // fixedPrice — цена в λ не растёт с эпохами; durPerEpoch — с каждой эпохой обряд длится дольше (30, 35, 40, 45 минут)
   { id: 'settlers', epoch: 0, logos: 15, buff: { workers: 1 }, dur: 1800, fixedPrice: true, durPerEpoch: 300 },
   // «Обряд урожая» (зерно ×2) появляется после «Виноградарства», когда загоны уходят, а с ними и «Благословение полей и стад»
-  { id: 'harvest', epoch: 0, logos: 12, logosAt: { 2: 12 }, cost: { food: 20 }, tech: 'viticulture', buff: { mult: { food: 1 } }, dur: 600 },
+  { id: 'harvest', epoch: 0, logos: 12, logosAt: { 2: 12, 3: 12 }, cost: { food: 20 }, tech: 'viticulture', buff: { mult: { food: 1 } }, dur: 600 },
   // Царства-города (≈3.9 λ за минуту, 1 λ ≈ 1650 зерна): цены прежние — по курсу они худо-бедно годятся (труда и рудокопы чуть дороже, урожай — заметно).
   // Бронза (курс 4 λ за минуту, 1 λ ≈ 410 зерна): обряд труда и поля со стадами — по медным ценам (в курсе или чуть щедрее),
   // праздник — 50, рудокопы — 15 минут, торговля — гавани и мастерские (бронзу литеен удваивают только рудокопы).
   // по курсу обрядов: 10 минут дерева и камня ×2 — около 6 минут выпуска города (дерево и камень — главные траты эпохи)
-  { id: 'hearth', epoch: 0, logos: 18, logosAt: { 1: 18, 2: 18 }, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
+  { id: 'hearth', epoch: 0, logos: 18, logosAt: { 1: 18, 2: 18, 3: 18 }, buff: { mult: { wood: 1, stone: 1 } }, dur: 600 },
   // поля и загоны ×2 и беглая коза: по курсу около 14 λ, но зерно и сыр в основном лишние (≈8% трат эпохи) — половина благословения + коза
   { id: 'herds', epoch: 0, logos: 10, logosAt: { 1: 10, 2: 10 }, buff: { bmult: { field: 1, goatpen: 1 } }, dur: 600, goat: true, cooldown: 60, untilTech: 'viticulture' },
-  { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50, 2: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
+  { id: 'festival', epoch: 0, logos: 40, logosAt: { 1: 50, 2: 50, 3: 50 }, cost: { cheese: 80, goods: 60 }, req: 'shrine1', buff: { all: 1, growth: 2 }, dur: 1200 },
   { id: 'vigil', epoch: 0, logos: 0, cost: { cheese: 100, goods: 80, food: 150 }, req: 'shrine1', buff: { logos: 0.5 }, dur: 900, cooldown: 4 * 3600, realTime: true, until: 'sp_aphrodite' },
   // рудокопы — по зданиям (рудники, литейни, кузницы), а не по ресурсам: после «Медной монеты» медь стала монетами,
   //   и «медь ×2» удвоило бы все монеты города
-  { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15 }, cost: { goods: 100 }, buff: { bmult: { mine: 1, foundry: 1, forge: 1 } }, dur: 900 },
+  { id: 'bullmask', epoch: 1, logos: 15, logosAt: { 2: 15, 3: 15 }, cost: { goods: 100 }, buff: { bmult: { mine: 1, foundry: 1, forge: 1 } }, dur: 900 },
   // reqUntil — с этой эпохи чудо обряду не нужно: Святилище Слиткового бога в железном веке становится литейней,
   //   а торговля — делом всего острова. Удваивает основную работу гаваней (серебро и зерно — без лишней меди) и мастерских;
   //   вывоз амфор под благословением вдвое шире, но по той же цене (вместе с амфорами) — это не прибыль.
   //   По курсу это 7 минут выпуска города всю эпоху (доля гаваней и мастерских ≈ 36%, зерно вполцены) = 28 λ; в бронзе — тоже
   //   ≈ 28 λ, но там обряд — подарок Святилища Слиткового бога (16 λ)
-  { id: 'ingot', epoch: 1, logos: 16, logosAt: { 2: 28 }, cost: { copper: 150 }, req: 'sp_ingot', reqUntil: 2, buff: { bmult: { port: 1, workshop: 1 } }, dur: 1200 },
+  { id: 'ingot', epoch: 1, logos: 16, logosAt: { 2: 28, 3: 28 }, cost: { copper: 150 }, req: 'sp_ingot', reqUntil: 2, buff: { bmult: { port: 1, workshop: 1 } }, dur: 1200 },
   { id: 'hornedfeast', epoch: 1, logos: 0, cost: { copper: 100, goods: 200, cheese: 150 }, req: 'shrine2', buff: { logos: 0.75 }, dur: 900, cooldown: 8 * 3600, realTime: true, until: 'sp_apollo' },
   // Царства-города. untilTech / until — обряд уходит после знания / улучшения святилища; tech — появляется после знания.
-  { id: 'vintage', epoch: 2, logos: 12, cost: { food: 60 }, tech: 'viticulture', buff: { bmult: { vineyard: 1, olivegrove: 1 } }, dur: 600, goat: true, cooldown: 60 },
+  { id: 'vintage', epoch: 2, logos: 12, logosAt: { 3: 12 }, cost: { food: 60 }, tech: 'viticulture', buff: { bmult: { vineyard: 1, olivegrove: 1 } }, dur: 600, goat: true, cooldown: 60 },
   // «золотые часы» святилищ: подношения заданы в старых ресурсах и сами пересчитываются, когда те уходят (сыр → амфоры, товары → серебро)
   { id: 'morningstar', epoch: 2, logos: 0, cost: { cheese: 300, goods: 350 }, req: 'sp_aphrodite', buff: { logos: 1 }, dur: 900, cooldown: 8 * 3600, realTime: true },
   { id: 'gnomon', epoch: 2, logos: 0, cost: { goods: 900, cheese: 450 }, req: 'sp_apollo', buff: { logos: 0.75 }, dur: 900, cooldown: 4 * 3600, realTime: true },

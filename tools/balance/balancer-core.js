@@ -22,7 +22,7 @@ const Balancer = (() => {
     0: { house: 9, field: 3, goatpen: 4, lumber: 5, quarry: 5, workshop: 4, storehouse: 3 },
     1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
     2: { house: 12, field: 4, lumber: 10, quarry: 6, workshop: 10, storehouse: 6, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
-    3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, mine: 6, port: 6, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
+    3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, mine: 6, port: 6, scribe: 3, vineyard: 4, olivegrove: 12, forge: 6 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
   const BUDGET = { 0: 100, 1: 300, 2: 1000, 3: 1200 };
@@ -193,12 +193,8 @@ const Balancer = (() => {
       };
       for (let pass = 0; pass < 3; pass++) for (const [t, k] of [['lumber', 'wood'], ['quarry', 'stone'], ['mine', 'copper'], ['workshop', 'goods'], ['workshop', 'silver'],
         ['goatpen', 'cheese'], ['foundry', 'bronze'], ['forge', 'iron'], ['vineyard', 'amphora'], ['olivegrove', 'amphora']]) solve(t, k);
-      // папирус не производится: корабль даёт его за пакет груза — курс по самому дешёвому пакету (за монеты — втрое-вчетверо дороже)
-      if (G.resVisible('papyrus') && BAL.ships) {
-        const per = BAL.ships.packs.map(pk => Object.entries(pk.want).every(([k]) => r[k] != null)
-          ? Object.entries(pk.want).reduce((v, [k, n]) => v + n * r[k], 0) / BAL.ships.give.papyrus : Infinity);
-        if (Math.min(...per) < Infinity) r.papyrus = Math.min(...per);
-      }
+      // папирус не производится: его «настоящая» цена — BALANCE.ships.price монет за лист (грузом выходит ≈40, за монеты — 60)
+      if (G.resVisible('papyrus') && BAL.ships && r.silver != null) r.papyrus = BAL.ships.price * r.silver;
       return r;
     }
     /** Серебро (монеты) с одного здания уровня города: само, через гавань (амфоры — торговая линия, медь — основная). */
@@ -394,7 +390,10 @@ const Balancer = (() => {
       const target = T ? { labor: T.labor, part: T.part, share: n > 1 ? (g - 1) / (Math.pow(g, n) - 1) : 1 } : null;
       if (target) { target.want = target.labor * target.share; target.have = scen.labor.w;
         if (T.techs) { target.techsWant = T.techs * target.share; target.techsThird = T.techs * T.part; target.techsHave = tlab; } }
-      return { e, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, riteReal: real, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
+      // корабли: сколько монет за лист выходит у каждого пакета груза по курсу эпохи (цель — ≈40; за монеты — buy)
+      const ships = rates.papyrus != null && rates.silver ? BAL.ships.packs.map(pk => ({ id: pk.id,
+        coins: Object.entries(pk.want).reduce((v, [k, n]) => v + n * (rates[k] != null ? rates[k] : NaN), 0) / rates.silver / BAL.ships.give.papyrus })) : null;
+      return { e, ships, prod, prod0, prodStart, prod0Assumed: startAssumed, prod1: m1.prod, riteL, riteRate, riteReal: real, infl, riteSet, rates, techs, tl, tm, tlab, techMind, techLabor, parts, wonders: wc, adv: adv ? { logos: adv.logos, res: advRes, w: wh(advRes) } : null, mustL, up,
         perL: tl ? (tlab - tm) / tl : null, scen, target };
     });
     // ---------- окупаемость необязательных чудес ----------
