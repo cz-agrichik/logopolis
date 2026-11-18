@@ -49,7 +49,7 @@ const BALANCE = {
   raidEvery: [300, 1800],  // набег «народов моря»: через 5–30 минут игры (срок известен заранее — таймер)
   raidLoot: [0.1, 0.5],    //   уносят 10–50% всех запасов (без Циклопических стен)        // «Сбор припасов»: столько секунд выпуска (без благословений)
   laborPerLogos: 8,        // путь «трудом»: каждый λ цены заменяется 8 единицами ресурсов
-  laborTechMult: 3,        //   и ресурсная часть цены знания ×3
+  laborTechMult: 3,        //   и ресурсная часть цены знания ×3 (от laborBase, если у знания она своя)
   laborSpecialMult: 2,     //   спецстроения ×2
   // путь «через силу» с эпохами жёстче: вся его цена ×1.7 в бронзе (пересмотрено: знания бронзы на 70% дороже),
   // ×1.5 в железном, ×2.25 в эллинском (их ещё пересмотрим; дальше — ещё больше)
@@ -227,24 +227,27 @@ const TECHS = [
   // Царства-города: «через силу» — закупка за рубежом (buy — что платят за каждый λ прежней цены laborLogos): до «Финикийцев» — медью
   // и товарами, после — серебром (товары в ценах сами становятся серебром); лес и камень — там, где к месту (печи, террасы, рукояти, корабли).
   // Путь «ресурсами» эпохи — ×2.7 к прежнему; λ «с умом» — по курсу обрядов (1 λ ≈ 1680 зерна: оба пути стоят одинаково). Железо — в печи, орудия, флот, чудеса.
-  { id: 'iron', epoch: 2, logos: 60, laborLogos: 200, cost: { copper: 1200, wood: 2000, stone: 1500 }, buy: { goods: 15, copper: 10 }, retire: { res: { bronze: { into: 'iron', rate: 1, stock: 0 } }, buildings: { foundry: 'forge' } } },   // бронзу в железо не перекуёшь: запасы пропадают
-  { id: 'syllabary', epoch: 2, logos: 55, laborLogos: 200, cost: { goods: 1200, stone: 1500 }, buy: { goods: 15, copper: 10 } },   // второй дом писцов, писцам 10-й и 11-й уровни, Святилище Аполлона
+  // «С умом» — не только λ: ресурсы этого пути (cost) ×1.5 к прежним, чтобы λ не решал всё сам; «через силу» — прежний: он считается
+  //   от прежней ресурсной части (laborBase), а не от cost. λ по курсу чуть меньше.
+  { id: 'iron', epoch: 2, logos: 55, laborLogos: 200, cost: { copper: 1800, wood: 3000, stone: 2250 }, laborBase: { copper: 1200, wood: 2000, stone: 1500 }, buy: { goods: 15, copper: 10 }, retire: { res: { bronze: { into: 'iron', rate: 1, stock: 0 } }, buildings: { foundry: 'forge' } } },   // бронзу в железо не перекуёшь: запасы пропадают
+  { id: 'syllabary', epoch: 2, logos: 50, laborLogos: 200, cost: { goods: 1800, stone: 2250 }, laborBase: { goods: 1200, stone: 1500 }, buy: { goods: 15, copper: 10 } },   // второй дом писцов, писцам 10-й и 11-й уровни, Святилище Аполлона
   // финикийцы: товары уходят в серебро 5 : 1 — и запасы, и цены, и выпуск мастерских и гаваней (prodToo); серебро +50%
-  { id: 'phoenicians', epoch: 2, logos: 70, laborLogos: 260, cost: { copper: 1300, goods: 1000 }, buy: { goods: 15, copper: 12 }, effect: { mult: { silver: 0.5 } }, retire: { res: { goods: { into: 'silver', rate: 0.2, prodToo: true } } } },
+  { id: 'phoenicians', epoch: 2, logos: 70, laborLogos: 260, cost: { copper: 1950, goods: 1500 }, laborBase: { copper: 1300, goods: 1000 }, buy: { goods: 15, copper: 12 }, effect: { mult: { silver: 0.5 } }, retire: { res: { goods: { into: 'silver', rate: 0.2, prodToo: true } } } },
   // виноградарство: сыр уходит в амфоры, загоны на холмах — в виноградники, в лесу — в оливковые рощи
-  { id: 'viticulture', epoch: 2, logos: 95, laborLogos: 240, cost: { food: 2000, wood: 2000, stone: 2500 }, buy: { goods: 70 }, req: ['phoenicians'], retire: { res: { cheese: { into: 'amphora', rate: 0.5 } }, buildings: { goatpen: { hill: 'vineyard', forest: 'olivegrove' } } } },
+  { id: 'viticulture', epoch: 2, logos: 90, laborLogos: 240, cost: { food: 3000, wood: 3000, stone: 3750 }, laborBase: { food: 2000, wood: 2000, stone: 2500 }, buy: { goods: 70 }, req: ['phoenicians'], retire: { res: { cheese: { into: 'amphora', rate: 0.5 } }, buildings: { goatpen: { hill: 'vineyard', forest: 'olivegrove' } } } },
   // Вторая половина: серебро и железо.
   // Дань: «Дань фараону» — Египет вместо Ассирии (серебро с жителя), «Дары царю царей» — Персия (твёрдая сумма с присяги, fixTribute).
-  { id: 'pharaoh', epoch: 2, logos: 115, laborLogos: 260, cost: { amphora: 1500, silver: 300, stone: 1500 }, buy: { goods: 70 }, req: ['phoenicians'] },
-  { id: 'irontools', epoch: 2, logos: 105, laborLogos: 240, cost: { iron: 500, wood: 3000 }, buy: { goods: 70 }, req: ['iron', 'phoenicians'] },   // лесорубы и каменоломни: линия железо → +30%
-  { id: 'doctors', epoch: 2, logos: 125, laborLogos: 280, cost: { silver: 400, amphora: 1200 }, buy: { goods: 80 }, req: ['phoenicians'], effect: { houseCap: 2, growth: 0.5 } },
+  { id: 'pharaoh', epoch: 2, logos: 110, laborLogos: 260, cost: { amphora: 2250, silver: 450, stone: 2250 }, laborBase: { amphora: 1500, silver: 300, stone: 1500 }, buy: { goods: 70 }, req: ['phoenicians'] },
+  { id: 'irontools', epoch: 2, logos: 100, laborLogos: 240, cost: { iron: 750, wood: 4500 }, laborBase: { iron: 500, wood: 3000 }, buy: { goods: 70 }, req: ['iron', 'phoenicians'] },   // лесорубы и каменоломни: линия железо → +30%
+  { id: 'doctors', epoch: 2, logos: 125, laborLogos: 280, cost: { silver: 600, amphora: 1800 }, laborBase: { silver: 400, amphora: 1200 }, buy: { goods: 80 }, req: ['phoenicians'], effect: { houseCap: 2, growth: 0.5 } },
   // reqWonder — чудо, без которого знание не изучить: флот снаряжают цари Саламина
-  { id: 'fleet', epoch: 2, logos: 125, laborLogos: 280, cost: { wood: 3000, iron: 600 }, buy: { goods: 70 }, req: ['pharaoh'], reqWonder: 'sp_salamis', effect: { tributeCut: 0.25 } },
-  { id: 'gifts', epoch: 2, logos: 170, laborLogos: 320, cost: { silver: 500, amphora: 2000 }, buy: { goods: 90 }, req: ['pharaoh', 'fleet'], fixTribute: true },
-  // Эллинский Кипр, первая треть. «Через силу» — закупка за рубежом (buy — что платят за каждый λ прежней цены laborLogos):
-  // главным образом монеты, немного меди и железа (штемпели) у монет, зерна и амфор у кораблей, папирус у алфавита.
-  // Знания первой трети «через силу» — ≈1.3 млн зерна (балансер, TARGET: путь «ресурсами» эпохи — 7 млн, из них знания ≥5 млн);
-  // λ «с умом» — по курсу обрядов: (через силу − с умом) ÷ зерна в 1 λ (≈3600).
+  { id: 'fleet', epoch: 2, logos: 120, laborLogos: 280, cost: { wood: 4500, iron: 900 }, laborBase: { wood: 3000, iron: 600 }, buy: { goods: 70 }, req: ['pharaoh'], reqWonder: 'sp_salamis', effect: { tributeCut: 0.25 } },
+  { id: 'gifts', epoch: 2, logos: 165, laborLogos: 320, cost: { silver: 750, amphora: 3000 }, laborBase: { silver: 500, amphora: 2000 }, buy: { goods: 90 }, req: ['pharaoh', 'fleet'], fixTribute: true },
+  // Эллинский Кипр, первая треть. «С умом» — λ и уже заметные ресурсы: cost вчетверо больше прежнего (папирус — нет), чтобы λ не решал всё сам.
+  // «Через силу» — прежний: прежняя ресурсная часть (laborBase) ×laborTechMult (3) × laborEpochMult (2.25) и закупка за рубежом
+  // (buy — что платят за каждый λ прежней цены laborLogos). λ «с умом» по курсу — меньше прежнего.
+  // Знания первой трети «через силу» — ≈1.2 млн зерна (балансер, TARGET: путь «ресурсами» эпохи — 7 млн, из них знания ≥5 млн);
+  // λ «с умом» — по курсу обрядов: (через силу − с умом) ÷ зерна в 1 λ (≈3500).
   // coinage — «Серебряная монета»: серебро зовётся монетами, открыт 12-й уровень зданий (BALANCE.coinTech), монет +25%,
   //   гавань продаёт амфоры на 25% дороже.
   // coppercoin — «Медная монета»: медь уходит в монеты — запасы и цены 3 : 1, выпуск рудников вдвое хуже (rate 1/3 и рудники
@@ -252,13 +255,13 @@ const TECHS = [
   //   Гавань больше не меняет медь на зерно и товары — только продаёт амфоры, ещё на 25% дороже (итого +50%). Монет ещё +25%.
   // piraeus: корабли и папирус (BALANCE.ships); alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
   //   «Через силу» алфавит — 120 папируса (три полных корабля по 4 сделки) и монеты, всего ≈300 тыс. зерна (папирус по 50 монет);
-  //   λ «с умом» по курсу — 80, дешевле кораблей: знание лёгкое, тяжесть — в самих кораблях.
-  { id: 'coinage', epoch: 3, logos: 75, laborLogos: 300, cost: { silver: 440, copper: 700, iron: 100 }, buy: { silver: 12, copper: 6 }, effect: { mult: { silver: 0.25 }, trade: { port: 0.25 } } },
-  { id: 'coppercoin', epoch: 3, logos: 85, laborLogos: 300, cost: { silver: 300, copper: 1500, iron: 150 }, buy: { silver: 13.5, copper: 4 }, req: ['coinage'],
+  //   λ «с умом» по курсу — 80: знание лёгкое, тяжесть — в самих кораблях.
+  { id: 'coinage', epoch: 3, logos: 65, laborLogos: 300, cost: { silver: 1760, copper: 2800, iron: 400 }, laborBase: { silver: 440, copper: 700, iron: 100 }, buy: { silver: 12, copper: 6 }, effect: { mult: { silver: 0.25 }, trade: { port: 0.25 } } },
+  { id: 'coppercoin', epoch: 3, logos: 70, laborLogos: 300, cost: { silver: 1200, copper: 6000, iron: 600 }, laborBase: { silver: 300, copper: 1500, iron: 150 }, buy: { silver: 13.5, copper: 4 }, req: ['coinage'],
     effect: { mult: { silver: 0.25 }, trade: { port: 0.25 }, scale: { mine: 0.5 } },
     retire: { res: { copper: { into: 'silver', rate: 1 / 3, prodToo: true } }, sunset: ['mine'] } },
-  { id: 'piraeus', epoch: 3, logos: 90, laborLogos: 320, cost: { food: 3000, wood: 2500, amphora: 600 }, buy: { silver: 17.5, amphora: 3 }, req: ['coinage'] },
-  { id: 'alphabet', epoch: 3, logos: 80, laborLogos: 340, cost: { papyrus: 10, silver: 200 }, buy: { silver: 11, papyrus: 0.068 }, req: ['piraeus'] },
+  { id: 'piraeus', epoch: 3, logos: 80, laborLogos: 320, cost: { food: 12000, wood: 10000, amphora: 2400 }, laborBase: { food: 3000, wood: 2500, amphora: 600 }, buy: { silver: 17.5, amphora: 3 }, req: ['coinage'] },
+  { id: 'alphabet', epoch: 3, logos: 80, laborLogos: 340, cost: { papyrus: 10, silver: 800 }, laborBase: { papyrus: 10, silver: 200 }, buy: { silver: 11, papyrus: 0.068 }, req: ['piraeus'] },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 

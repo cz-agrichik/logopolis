@@ -5,7 +5,7 @@
 
 /** Подборки колод для вопроса «Что будем учить?»: decks — id колод, groups — целые группы ('start', 'A1', 'A2', 'B1', 'own'). */
 const LEARN_PLANS = {
-  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-num', 'a1-adv', 'a1-conn', 'a1-pron', 'a1-adj', 'a1-omega1', 'a1-omega2'] },
+  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-num', 'a1-time', 'a1-food', 'a1-home', 'a1-body', 'a1-city', 'a1-adv', 'a1-conn', 'a1-pron', 'a1-adj', 'a1-omega1', 'a1-omega2'] },
   a1:      { groups: ['start', 'A1'] },
   a2:      { groups: ['A2'] },
   b1:      { groups: ['B1'] },
@@ -122,8 +122,14 @@ const Decks = {
       delete state.progress[c.id];
     }
     state.decks = state.decks.filter(d => !d.builtin || ids.has(d.id));
+    // новая колода уровня приходит в том же состоянии, что и колоды этого уровня у игрока: включил A2 — новые колоды A2 тоже
+    // включены (иначе слова, переехавшие в новую тематическую колоду, выпали бы из раундов); выключил A1 — новые A1 тоже выключены
     let added = 0;
-    for (const nd of fresh) if (!state.decks.some(d => d.id === nd.id)) { state.decks.push(nd); added++; }
+    for (const nd of fresh) if (!state.decks.some(d => d.id === nd.id)) {
+      const lvl = this.levelOf(nd), same = lvl ? state.decks.filter(d => this.levelOf(d) === lvl) : [];
+      if (same.length) nd.active = same.some(d => d.active);
+      state.decks.push(nd); added++;
+    }
     return added;
   },
 

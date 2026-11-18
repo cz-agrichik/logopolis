@@ -243,8 +243,8 @@ test('железный век: «Финикийцы» — ремёсла ухо�
   const C = fresh(), G = ironAge(C), s = G.state;
   const ws = { id: 900, type: 'workshop', level: 1, x: 8, y: 9 }; s.buildings.push(ws);
   const goodsBefore = G.prodOf(ws).goods;
-  s.res.goods = 3000; s.res.silver = 0;
-  assert.ok(G.research('phoenicians'));   // «с умом» — 1000 ремёсел из 3000
+  s.res.goods = 3500; s.res.silver = 0;
+  assert.ok(G.research('phoenicians'));   // «с умом» — 1500 ремёсел из 3500
   assert.equal(s.res.goods, 0); assert.equal(s.res.silver, 400, 'оставшиеся 2000 ремёсел → 400 серебра');
   assert.equal(G.resVisible('goods'), false);
   const bb = G.effects().bbonus.workshop || 0;
@@ -266,7 +266,7 @@ test('железный век: «Виноградарство» — сыр в а
   const R = C.get('RITUAL_BY_ID');
   assert.equal(G.ritualStatus(R.herds).hidden, undefined); assert.equal(G.ritualStatus(R.vintage).hidden, true);
   assert.equal(G.ritualStatus(R.harvest).hidden, true, 'пока есть загоны, поля благословляют вместе со стадами');
-  s.res.cheese = 900; s.res.amphora = 0; s.res.food = 4500; s.res.wood = 4500;
+  s.res.cheese = 900; s.res.amphora = 0; s.res.food = 6000; s.res.wood = 6000; s.res.stone = 6000;
   assert.ok(G.research('viticulture'));
   assert.equal(s.res.amphora, 450, '2 сыра = 1 амфора');
   assert.equal(Object.keys(G.prodOf(penH)).length, 0, 'старый загон стоит');
@@ -617,7 +617,7 @@ test('колоды: слово переехало из A1 в A2 — прогре
   const learned = D.learnedCount(s);
   const added = D.ensureBuiltins(s);
   assert.ok(added >= 10, 'добавились колоды A2 и B1');
-  const a2 = s.decks.find(d => d.id === 'a2-masc'), moved = a2.cards.find(c => c.front === 'ξενώνας');
+  const a2 = s.decks.find(d => D.levelOf(d) === 'A2' && d.cards.some(c => c.front === 'ξενώνας')), moved = a2.cards.find(c => c.front === 'ξενώνας');   // в v6 — «Путешествия»
   assert.equal(a2.active, false);
   assert.deepEqual(s.progress[moved.id], { step: 3, rev: 2, due: 0, right: 5, wrong: 1, built: true });
   assert.equal(s.progress[was], undefined);
@@ -645,9 +645,9 @@ test('колоды v4: большую колоду A1 поделили надв�
   assert.ok(s.progress[stay.id], 'прогресс оставшихся слов на месте');
   assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
   assert.ok(['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].every(id => s.decks.find(d => d.id === id).active), 'новые колоды A1 включены');
-  // колоды по 16–45 слов (глаголы A1 — до 70); в версии 5 — ещё по 100 новых слов (A1 — и 4 из A2, A2 — минус они и φθηνός)
+  // колоды по 15–70 слов; в версиях 5 и 6 — ещё по 100 новых слов (и реквалификация: в v6 в A1 — 3 из A2 и 4 из B1, в A2 — 2 из B1)
   const lvl = l => s.decks.filter(d => D.levelOf(d) === l).reduce((t, d) => t + d.cards.length, 0);
-  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [589, 401, 363]);
+  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [696, 500, 457]);
   assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length >= 15 && d.cards.length <= 70));
 });
 
@@ -678,6 +678,34 @@ test('колоды v5: числа ушли в свою колоду, ότι — 
   assert.ok(!s.decks.some(d => d.cards.some(c => c.front === 'φθηνός')), 'φθηνός — только как φτηνός в A1');
   assert.equal(s.decks.find(d => d.id === 'a1-adv').name, 'A1 · Наречия места');
   assert.ok(['a1-num', 'a1-pron'].every(id => C.get('LEARN_PLANS').a1start.decks.includes(id)), '«A1 · начинающий» — с числами и местоимениями');
+});
+
+test('колоды v6: тематические колоды — слова своей темы переезжают туда с прогрессом; новая колода уровня — как остальные колоды уровня', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  const THEME = ['a1-time', 'a1-food', 'a1-home', 'a1-body', 'a1-city', 'a2-health', 'a2-travel', 'a2-leisure', 'b1-work', 'b1-society', 'b1-eco'];
+  // сохранение v5: καφές — в «a1-masc», στόμα — в «a2-neut»; тематических колод ещё нет; игрок включил A2, B1 выключен
+  const card = (front, back, hint = '') => ({ front, back, hint });
+  const masc = s.decks.find(d => d.id === 'a1-masc'), neut2 = s.decks.find(d => d.id === 'a2-neut');
+  const oldMasc = D.makeDeck(masc.name, [...masc.cards, card('καφές', 'кофе', 'ο καφές')], { id: 'a1-masc', builtin: true });
+  const oldNeut = D.makeDeck(neut2.name, [...neut2.cards, card('στόμα', 'рот', 'το στόμα · τα στόματα')], { id: 'a2-neut', builtin: true });
+  for (const d of [oldMasc, oldNeut]) d.ver = 5;
+  const swap = { 'a1-masc': oldMasc, 'a2-neut': oldNeut };
+  s.decks = s.decks.filter(d => !THEME.includes(d.id)).map(d => swap[d.id] || d);
+  for (const d of s.decks) if (D.levelOf(d) === 'A2') d.active = true;
+  const kafes = oldMasc.cards.at(-1), stoma = oldNeut.cards.at(-1);
+  s.progress[kafes.id] = { step: 3, rev: 2, due: 0, right: 6, wrong: 0, built: true };
+  s.progress[stoma.id] = { step: 2, rev: 1, due: 0, right: 2, wrong: 1 };
+  assert.equal(D.ensureBuiltins(s), THEME.length, 'добавились все тематические колоды');
+  const deck = id => s.decks.find(d => d.id === id), has = (id, w) => deck(id).cards.find(c => c.front === w);
+  assert.equal(s.progress[has('a1-food', 'καφές').id].right, 6, 'прогресс «καφές» — в «Еде и напитках»');
+  assert.equal(s.progress[has('a1-body', 'στόμα').id].right, 2, 'στόμα переехал из A2 в A1 вместе с прогрессом');
+  assert.ok(!has('a1-masc', 'καφές') && !has('a2-neut', 'στόμα'));
+  assert.ok(['a1-time', 'a1-food', 'a1-body'].every(id => deck(id).active), 'новые колоды A1 включены, как остальные A1');
+  assert.ok(['a2-health', 'a2-travel', 'a2-leisure'].every(id => deck(id).active), 'A2 включён — новые колоды A2 тоже');
+  assert.ok(['b1-work', 'b1-society', 'b1-eco'].every(id => !deck(id).active), 'B1 выключен — новые колоды B1 тоже');
+  assert.deepEqual([...deck('a1-time').cards.slice(0, 3).map(c => c.front)], ['Δευτέρα', 'Τρίτη', 'Τετάρτη'], 'дни — по порядку');
+  assert.ok(['a1-time', 'a1-food', 'a1-home', 'a1-body', 'a1-city'].every(id => C.get('LEARN_PLANS').a1start.decks.includes(id)), '«A1 · начинающий» — с тематическими колодами');
 });
 
 test('сохранение: старое общее сохранение делится на город и обучение', () => {
@@ -793,7 +821,7 @@ test('железный век: «через силу» — закупка за �
   assert.deepEqual(Object.keys(G.techPrice(T.iron, 'labor').cost).sort(), ['copper', 'goods', 'stone', 'wood'], 'до «Финикийцев» — медь и ремёсла, к месту — лес и камень');
   s.techs.push('phoenicians');
   const lab = G.techPrice(T.doctors, 'labor').cost;
-  assert.equal(lab.silver, 400 * 3 * BAL.laborEpochMult[2] + 280 * T.doctors.buy.goods * BAL.laborEpochMult[2] / 5);
+  assert.equal(lab.silver, T.doctors.laborBase.silver * 3 * BAL.laborEpochMult[2] + 280 * T.doctors.buy.goods * BAL.laborEpochMult[2] / 5, '«через силу» — от прежней ресурсной части (laborBase)');
   assert.equal(lab.goods, undefined); assert.equal(lab.wood, undefined); assert.equal(lab.stone, undefined);
   for (const id of ['iron', 'syllabary', 'phoenicians', 'viticulture', 'pharaoh', 'irontools', 'doctors', 'fleet', 'gifts']) assert.ok(typeof T[id].buy === 'object' && T[id].epoch === 2, id);
   // топоры и кирки: пока есть железо, лесорубы и каменоломни дают +30% и тратят железо
@@ -863,7 +891,7 @@ test('справочные расчёты (facts): где добыть, на ч�
   assert.deepEqual([...G.obsoleteAfter('goatpen').into].sort(), ['olivegrove', 'vineyard']);
   assert.equal(G.obsoleteAfter('house'), null);
   assert.deepEqual([...G.techLinks('iron').opens].sort(), ['forge', 'sp_salamis']);
-  assert.ok(G.logosPrices('techs').includes(170) && ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].every(w => G.advanceWonders().includes(w)));
+  assert.ok(G.logosPrices('techs').includes(165) && ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].every(w => G.advanceWonders().includes(w)));
 });
 
 test('с 4-го уровня улучшения просят товары (как медь с 6-го); после «Финикийцев» — серебром', () => {
@@ -933,7 +961,9 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
 test('эллинский Кипр: четыре знания; «через силу» — закупка монетами (медь и железо у монет, амфоры у кораблей, папирус у алфавита)', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
   assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3, 3]);
-  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [75, 85, 90, 80], 'λ «с умом» — по курсу обрядов');
+  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [65, 70, 80, 80], 'λ «с умом» — по курсу обрядов');
+  assert.deepEqual({ ...G.techPrice(T.coinage).cost }, { silver: 1760, copper: 2800, iron: 400 }, '«с умом» — ресурсов вчетверо больше прежнего');
+  // «через силу» — прежний: считается от прежней ресурсной части (laborBase)
   assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 11070, copper: 8780, iron: 680 });
   assert.deepEqual({ ...G.techPrice(T.coppercoin, 'labor').cost }, { silver: 11140, copper: 12830, iron: 1020 });
   assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 20250, wood: 16880, amphora: 6210, silver: 12600 });
@@ -1078,9 +1108,9 @@ test('монеты: Серебряная — монет +25%, амфоры на 
   // Медная монета: медь уходит в монеты 3 : 1 (запас), рудник даёт монеты по 6 : 1, гавань больше не меняет медь на зерно
   s.logos = 5000;
   for (const [k, v] of Object.entries(G.techPrice(T.coppercoin).cost)) s.res[k] = v;
-  s.res.copper = 4500;
+  s.res.copper = 9000;
   assert.ok(G.research('coppercoin'));
-  assert.equal(s.res.silver, 1000, 'медь 4500 − 1500 (цена знания) = 3000 → 1000 монет');
+  assert.equal(s.res.silver, 1000, 'медь 9000 − 6000 (цена знания) = 3000 → 1000 монет');
   assert.equal(G.resVisible('copper'), false, 'меди больше нет');
   const fx = G.effects(), m2 = G.prodOf(mine, fx), p2 = G.prodOf(port, fx), t2 = G.tradeOf(port, fx);
   assert.ok(!m2.copper && Math.abs(m2.silver - 0.15 / 6 * G.levelMult(11) * G.bonusMult('mine', 'silver', fx)) < 1e-9, 'рудник чеканит монеты — 6 меди за монету');
