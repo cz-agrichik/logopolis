@@ -30,6 +30,8 @@ Object.assign(Game, {
     this.state.techPath[id] = mode;
     this.log('tech', { id, mode });
     this.applyRetire(T);   // перемены: уходящие ресурсы переходят в новые
+    // чудо, которое уходит с этим знанием (retire.tech), становится обычным зданием: Циклопические стены — складом
+    for (const [from, into, level] of this.retireWonders()) this.log('retired', { from, into, level, epoch: this.state.epoch, tech: id });
     if (T.fixTribute) this.state.tributeFixed = this.tributeBase('persia');   // присяга Персии: сумма дани считается один раз
     this.fx = this.effects();   // бонусы знания действуют сразу, а не со следующего такта
     this.save();

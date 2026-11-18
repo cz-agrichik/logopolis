@@ -42,7 +42,13 @@ Object.assign(Game, {
       for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth', 'tributeCut']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
       if (e.raidShield) fx.raidShield = true;
-      if (e.ships) fx.ships = Object.assign({}, fx.ships, e.ships);   // корабли эллинского Кипра (core/city/ships.js)
+      if (e.ships) {   // корабли эллинского Кипра (core/city/ships.js): свой срок — меньший, сделки складываются, выбор — больший
+        const w = fx.ships = fx.ships || {};
+        if (e.ships.every) w.every = Math.min(w.every || Infinity, e.ships.every);
+        if (e.ships.deals) w.deals = (w.deals || 0) + e.ships.deals;
+        if (e.ships.choice) w.choice = Math.max(w.choice || 1, e.ships.choice);
+      }
+      if (e.noTribute) fx.noTribute = true;   // «Поддержка Александра»: дани больше нет
     };
     const applyBuff = e => {
       if (!e) return;

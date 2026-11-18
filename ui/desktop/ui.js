@@ -345,6 +345,8 @@ const UI = {
   },
 
   // ---------------- общие фрагменты ----------------
+  /** Показывать ли «⏳ станет обычным зданием»: уход по знанию — только когда эпоха этого знания уже наступила (не раскрывать будущее). */
+  retireShown(B) { const r = B.retire; return !!r && (!r.tech || TECH_BY_ID[r.tech].epoch <= Game.state.epoch); },
   costHtml(cost, logos = 0) {
     const s = Game.state;
     let h = '';
@@ -438,7 +440,7 @@ const UI = {
             <div class="chips">${this.costHtml(st.cost, st.logos)}${st.logos ? '' : '<span class="chip muted">без λ</span>'}</div>
             ${this.reasonHtml(st)}`;
         }
-        if (B.retire && !st.locked && !st.into) body += `<div class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</div>`;
+        if (this.retireShown(B) && !st.locked && !st.into) body += `<div class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</div>`;
         specials += `<div class="item sp ${st.ok || st.done ? '' : 'disabled'} ${this.placing === type ? 'selected' : ''}">${head}${body}</div>
           ${st.locked || st.done ? '' : `<button class="btn small gold ${st.ok ? '' : 'off'}" data-build="${type}">${st.stashed ? 'Поставить' : st.upgrade ? 'Улучшить' : 'Строить'}</button>`}</div>`;
       } else {
@@ -539,7 +541,7 @@ const UI = {
     let h = `<div class="epoch-card"><div class="epoch-title">${esc(E.name)}</div><div class="epoch-years">${esc(E.sub)}</div>
       ${intro}${E.maxLevel ? `<div class="dim">Предел улучшения зданий в эту эпоху: ${E.maxLevel}-й уровень.</div>` : ''}</div>`;
     const reqs = Game.epochReqs();
-    if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Вторая половина эпохи и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
+    if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Последняя треть эпохи и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
     if (reqs) {
       const next = Cat.epochs[s.epoch + 1];
       const done = reqs.filter(r => r.ok).length;
@@ -653,7 +655,7 @@ const UI = {
       <div class="dim">${B.special ? 'Чудо древнего Кипра' : `Уровень ${b.level} из ${Game.maxLevel()} возможных в эту эпоху`}</div></div></div>`;
     if (B.special) {
       const upT = Object.keys(BUILDINGS).find(t => BUILDINGS[t].upgradeOf === b.type), upSt = upT && Game.buildStatus(upT);
-      h += `<p>${esc(B.desc)}</p>${B.retire ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}`;
+      h += `<p>${esc(B.desc)}</p>${this.retireShown(B) ? `<p class="item-retire">⏳ ${esc(Msg.retireNote(B.retire))}</p>` : ''}`;
       if (upSt && !upSt.hidden) h += `<div class="upgrade lv-logos"><div class="up-head"><b>✨ Улучшить до «${esc(Cat.bld[upT].name)}»</b></div>
           <div class="small">${esc(Cat.bld[upT].desc)}</div>
           ${upSt.locked ? `<div class="item-lock">🔒 ${esc(Msg.reason(upSt.reason))}</div>` : `<div class="up-cost"><span class="dim">Цена</span> <span class="chips">${this.costHtml(upSt.cost, upSt.logos)}</span></div>

@@ -42,7 +42,7 @@
   поменяли числа в игре — обновите страницу. Сколько зданий стоит к концу эпохи — допущение, правится прямо в разделе 1.</p>
 </header>
 <div class="bar">
-  <label><input type="checkbox" id="peek"> + эллинский Кипр (первая треть)</label>
+  <label><input type="checkbox" id="peek"> + эллинский Кипр (две трети)</label>
   <a href="#s1">1 здания</a><a href="#s2">2 население</a><a href="#s3">3 λ</a><a href="#s4">4 курсы</a><a href="#s5">5 выпуск</a>
   <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a><a href="#s11">11 чудеса</a>
   <span class="sp"></span><span id="status" class="dim"></span>
@@ -274,7 +274,7 @@
     h += EP.filter(p => p.target).map(p => `<p class="note"><b>Цель пути «ресурсами»</b>, эпоха ${ep(p)}: ${fmt(p.target.labor)} зерна на всю эпоху (TARGET в balancer-core.js).
       Описана ${fmt(p.target.part * 100)}% эпохи. Части считаем равными по времени, а город — растущим, как в описанной части (×${fmt(p.prod1 / p.prodStart)} за часть),
       поэтому на неё по выпуску приходится ${fmt(p.target.share * 100)}% цели = <b>${fmt(p.target.want)}</b> зерна; сейчас — ${fmt(p.target.have)} (${fmt(p.target.have / p.target.want * 100)}%).
-      ${p.target.techsWant ? `Из пути — знания «через силу»: ${fmt(p.target.techsWant / p.target.share)} на эпоху; на описанную часть по выпуску <b>${fmt(p.target.techsWant)}</b>, ровно третью — ${fmt(p.target.techsThird)}; сейчас — <b>${fmt(p.target.techsHave)}</b>.` : ''}</p>`).join('');
+      ${p.target.techsWant ? `Из пути — знания «через силу»: ${fmt(p.target.techsWant / p.target.share)} на эпоху; на описанную часть по выпуску <b>${fmt(p.target.techsWant)}</b>, ровно по доле времени — ${fmt(p.target.techsThird)}; сейчас — <b>${fmt(p.target.techsHave)}</b>.` : ''}</p>`).join('');
     h += EP.filter(p => p.ships).map(p => `<p class="note"><b>Корабли</b>, эпоха ${ep(p)}: папирус по курсу — ${fmt(BALANCE.ships.price)} монет за лист (BALANCE.ships.price);
       пакеты груза — ${p.ships.map(x => `${esc(x.id)} <b>${x.coins.toFixed(1)}</b>`).join(', ')} монет за лист (цель ≈40), за монеты — ${fmt(BALANCE.ships.buy.silver / BALANCE.ships.give.papyrus)}.</p>`).join('');
     const PART = { techMind: 'знания «с умом» (раздел 6)', techLabor: 'знания «через силу» (раздел 6)', must: 'обязательные чудеса (раздел 7)',

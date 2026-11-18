@@ -31,7 +31,7 @@ Object.assign(Game, {
         s.timers.goat = rand(...(fx.goats ? BALANCE.goatEveryFast : BALANCE.goatEvery));
       }
     }
-    if (s.epoch >= 1 && !s.finished) {
+    if (this.raidsOn(fx)) {
       if (s.timers.raid == null) s.timers.raid = this.nextRaidIn();
       s.timers.raid -= dt;
       if (s.timers.raid <= 0) { this.raid(); s.timers.raid = this.nextRaidIn(); }
@@ -66,6 +66,8 @@ Object.assign(Game, {
     return { x: pos.x, y: pos.y, gains, roll, kind: maenad ? 'maenad' : 'goat' };
   },
 
+  /** Грозят ли набеги или дань: с бронзового века и пока не изучена «Поддержка Александра» (effect.noTribute). */
+  raidsOn(fx = this.fx || this.effects()) { const s = this.state; return s.epoch >= 1 && !s.finished && !fx.noTribute; },
   /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery). */
   nextRaidIn() { const [a, b] = BALANCE.raidEvery; return rand(a, b); },
   /** Что грозит: 'sea' — набеги «народов моря» (бронзовый век), 'tribute' — дань империям (железный век). */
@@ -92,10 +94,10 @@ Object.assign(Game, {
     const base = lord === 'persia' ? (this.state.tributeFixed || this.tributeBase('persia', fx)) : this.tributeBase('egypt', fx);
     return Math.ceil(base * (1 - Math.min(0.9, fx.tributeCut || 0)));
   },
-  /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век или игра окончена). */
+  /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век, после «Поддержки Александра» или игра окончена). */
   raidIn() {
     const s = this.state;
-    return s.epoch >= 1 && !s.finished && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
+    return this.raidsOn() && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
   },
   /** Набег (бронзовый век) или дань (железный век).
    *  «Народы моря» и Ассирия уносят случайную долю (BALANCE.raidLoot) всех запасов: стены от «народов моря» защищают полностью,
@@ -164,7 +166,7 @@ Object.assign(Game, {
     const gained = {};
     for (const k of RES_KEYS) { const d = Math.floor(s.res[k] - before[k]); if (d > 0) gained[k] = d; }
     let raid = null;
-    if (s.epoch >= 1 && !s.finished) {
+    if (this.raidsOn()) {
       const left = s.timers.raid ?? this.nextRaidIn();
       if (left <= away) { raid = this.raid(true); s.timers.raid = this.nextRaidIn(); }
       else s.timers.raid = left - away;

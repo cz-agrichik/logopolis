@@ -82,6 +82,11 @@ const Msg = {
   maenadLine(roll) { return Lex.maenadLines[Math.floor(roll * Lex.maenadLines.length)]; },
   /** Предупреждение о чуде эпохи: во что оно превратится. r — BUILDINGS[тип].retire. */
   retireNote(r) {
+    if (r.tech) {
+      const T = TECH_BY_ID[r.tech], keep = T.effect && T.effect.storagePct;
+      return `После знания «${Lex.tech[r.tech].name}» оно станет обычным зданием — «${this.formName(r.into, T.epoch)}» ${r.level}-го уровня. ` +
+        (keep ? `Его +${Math.round(keep * 100)}% к вместимости складов не пропадёт — их даст само знание.` : 'Бонус чуда тогда пропадёт.');
+    }
     return `Чудо эпохи: в эпоху «${Lex.epochs[r.epoch].name}» оно станет обычным зданием — «${this.formName(r.into, r.epoch)}» ${r.level}-го уровня. Бонус чуда тогда пропадёт.`;
   },
   /** Что стало с чудом эпохи: «Большой круглый дом Лембы» → дом из сырцового кирпича 5-го уровня. */
