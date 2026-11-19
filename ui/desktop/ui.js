@@ -347,6 +347,11 @@ const UI = {
   // ---------------- общие фрагменты ----------------
   /** Показывать ли «⏳ станет обычным зданием»: уход по знанию — только когда эпоха этого знания уже наступила (не раскрывать будущее). */
   retireShown(B) { const r = B.retire; return !!r && (!r.tech || TECH_BY_ID[r.tech].epoch <= Game.state.epoch); },
+  /** Что игрок получает (продажа здания): зелёные фишки «+N», без проверки «хватает ли». */
+  gainHtml(res, logos = 0) {
+    return Object.entries(res || {}).filter(([, v]) => v > 0).map(([k, v]) => `<span class="chip good" title="${Cat.res[k].name}: получите ${v}"><i>${Art.res(k)}</i>+${fmt(v)}</span>`).join('')
+      + (logos ? `<span class="chip good logos" title="Логос: получите ${logos}"><i>λ</i>+${fmt(logos)}</span>` : '');
+  },
   costHtml(cost, logos = 0) {
     const s = Game.state;
     let h = '';
@@ -673,12 +678,12 @@ const UI = {
           <div class="up-cost"><span class="dim">Перестроить в «${esc(Msg.formName(rb.into, Game.state.epoch))}» ${b.level}-го уровня</span> <span class="chips">${this.costHtml(rb.cost, 0)}</span></div>
           ${rb.reason ? `<div class="item-lock">${esc(Msg.reason(rb.reason))}</div>` : ''}
           <div class="mb-actions"><button class="btn gold" data-action="rebuild" ${rb.ok ? '' : 'disabled'}>Перестроить</button>
-          <button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
+          <button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.gainHtml(sl.res, sl.logos)}</span></button></div></div>`;
       } else if (sl) {   // доживает: работает, но не улучшается — можно продать
         h += `<div class="upgrade obsolete"><div class="up-head"><b>⏳ Доживает</b></div>
           <p class="small">После знания «${esc(this.retiringTechName(b.type))}» здание ещё работает, но слабее; новых таких не строят, а это не улучшается. Его можно продать.
           <a href="#" data-pedia="a:epochs">Как устроены перемены</a></p>
-          <div class="mb-actions"><button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.costHtml(sl.res, sl.logos)}</span></button></div></div>`;
+          <div class="mb-actions"><button class="btn ghost" data-action="sell">Продать: <span class="chips">${this.gainHtml(sl.res, sl.logos)}</span></button></div></div>`;
       }
       h += `<div class="sect">Сейчас</div><div class="chips">${this.outputHtml(b)}</div>`;
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
@@ -702,7 +707,8 @@ const UI = {
       }
       h += '</div></div>';
     }
-    h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
+    // устаревшее и доживающее здание продают (кнопка выше) — «Снести» даром рядом с «Продать» не показываем
+    h += `<div class="mb-actions">${B.special ? '<button class="btn ghost small" data-action="stash">📦 Убрать на склад</button>' : Game.sellInfo(b) ? '' : '<button class="btn ghost danger small" data-action="demolish">Снести</button>'}
       <button class="btn ghost small" data-action="close">Закрыть</button></div>`;
     this.showModal(h);
   },

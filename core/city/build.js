@@ -188,8 +188,9 @@ Object.assign(Game, {
     return true;
   },
 
+  /** Снести здание даром. Чудо не сносят (его убирают на склад), устаревшее или доживающее — тоже: его продают (sellInfo). */
   demolish(b) {
-    if (BUILDINGS[b.type].special) return false;
+    if (BUILDINGS[b.type].special || this.sellInfo(b)) return false;
     this.state.buildings = this.state.buildings.filter(x => x !== b);
     this.log('demolished', { type: b.type, epoch: this.state.epoch, level: b.level });
     this.save();

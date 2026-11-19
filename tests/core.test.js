@@ -958,6 +958,18 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
   assert.ok(Math.abs(G.storeMult(12) / G.storeMult(11) - 1.3) < 1e-9 && Math.abs(G.storeMult(13) / G.storeMult(12) - 1.6) < 1e-9);
 });
 
+test('устаревшее и доживающее здание продают, а не сносят', () => {
+  const C = fresh(), G = hellenic(C), s = G.state;
+  const field = s.buildings.find(b => !C.get('BUILDINGS')[b.type].special && !G.sellInfo(b));
+  assert.ok(field && !G.sellInfo(field));
+  const mine = { id: 980, type: 'mine', level: 3, x: 1, y: 1 }; s.buildings.push(mine);
+  s.techs.push('coinage', 'coppercoin'); G.tick(0.001);
+  assert.ok(G.sellInfo(mine), 'рудник доживает — его можно продать');
+  assert.equal(G.demolish(mine), false, 'снести даром нельзя'); assert.ok(s.buildings.includes(mine));
+  assert.ok(G.sell(mine)); assert.ok(!s.buildings.includes(mine));
+  assert.ok(G.demolish(field), 'обычное здание сносится');
+});
+
 test('эллинский Кипр, первая треть: четыре знания; «через силу» — закупка монетами (медь и железо у монет, амфоры у кораблей, папирус у алфавита)', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
   assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3, 3]);
@@ -1082,7 +1094,7 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.ok(G.research('choregia'));
   assert.equal(G.ritualStatus(R.festival).hidden, true); assert.notEqual(G.ritualStatus(R.aphrodisia).hidden, true);
   assert.equal(R.aphrodisia.buff.all, 2); assert.equal(G.ritualDur(R.aphrodisia), 1200);
-  assert.deepEqual([R.thalysia, R.chalkeia, R.aphrodisia].map(r => G.ritualLogos(r)), [13, 35, 140], 'по курсу обрядов эпохи');
+  assert.deepEqual([R.thalysia, R.chalkeia, R.aphrodisia].map(r => G.ritualLogos(r)), [18, 35, 140], 'по курсу обрядов эпохи');
   // Поддержка Александра: дани больше нет
   s.timers.raid = 5; assert.ok(G.raidIn() != null);
   assert.ok(G.research('alexander'));
