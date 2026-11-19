@@ -996,15 +996,15 @@ test('эллинский Кипр, первая треть: четыре зна�
   assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 11070, copper: 8780, iron: 680 });
   assert.deepEqual({ ...G.techPrice(T.coppercoin, 'labor').cost }, { silver: 11140, copper: 12830, iron: 1020 });
   assert.deepEqual({ ...G.techPrice(T.piraeus, 'labor').cost }, { food: 20250, wood: 16880, amphora: 6210, silver: 12600 });
-  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 90, silver: 11300 }, 'три полных корабля папируса (по 3 сделки)');
+  assert.deepEqual({ ...G.techPrice(T.alphabet, 'labor').cost }, { papyrus: 90, silver: 11300 }, '9 сделок папируса');
   assert.ok(G.techStatus(T.coppercoin).locked && G.techStatus(T.piraeus).locked && G.techStatus(T.alphabet).locked);
   assert.ok(G.research('coinage'));
   assert.ok(!G.techStatus(T.piraeus).locked && !G.techStatus(T.coppercoin).locked, 'после Серебряной монеты — и корабли, и медная монета');
 });
 
-test('корабли: после «Кораблей в Пирей» и при гавани — через 7 минут; ждут сколько угодно; до 3 сделок грузом или монетами', () => {
+test('корабли: после «Кораблей в Пирей» и при гавани — через 7 минут; ждут сколько угодно; до 4 сделок грузом или монетами', () => {
   const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), S = BAL.ships;
-  assert.equal(S.packs.length, 5); assert.equal(S.every, 420); assert.equal(S.deals, 3);
+  assert.equal(S.packs.length, 5); assert.equal(S.every, 420); assert.equal(S.deals, 4);
   s.timers.ship = 0; G.events(1);
   assert.equal(s.ship, null, 'без знания кораблей нет');
   s.techs.push('coinage', 'piraeus'); G.events(1);
@@ -1016,24 +1016,25 @@ test('корабли: после «Кораблей в Пирей» и при г
   assert.ok(G.shipSpot(), 'корабль стоит у гавани');
   assert.ok(G.resVisible('papyrus'));
   G.events(3 * 3600); assert.ok(s.ship, 'ждёт сколько угодно');
-  // отгрузить: груз уходит, папирус приходит; корабль остаётся — сделок ещё 3
+  // отгрузить: груз уходит, папирус приходит; корабль остаётся — сделок ещё 3 из 4
   for (const k of Object.keys(s.res)) s.res[k] = 9000;
   const want = Object.assign({}, s.ship.want), before = Object.assign({}, s.res);
   const r = G.shipLoad();
-  assert.ok(r && r.how === 'load' && r.left === 2 && !r.sailed); assert.equal(s.res.papyrus, before.papyrus + 10);
+  assert.ok(r && r.how === 'load' && r.left === 3 && !r.sailed); assert.equal(s.res.papyrus, before.papyrus + 10);
   for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v);
-  assert.ok(s.ship); assert.equal(G.shipStatus().deals.left, 2);
+  assert.ok(s.ship); assert.equal(G.shipStatus().deals.left, 3);
   // купить за монеты: 750 за 10 листов — 75 за лист, по ценнику на 50% дороже «настоящей» цены (50)
   const W = BAL.worth, worth = c => Object.entries(c).reduce((t, [k, v]) => t + v * W[k], 0);
   assert.equal(W.papyrus, S.price * W.silver); assert.ok(Math.abs(worth(S.buy) / worth(S.give) - 1.5) < 1e-9);
   const silver = s.res.silver;
   assert.ok(G.shipBuy()); assert.equal(s.res.silver, silver - 750);
-  // третья сделка — корабль отчаливает сам, следующий — через 7 минут
+  const third = G.shipLoad(); assert.ok(third && third.left === 1 && !third.sailed && s.ship);
+  // четвёртая сделка — корабль отчаливает сам, следующий — через 7 минут
   const last = G.shipLoad();
   assert.ok(last && last.sailed && last.left === 0); assert.equal(s.ship, null);
-  assert.equal(s.res.papyrus, before.papyrus + 30);
+  assert.equal(s.res.papyrus, before.papyrus + 40);
   assert.equal(s.timers.ship, 420); assert.equal(G.shipIn(), 420);
-  assert.ok(s.log.some(e => e.k === 'shipSailed' && e.p.deals === 3));
+  assert.ok(s.log.some(e => e.k === 'shipSailed' && e.p.deals === 4));
   G.events(419); assert.equal(s.ship, null); G.events(1.5); assert.ok(s.ship, 'через 7 минут — следующий');
   // не хватает груза — отгрузить нельзя; «Отправление» без сделок — без штрафа
   for (const k of Object.keys(s.ship.want)) s.res[k] = 0;
@@ -1121,31 +1122,31 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.equal(G.raidIn(), null); const res = JSON.stringify(s.res); G.events(10); assert.equal(JSON.stringify(s.res), res, 'дань не пришла');
 });
 
-test('Гавань Нового Пафоса: на минуту чаще, ещё груз на выбор и +2 сделки; Корабельные сараи Китиона (за λ): ещё на минуту чаще, +1 сделка и ещё груз; вместе — 5 минут, 6 сделок и 3 груза', () => {
+test('Гавань Нового Пафоса: на минуту чаще, ещё груз на выбор и +2 сделки; Корабельные сараи Китиона (за λ): ещё на минуту чаще, +1 сделка и ещё груз; вместе — 5 минут, 7 сделок и 3 груза', () => {
   const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), B = C.get('BUILDINGS');
   const rules = () => { const r = G.shipRules(); return [r.every, r.deals, r.choice, r.buy.silver]; };
   s.techs.push('coinage', 'piraeus'); addPort(G); G.tick(0.001);
-  assert.deepEqual(rules(), [420, 3, 1, 750]);
+  assert.deepEqual(rules(), [420, 4, 1, 750]);
   const spot = type => G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t));
   const t = spot('sp_neapaphos');
   assert.ok(t, 'чудо встаёт у моря'); assert.equal(B.sp_neapaphos.logos, 450, 'обязательное для перехода — 450 λ');
   s.buildings.push({ id: 970, type: 'sp_neapaphos', level: 1, x: t.x, y: t.y }); G.tick(0.001);
-  assert.deepEqual(rules(), [360, 5, 2, 750]); assert.equal(G.nextShipIn(), 360);
+  assert.deepEqual(rules(), [360, 6, 2, 750]); assert.equal(G.nextShipIn(), 360);
   s.ship = null; s.timers.ship = 0; G.events(1);
   assert.ok(s.ship.alts && s.ship.alts.length === 1 && s.ship.alts[0].pack !== s.ship.pack);
   for (const k of Object.keys(s.res)) s.res[k] = 20000;
   s.res.papyrus = 0;
   const want = Object.assign({}, s.ship.alts[0].want), before = Object.assign({}, s.res);
-  const r = G.shipLoad(1); assert.ok(r && r.pack === s.ship.alts[0].pack && r.left === 4);
+  const r = G.shipLoad(1); assert.ok(r && r.pack === s.ship.alts[0].pack && r.left === 5);
   for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v, 'ушёл второй груз');
   assert.equal(s.res.papyrus, before.papyrus + 10);
-  for (let i = 0; i < 3; i++) assert.ok(G.shipLoad(i % 2) && s.ship);
+  for (let i = 0; i < 4; i++) assert.ok(G.shipLoad(i % 2) && s.ship);
   assert.ok(G.shipBuy().sailed); assert.equal(s.ship, null);
-  assert.equal(s.res.papyrus, before.papyrus + 50);
+  assert.equal(s.res.papyrus, before.papyrus + 60);
   // сараи Китиона — за λ, у моря: ещё на минуту чаще, ещё сделка и груз; с Новым Пафосом — вместе
   assert.ok(B.sp_kition.logos > 0 && B.sp_kition.coast);
   const k = spot('sp_kition'); s.buildings.push({ id: 971, type: 'sp_kition', level: 1, x: k.x, y: k.y }); G.tick(0.001);
-  assert.deepEqual(rules(), [300, 6, 3, 750]); assert.equal(G.nextShipIn(), 300);
+  assert.deepEqual(rules(), [300, 7, 3, 750]); assert.equal(G.nextShipIn(), 300);
   s.ship = null; s.timers.ship = 0; G.events(1);
   const packs = G.shipStatus().offers.map(o => o.pack);
   assert.equal(packs.length, 3); assert.equal(new Set(packs).size, 3, 'три разных груза');
