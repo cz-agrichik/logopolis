@@ -161,7 +161,7 @@ const UI = {
     const shipIn = Game.shipIn(), st = Game.shipStatus(), mmss = x => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
     const ship = st ? `<span class="bf ship ${st.any ? 'ready' : ''}" data-ship title="${esc(Cat.ship.name)} у причала и ждёт, пока не отправите: просит ${st.offers.map(o => `«${esc(Cat.ship.packs[o.pack][0])}» (${esc(Msg.wantList(o.want))})`).join(' или ')} за ${esc(Msg.wantList(st.ship.give))}; то же — за ${esc(Msg.wantList(st.buy.cost))}. Сделок осталось ${st.deals.left} из ${st.deals.max}. Нажмите — торговать или отправить.">
         <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>${Art.res('papyrus', 'inl')} ${st.ship.give.papyrus} · ${st.deals.left}/${st.deals.max}</small></span>`
-      : shipIn == null ? '' : `<span class="bf ship wait" title="Следующий корабль придёт через ${mmss(shipIn)} — корабли приходят через ${Game.shipRules().every / 60} минут после того, как ушёл прежний (время идёт и без вас).">
+      : shipIn == null ? '' : `<span class="bf ship wait" title="Следующий корабль придёт через ${mmss(shipIn)} — корабли приходят через ${Game.shipRules().every / 60} ${plural(Game.shipRules().every / 60, 'минуту', 'минуты', 'минут')} после того, как ушёл прежний (время идёт и без вас).">
         <i class="bf-ic">${Cat.ship.icon}</i><b>Корабль</b><small>через ${mmss(shipIn)}</small></span>`;
     const bhtml = pills + slots + (buffs.length ? '' : `<span class="bf-empty">благословения — во вкладке «Обряды»</span>`) + ship + raid;
     if (bhtml !== this.lastBuffs) {
@@ -779,7 +779,7 @@ const UI = {
           <button class="btn small" data-action="ship-buy" ${st.buy.ok ? '' : 'disabled'}>Купить</button></div>
         ${lock(st.buy.ok, st.buy.reason)}</div>
       <div class="em-actions"><button class="btn ${done ? 'gold' : 'ghost'}" data-action="ship-off">⛵ Отправление</button></div>
-      <div class="hint dim">${done ? '' : 'Отправить без сделок — без штрафа. '}Следующий корабль придёт через ${Game.shipRules().every / 60} минут после отправления. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
+      <div class="hint dim">${done ? '' : 'Отправить без сделок — без штрафа. '}Следующий корабль придёт через ${Game.shipRules().every / 60} ${plural(Game.shipRules().every / 60, 'минуту', 'минуты', 'минут')} после отправления. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
   },
 
   showEpoch(first = false) {

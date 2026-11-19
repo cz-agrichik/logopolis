@@ -735,13 +735,14 @@ const PEDIA_ARTICLES = [
 
   { id: 'ships', icon: '⛵', title: 'Корабли и папирус', html: () => {
     const S = BALANCE.ships, give = Object.entries(S.give).map(([k, v]) => `${ri(k)} ${v}`).join(' '), buy = Game.liveCost(S.buy);
-    const N = BUILDINGS.sp_neapaphos.effect.ships, K = BUILDINGS.sp_kition.effect.ships, V = BUILDINGS.sp_vouni.effect.ships, R = Game.shipRules(), coin = Msg.silverOf(5);
+    const N = BUILDINGS.sp_neapaphos.effect.ships, K = BUILDINGS.sp_kition.effect.ships, V = BUILDINGS.sp_vouni.effect.ships, R = Game.shipRules(), coin = Msg.silverOf(5),
+      mins = n => `${n} ${plural(n, 'минуту', 'минуты', 'минут')}`;
     const goods = n => n > 1 ? `${['', '', 'два', 'три', 'четыре', 'пять'][n]} груза на выбор` : 'один груз';
     const rows = S.packs.map(P => { const [n, d] = Cat.ship.packs[P.id]; return `<tr><td><b>${n}</b><br><span class="dim">${d}</span></td><td>${Object.entries(Game.liveCost(P.want)).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`; }).join('');
     return `
     <p class="story">Кипр — на перекрёстке морей: суда из Пирея в Египет и из Финикии на запад идут мимо его берегов. Кипрские купцы продают зерно,
     вино и масло, лес и железо, а из Египта везут папирус — бумагу древнего мира.</p>
-    <p>После знания ${pl('t:piraeus', '«Корабли в Пирей»')} к вашей ${pl('b:port', 'гавани')} приходит купеческий корабль — через ${S.every / 60} минут
+    <p>После знания ${pl('t:piraeus', '«Корабли в Пирей»')} к вашей ${pl('b:port', 'гавани')} приходит купеческий корабль — через ${mins(S.every / 60)}
     после того, как ушёл прежний. Время идёт и без вас: вернётесь — корабль уже ждёт. А ждёт он сколько угодно, пока вы его не отправите.
     Над картой — синяя плашка «${Cat.ship.icon} Корабль» (пока корабль в пути — с обратным отсчётом), а сам корабль покачивается на воде у гавани — нажмите на любой из них.</p>
     <p>Корабль просит один груз (какой — решает случай). За стоянку можно сделать до <b>${S.deals} сделок</b> — каждая даёт ${give}:</p>
@@ -750,14 +751,14 @@ const PEDIA_ARTICLES = [
       <li><b>Купить</b> — то же за ${Object.entries(buy).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}: ${S.buy.silver / S.give.papyrus} ${coin} за лист
         (с ${pl('b:sp_vouni', 'Дворцом Вуни')} — ${V.buy}, после знания ${pl('t:alexandria', '«Папирус Александрии»')} — ${TECH_BY_ID.alexandria.effect.ships.buy} ${coin} за 10 листов). По ценам эллинского Кипра каждый груз стоит около 400 ${coin} —
         грузом выходит примерно 40 за лист, а настоящая цена папируса — около ${S.price};</li>
-      <li><b>Отправление</b> — корабль уходит, через ${R.every / 60} минут придёт следующий. Без сделок — без штрафа. После последней сделки корабль отчаливает сам.</li>
+      <li><b>Отправление</b> — корабль уходит, через ${mins(R.every / 60)} придёт следующий. Без сделок — без штрафа. После последней сделки корабль отчаливает сам.</li>
     </ul>
-    <p>Два чуда это улучшают, и вместе — ещё больше (всё складывается): ${pl('b:sp_neapaphos', 'Гавань Нового Пафоса')} — корабль на ${N.faster / 60} минуту чаще,
+    <p>Два чуда это улучшают, и вместе — ещё больше (всё складывается): ${pl('b:sp_neapaphos', 'Гавань Нового Пафоса')} — корабль на ${mins(N.faster / 60)} чаще,
     ещё ${N.choice} груз на выбор и ещё ${N.deals} ${plural(N.deals, 'сделка', 'сделки', 'сделок')} за стоянку,
-    ${pl('b:sp_kition', 'Корабельные сараи Китиона')} — на ${K.faster / 60} минуту чаще, ещё ${K.deals} ${plural(K.deals, 'сделка', 'сделки', 'сделок')} и ещё ${K.choice} груз на выбор.
-    С обоими — раз в ${(S.every - N.faster - K.faster) / 60} минут, ${goods(1 + N.choice + K.choice)}, до ${S.deals + N.deals + K.deals} сделок.
-    После знания ${pl('t:pompey', '«Помпей и пираты»')} море чисто от пиратов, и корабль приходит ещё на ${TECH_BY_ID.pompey.effect.ships.faster / 60} минуту чаще: со всеми тремя — раз в ${(S.every - N.faster - K.faster - TECH_BY_ID.pompey.effect.ships.faster) / 60} минут.
-    Сейчас у вас: раз в ${R.every / 60} минут, ${goods(R.choice)}, до ${R.deals} ${plural(R.deals, 'сделки', 'сделок', 'сделок')}, 10 листов за ${R.buy.silver} ${coin}.</p>
+    ${pl('b:sp_kition', 'Корабельные сараи Китиона')} — на ${mins(K.faster / 60)} чаще, ещё ${K.deals} ${plural(K.deals, 'сделка', 'сделки', 'сделок')} и ещё ${K.choice} груз на выбор.
+    С обоими — раз в ${mins((S.every - N.faster - K.faster) / 60)}, ${goods(1 + N.choice + K.choice)}, до ${S.deals + N.deals + K.deals} сделок.
+    После знания ${pl('t:pompey', '«Помпей и пираты»')} море чисто от пиратов, и корабль приходит ещё на ${mins(TECH_BY_ID.pompey.effect.ships.faster / 60)} чаще: со всеми тремя — раз в ${mins((S.every - N.faster - K.faster - TECH_BY_ID.pompey.effect.ships.faster) / 60)}.
+    Сейчас у вас: раз в ${mins(R.every / 60)}, ${goods(R.choice)}, до ${R.deals} ${plural(R.deals, 'сделки', 'сделок', 'сделок')}, 10 листов за ${R.buy.silver} ${coin}.</p>
     <table class="pt"><tr><th>Груз</th><th>Корабль просит</th></tr>${rows}</table>
     <p>Нужна хотя бы одна гавань.</p>
     <p>${pl('r:papyrus', 'Папирус')} на Кипре не делают — только привозят. Лист дорогой, поэтому он собирает цену в немного единиц.

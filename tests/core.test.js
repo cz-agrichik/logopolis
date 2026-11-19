@@ -1002,9 +1002,9 @@ test('эллинский Кипр, первая треть: четыре зна�
   assert.ok(!G.techStatus(T.piraeus).locked && !G.techStatus(T.coppercoin).locked, 'после Серебряной монеты — и корабли, и медная монета');
 });
 
-test('корабли: после «Кораблей в Пирей» и при гавани — через 8 минут; ждут сколько угодно; до 3 сделок грузом или монетами', () => {
+test('корабли: после «Кораблей в Пирей» и при гавани — через 7 минут; ждут сколько угодно; до 3 сделок грузом или монетами', () => {
   const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), S = BAL.ships;
-  assert.equal(S.packs.length, 5); assert.equal(S.every, 480); assert.equal(S.deals, 3);
+  assert.equal(S.packs.length, 5); assert.equal(S.every, 420); assert.equal(S.deals, 3);
   s.timers.ship = 0; G.events(1);
   assert.equal(s.ship, null, 'без знания кораблей нет');
   s.techs.push('coinage', 'piraeus'); G.events(1);
@@ -1028,18 +1028,18 @@ test('корабли: после «Кораблей в Пирей» и при г
   assert.equal(W.papyrus, S.price * W.silver); assert.ok(Math.abs(worth(S.buy) / worth(S.give) - 1.5) < 1e-9);
   const silver = s.res.silver;
   assert.ok(G.shipBuy()); assert.equal(s.res.silver, silver - 750);
-  // третья сделка — корабль отчаливает сам, следующий — через 8 минут
+  // третья сделка — корабль отчаливает сам, следующий — через 7 минут
   const last = G.shipLoad();
   assert.ok(last && last.sailed && last.left === 0); assert.equal(s.ship, null);
   assert.equal(s.res.papyrus, before.papyrus + 30);
-  assert.equal(s.timers.ship, 480); assert.equal(G.shipIn(), 480);
+  assert.equal(s.timers.ship, 420); assert.equal(G.shipIn(), 420);
   assert.ok(s.log.some(e => e.k === 'shipSailed' && e.p.deals === 3));
-  G.events(479); assert.equal(s.ship, null); G.events(1.5); assert.ok(s.ship, 'через 8 минут — следующий');
+  G.events(419); assert.equal(s.ship, null); G.events(1.5); assert.ok(s.ship, 'через 7 минут — следующий');
   // не хватает груза — отгрузить нельзя; «Отправление» без сделок — без штрафа
   for (const k of Object.keys(s.ship.want)) s.res[k] = 0;
   assert.ok(!G.shipStatus().ok); assert.equal(G.shipLoad(), null);
   const res = JSON.stringify(s.res); assert.ok(G.shipDepart()); assert.equal(JSON.stringify(s.res), res); assert.equal(s.ship, null);
-  assert.ok(s.log.some(e => e.k === 'shipGone')); assert.equal(s.timers.ship, 480);
+  assert.ok(s.log.some(e => e.k === 'shipGone')); assert.equal(s.timers.ship, 420);
   // склады полны папируса — сделка не нужна
   s.timers.ship = 0; G.events(1); for (const k of Object.keys(s.res)) s.res[k] = 9000; s.res.papyrus = G.storageCap();
   const st = G.shipStatus(); assert.ok(!st.ok && !st.buy.ok && st.reason.code === 'shipFull');
@@ -1121,16 +1121,16 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.equal(G.raidIn(), null); const res = JSON.stringify(s.res); G.events(10); assert.equal(JSON.stringify(s.res), res, 'дань не пришла');
 });
 
-test('Гавань Нового Пафоса: на минуту чаще, ещё груз на выбор и +2 сделки; Корабельные сараи Китиона (за λ): ещё на минуту чаще, +1 сделка и ещё груз; вместе — 6 минут, 6 сделок и 3 груза', () => {
+test('Гавань Нового Пафоса: на минуту чаще, ещё груз на выбор и +2 сделки; Корабельные сараи Китиона (за λ): ещё на минуту чаще, +1 сделка и ещё груз; вместе — 5 минут, 6 сделок и 3 груза', () => {
   const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), B = C.get('BUILDINGS');
   const rules = () => { const r = G.shipRules(); return [r.every, r.deals, r.choice, r.buy.silver]; };
   s.techs.push('coinage', 'piraeus'); addPort(G); G.tick(0.001);
-  assert.deepEqual(rules(), [480, 3, 1, 750]);
+  assert.deepEqual(rules(), [420, 3, 1, 750]);
   const spot = type => G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t));
   const t = spot('sp_neapaphos');
   assert.ok(t, 'чудо встаёт у моря'); assert.equal(B.sp_neapaphos.logos, 450, 'обязательное для перехода — 450 λ');
   s.buildings.push({ id: 970, type: 'sp_neapaphos', level: 1, x: t.x, y: t.y }); G.tick(0.001);
-  assert.deepEqual(rules(), [420, 5, 2, 750]); assert.equal(G.nextShipIn(), 420);
+  assert.deepEqual(rules(), [360, 5, 2, 750]); assert.equal(G.nextShipIn(), 360);
   s.ship = null; s.timers.ship = 0; G.events(1);
   assert.ok(s.ship.alts && s.ship.alts.length === 1 && s.ship.alts[0].pack !== s.ship.pack);
   for (const k of Object.keys(s.res)) s.res[k] = 20000;
@@ -1145,7 +1145,7 @@ test('Гавань Нового Пафоса: на минуту чаще, ещё
   // сараи Китиона — за λ, у моря: ещё на минуту чаще, ещё сделка и груз; с Новым Пафосом — вместе
   assert.ok(B.sp_kition.logos > 0 && B.sp_kition.coast);
   const k = spot('sp_kition'); s.buildings.push({ id: 971, type: 'sp_kition', level: 1, x: k.x, y: k.y }); G.tick(0.001);
-  assert.deepEqual(rules(), [360, 6, 3, 750]); assert.equal(G.nextShipIn(), 360);
+  assert.deepEqual(rules(), [300, 6, 3, 750]); assert.equal(G.nextShipIn(), 300);
   s.ship = null; s.timers.ship = 0; G.events(1);
   const packs = G.shipStatus().offers.map(o => o.pack);
   assert.equal(packs.length, 3); assert.equal(new Set(packs).size, 3, 'три разных груза');
@@ -1181,10 +1181,10 @@ test('эллинский Кипр, последняя треть: шесть з�
   // бонусы зданий
   assert.ok(Math.abs(bb().forge - bb0.forge - 0.15) < 1e-9 && Math.abs(bb().lumber - bb0.lumber - 0.15) < 1e-9, 'кузницы и лесорубы +15%');
   fx(); assert.ok(G.research('koinon')); assert.ok(Math.abs(bb().workshop - bb0.workshop - 0.15) < 1e-9, 'мастерские +15%');
-  // корабли: раз в 8 минут, 750 монет; Папирус Александрии — 600; Помпей и пираты — на минуту чаще
-  assert.equal(G.shipRules().every, 480); assert.equal(G.shipRules().buy.silver, 750);
+  // корабли: раз в 7 минут, 750 монет; Папирус Александрии — 600; Помпей и пираты — на минуту чаще
+  assert.equal(G.shipRules().every, 420); assert.equal(G.shipRules().buy.silver, 750);
   fx(); assert.ok(G.research('alexandria')); assert.equal(G.shipRules().buy.silver, 600);
-  fx(); assert.ok(G.research('pompey')); assert.equal(G.shipRules().every, 420);
+  fx(); assert.ok(G.research('pompey')); assert.equal(G.shipRules().every, 360);
   // чудеса: Стоя Зенона продлевает золотые часы, театр — праздники эпохи
   assert.ok(B.sp_stoa.logos === 900 && B.sp_neapaphos.logos === 450 && B.sp_vouni.logos === 450 && B.sp_theatre.logos === 120);
   const free = type => G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t));
@@ -1193,7 +1193,7 @@ test('эллинский Кипр, последняя треть: шесть з�
   assert.equal(G.ritualDur(R.gnomon), 900, 'Стоя: золотые часы — 15 минут');
   assert.equal(G.ritualDur(R.aphrodisia), 1500, 'театр: Афродисии на 5 минут дольше'); assert.equal(G.ritualDur(R.thalysia), 1200);
   assert.equal(G.shipRules().buy.silver, 600, 'с Вуни и Александрией — меньшая цена');
-  assert.equal(G.shipRules().every, 360, 'Помпей и Новый Пафос — на две минуты чаще');
+  assert.equal(G.shipRules().every, 300, 'Помпей и Новый Пафос — на две минуты чаще');
   // переход: 200 жителей, три обязательных чуда, все знания эпохи, 700 λ и ресурсы → Римский Кипр (пока — конец прототипа)
   const a = E[3].advance;
   assert.deepEqual([a.pop, a.logos, [...a.specials]], [200, 700, ['sp_stoa', 'sp_neapaphos', 'sp_vouni']]);
