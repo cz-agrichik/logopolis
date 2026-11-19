@@ -58,7 +58,11 @@ Object.assign(Game, {
       if (B.trade && !old && B.trade.out[k]) from.push({ type, via: 'trade', tech: B.trade.tech });
       if (cost[k] && !old && !(B.special && B.epoch < ep)) to.push({ kind: 'building', type, via: 'cost' });
     }
-    for (const t of TECHS) if (this.liveCost(t.cost)[k] && t.epoch >= ep) to.push({ kind: 'tech', id: t.id });
+    // знания: и путь «с умом», и «через силу» (labor: true — ресурс нужен только «через силу», как папирус у Симпосия)
+    for (const t of TECHS) if (t.epoch >= ep) {
+      if (this.liveCost(t.cost)[k]) to.push({ kind: 'tech', id: t.id });
+      else if (this.techPrice(t, 'labor').cost[k]) to.push({ kind: 'tech', id: t.id, labor: true });
+    }
     EPOCHS.forEach((E, i) => { if (E.advance && i >= ep && this.liveCost(E.advance.res)[k]) to.push({ kind: 'epoch', epoch: i }); });
     const gone = this.resourceGone(k);
     return {

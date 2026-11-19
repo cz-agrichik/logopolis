@@ -42,11 +42,12 @@ Object.assign(Game, {
       for (const k of ['logos', 'cap', 'houseCap', 'storage', 'storagePct', 'growth', 'tributeCut']) if (e[k]) fx[k] += e[k];
       if (e.goats) fx.goats = true;
       if (e.raidShield) fx.raidShield = true;
-      if (e.ships) {   // корабли эллинского Кипра (core/city/ships.js): свой срок — меньший, сделки складываются, выбор — больший
+      if (e.ships) {   // корабли эллинского Кипра (core/city/ships.js): срок и цена листов — меньшие, сделки и грузы на выбор складываются
         const w = fx.ships = fx.ships || {};
         if (e.ships.every) w.every = Math.min(w.every || Infinity, e.ships.every);
         if (e.ships.deals) w.deals = (w.deals || 0) + e.ships.deals;
-        if (e.ships.choice) w.choice = Math.max(w.choice || 1, e.ships.choice);
+        if (e.ships.choice) w.choice = (w.choice || 0) + e.ships.choice;
+        if (e.ships.buy) w.buy = Math.min(w.buy || Infinity, e.ships.buy);
       }
       if (e.noTribute) fx.noTribute = true;   // «Поддержка Александра»: дани больше нет
     };

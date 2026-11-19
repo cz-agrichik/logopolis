@@ -5,8 +5,10 @@
 
 Object.assign(Game, {
   // ---------- знания ----------
-  /** Цена знания: 'logos' — λ + немного ресурсов; 'labor' — без λ, но ресурсов втрое больше (buy — λ-часть серебром: «купить у чужеземцев»). */
+  /** Цена знания: 'logos' — λ + немного ресурсов; 'labor' — без λ, но ресурсов втрое больше (buy — λ-часть серебром: «купить у чужеземцев»).
+   *  У знаний с T.labor цена «через силу» задана прямо числами (эллинский Кипр, вторая треть). */
   techPrice(T, mode = 'logos') {
+    if (mode === 'labor' && T.labor) return { cost: this.liveCost(T.labor), logos: 0 };
     if (mode === 'labor') return { cost: this.liveCost(this.laborCost(T.laborBase || T.cost, T.laborLogos != null ? T.laborLogos : T.logos, T.epoch, BALANCE.laborTechMult, T.buy)), logos: 0 };
     return { cost: this.liveCost(T.cost), logos: T.logos };
   },

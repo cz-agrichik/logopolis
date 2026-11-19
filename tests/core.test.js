@@ -961,7 +961,8 @@ test('эллинский Кипр: 12-й уровень — после «Сво�
 test('эллинский Кипр, первая треть: четыре знания; «через силу» — закупка монетами (медь и железо у монет, амфоры у кораблей, папирус у алфавита)', () => {
   const C = fresh(), G = hellenic(C), T = C.get('TECH_BY_ID');
   assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].epoch), [3, 3, 3, 3]);
-  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [65, 70, 80, 80], 'λ «с умом» — по курсу обрядов');
+  assert.deepEqual(['coinage', 'coppercoin', 'piraeus', 'alphabet'].map(id => T[id].logos), [65, 70, 80, 75], 'λ «с умом» — по курсу обрядов');
+  assert.equal(T.alphabet.cost.papyrus, 30, '«с умом» — один корабль папируса');
   assert.deepEqual({ ...G.techPrice(T.coinage).cost }, { silver: 1760, copper: 2800, iron: 400 }, '«с умом» — ресурсов вчетверо больше прежнего');
   // «через силу» — прежний: считается от прежней ресурсной части (laborBase)
   assert.deepEqual({ ...G.techPrice(T.coinage, 'labor').cost }, { silver: 11070, copper: 8780, iron: 680 });
@@ -982,7 +983,8 @@ test('корабли: после «Кораблей в Пирей» и при г
   assert.equal(s.ship, null, 'без гавани кораблей нет');
   addPort(G);
   s.timers.ship = 0.5; G.events(1);
-  assert.ok(s.ship && s.ship.deals === 0 && s.ship.give.papyrus === 10 && !s.ship.alt, 'корабль пришёл, груз один');
+  assert.ok(s.ship && s.ship.deals === 0 && s.ship.give.papyrus === 10 && !s.ship.alts, 'корабль пришёл, груз один');
+  assert.equal(G.shipStatus().offers.length, 1);
   assert.ok(G.shipSpot(), 'корабль стоит у гавани');
   assert.ok(G.resVisible('papyrus'));
   G.events(3 * 3600); assert.ok(s.ship, 'ждёт сколько угодно');
@@ -993,11 +995,11 @@ test('корабли: после «Кораблей в Пирей» и при г
   assert.ok(r && r.how === 'load' && r.left === 2 && !r.sailed); assert.equal(s.res.papyrus, before.papyrus + 10);
   for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v);
   assert.ok(s.ship); assert.equal(G.shipStatus().deals.left, 2);
-  // купить за монеты: 600 за 10 листов — 60 за лист, по ценнику на 20% дороже «настоящей» цены (50)
+  // купить за монеты: 700 за 10 листов — 70 за лист, по ценнику на 40% дороже «настоящей» цены (50)
   const W = BAL.worth, worth = c => Object.entries(c).reduce((t, [k, v]) => t + v * W[k], 0);
-  assert.equal(W.papyrus, S.price * W.silver); assert.equal(worth(S.buy) / worth(S.give), 1.2);
+  assert.equal(W.papyrus, S.price * W.silver); assert.ok(Math.abs(worth(S.buy) / worth(S.give) - 1.4) < 1e-9);
   const silver = s.res.silver;
-  assert.ok(G.shipBuy()); assert.equal(s.res.silver, silver - 600);
+  assert.ok(G.shipBuy()); assert.equal(s.res.silver, silver - 700);
   // третья сделка — корабль отчаливает сам, следующий — через 6 минут
   const last = G.shipLoad();
   assert.ok(last && last.sailed && last.left === 0); assert.equal(s.ship, null);
@@ -1038,20 +1040,24 @@ test('эллинский Кипр, вторая треть: пять знани�
   const C = fresh(), G = hellenic(C), s = G.state, T = C.get('TECH_BY_ID'), B = C.get('BUILDINGS'), R = C.get('RITUAL_BY_ID'), BAL = C.get('BALANCE');
   const ids = ['symposion', 'kitionsword', 'vounibaths', 'choregia', 'alexander'];
   assert.deepEqual(ids.map(id => T[id].epoch), [3, 3, 3, 3, 3]);
-  assert.deepEqual(ids.map(id => T[id].logos), [75, 80, 85, 90, 90], 'λ «с умом» — по курсу начала эпохи');
-  assert.ok(T.choregia.cost.papyrus > 0 && T.alexander.cost.papyrus > 0, 'папирус — в пьесах и письмах');
+  assert.deepEqual(ids.map(id => T[id].logos), [75, 80, 85, 85, 85], 'λ «с умом» — по курсу начала эпохи');
+  assert.deepEqual(ids.map(id => T[id].cost.papyrus || 0), [0, 0, 0, 30, 30], '«с умом» папирус — один корабль, в пьесах и письмах');
+  // «через силу» — импорт: папирус — около половины цены по ценнику
+  const W = BAL.worth, worth = c => Object.entries(c).reduce((t, [k, v]) => t + v * W[k], 0);
+  for (const id of ids) { const c = G.techPrice(T[id], 'labor').cost, share = c.papyrus * W.papyrus / worth(c); assert.ok(share > 0.45 && share < 0.55, `${id}: папирус ${share}`); }
   s.techs.push('coinage', 'coppercoin', 'piraeus', 'alphabet'); s.logos = 5000;
   for (const k of Object.keys(s.res)) s.res[k] = 30000;
   s.buildings.push({ id: 990, type: 'storehouse', level: 13, x: 9, y: 9 }, { id: 991, type: 'storehouse', level: 13, x: 10, y: 9 }); G.tick(0.001);
-  assert.deepEqual({ ...G.techPrice(T.choregia, 'labor').cost }, { amphora: 4220, silver: 14650, papyrus: 60 });
-  assert.deepEqual({ ...G.techPrice(T.alexander, 'labor').cost }, { food: 20250, iron: 1350, silver: 12740, papyrus: 90 });
-  // Симпосий: виноградники +30% (рощи — нет), «Обряд урожая» → Фалисии: зерно ×3 на 15 минут
+  assert.deepEqual({ ...G.techPrice(T.choregia, 'labor').cost }, { amphora: 4200, silver: 8200, papyrus: 190 });
+  assert.deepEqual({ ...G.techPrice(T.alexander, 'labor').cost }, { food: 20000, iron: 1400, silver: 7200, papyrus: 200 });
+  // Симпосий и Фалисии: виноградники +30% (рощи — нет), «Обряд урожая» → Фалисии: зерно и виноградники ×3 на 15 минут
   const vb = G.bonusMult('vineyard', 'amphora'), ob = G.bonusMult('olivegrove', 'amphora');
   assert.equal(G.ritualStatus(R.thalysia).hidden, true);
   assert.ok(G.research('symposion'));
   assert.ok(Math.abs(G.bonusMult('vineyard', 'amphora') - vb - 0.3) < 1e-9 && Math.abs(G.bonusMult('olivegrove', 'amphora') - ob) < 1e-9);
   assert.equal(G.ritualStatus(R.harvest).hidden, true); assert.notEqual(G.ritualStatus(R.thalysia).hidden, true);
-  assert.equal(R.thalysia.buff.mult.food, 2); assert.equal(G.ritualDur(R.thalysia), 900);
+  assert.equal(R.thalysia.buff.mult.food, 2); assert.equal(R.thalysia.buff.bmult.vineyard, 2); assert.ok(!R.thalysia.buff.bmult.olivegrove);
+  assert.ok(!R.thalysia.cost.food, 'зерна в подношениях нет'); assert.equal(G.ritualDur(R.thalysia), 900);
   // Меч царя Китиона: кузницы +30%
   const fb = G.bonusMult('forge', 'iron'); assert.ok(G.research('kitionsword')); assert.ok(Math.abs(G.bonusMult('forge', 'iron') - fb - 0.3) < 1e-9);
   // Дворец Вуни — улучшение Дворца Аласии; без него «Цистерн и бань» не изучить
@@ -1061,7 +1067,8 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.ok(G.techStatus(T.vounibaths).locked, 'нужен Дворец Вуни');
   const cap0 = G.storageCap();
   assert.ok(G.upgradeWonder('sp_vouni')); assert.equal(pal.type, 'sp_vouni'); G.tick(0.001);
-  assert.ok(G.storageCap() > cap0, 'Вуни: склады +20%');
+  assert.ok(G.storageCap() > cap0, 'Вуни: склады +40%');
+  assert.equal(G.shipRules().buy.silver, 600, 'Вуни: папирус у кормчего — 600 за 10 листов');
   // Цистерны и бани: жители быстрее, стены — склад 9-го уровня, а их +50% — у всего города
   const cap1 = G.storageCap(), gr = G.effects().growth;
   assert.ok(G.research('vounibaths'));
@@ -1075,37 +1082,46 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.ok(G.research('choregia'));
   assert.equal(G.ritualStatus(R.festival).hidden, true); assert.notEqual(G.ritualStatus(R.aphrodisia).hidden, true);
   assert.equal(R.aphrodisia.buff.all, 2); assert.equal(G.ritualDur(R.aphrodisia), 1200);
-  assert.deepEqual([R.thalysia, R.chalkeia, R.aphrodisia].map(r => G.ritualLogos(r)), [8, 35, 140], 'по курсу обрядов эпохи');
+  assert.deepEqual([R.thalysia, R.chalkeia, R.aphrodisia].map(r => G.ritualLogos(r)), [13, 35, 140], 'по курсу обрядов эпохи');
   // Поддержка Александра: дани больше нет
   s.timers.raid = 5; assert.ok(G.raidIn() != null);
   assert.ok(G.research('alexander'));
   assert.equal(G.raidIn(), null); const res = JSON.stringify(s.res); G.events(10); assert.equal(JSON.stringify(s.res), res, 'дань не пришла');
 });
 
-test('Гавань Нового Пафоса: два груза на выбор и +2 сделки; Корабельные сараи Китиона (за λ): раз в 5 минут и +1 сделка; вместе — 6 сделок', () => {
+test('Гавань Нового Пафоса: ещё груз на выбор и +2 сделки; Корабельные сараи Китиона (за λ): раз в 5 минут, +1 сделка и ещё груз; вместе — 6 сделок и 3 груза', () => {
   const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), B = C.get('BUILDINGS');
+  const rules = () => { const r = G.shipRules(); return [r.every, r.deals, r.choice, r.buy.silver]; };
   s.techs.push('coinage', 'piraeus'); addPort(G); G.tick(0.001);
-  assert.deepEqual({ ...G.shipRules() }, { every: 360, deals: 3, choice: 1 });
+  assert.deepEqual(rules(), [360, 3, 1, 700]);
   const spot = type => G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t));
   const t = spot('sp_neapaphos');
   assert.ok(t, 'чудо встаёт у моря'); assert.equal(B.sp_neapaphos.logos, 0);
   s.buildings.push({ id: 970, type: 'sp_neapaphos', level: 1, x: t.x, y: t.y }); G.tick(0.001);
-  assert.deepEqual({ ...G.shipRules() }, { every: 360, deals: 5, choice: 2 }); assert.equal(G.nextShipIn(), BAL.ships.every);
+  assert.deepEqual(rules(), [360, 5, 2, 700]); assert.equal(G.nextShipIn(), BAL.ships.every);
   s.ship = null; s.timers.ship = 0; G.events(1);
-  assert.ok(s.ship.alt && s.ship.alt.pack !== s.ship.pack);
+  assert.ok(s.ship.alts && s.ship.alts.length === 1 && s.ship.alts[0].pack !== s.ship.pack);
   for (const k of Object.keys(s.res)) s.res[k] = 20000;
   s.res.papyrus = 0;
-  const want = Object.assign({}, s.ship.alt.want), before = Object.assign({}, s.res);
-  const r = G.shipLoad(true); assert.ok(r && r.pack === s.log[0].p.pack && r.left === 4);
+  const want = Object.assign({}, s.ship.alts[0].want), before = Object.assign({}, s.res);
+  const r = G.shipLoad(1); assert.ok(r && r.pack === s.ship.alts[0].pack && r.left === 4);
   for (const [k, v] of Object.entries(want)) assert.equal(s.res[k], before[k] - v, 'ушёл второй груз');
   assert.equal(s.res.papyrus, before.papyrus + 10);
-  for (let i = 0; i < 3; i++) assert.ok(G.shipLoad(i % 2 === 0) && s.ship);
+  for (let i = 0; i < 3; i++) assert.ok(G.shipLoad(i % 2) && s.ship);
   assert.ok(G.shipBuy().sailed); assert.equal(s.ship, null);
   assert.equal(s.res.papyrus, before.papyrus + 50);
   // сараи Китиона — за λ, у моря: срок 5 минут, ещё сделка; с Новым Пафосом — вместе
   assert.ok(B.sp_kition.logos > 0 && B.sp_kition.coast);
   const k = spot('sp_kition'); s.buildings.push({ id: 971, type: 'sp_kition', level: 1, x: k.x, y: k.y }); G.tick(0.001);
-  assert.deepEqual({ ...G.shipRules() }, { every: 300, deals: 6, choice: 2 }); assert.equal(G.nextShipIn(), 300);
+  assert.deepEqual(rules(), [300, 6, 3, 700]); assert.equal(G.nextShipIn(), 300);
+  s.ship = null; s.timers.ship = 0; G.events(1);
+  const packs = G.shipStatus().offers.map(o => o.pack);
+  assert.equal(packs.length, 3); assert.equal(new Set(packs).size, 3, 'три разных груза');
+  assert.ok(G.shipLoad(2) && G.state.ship.deals === 1, 'третий груз тоже грузится');
+  // старое сохранение: второй груз — в ship.alt
+  s.ship = { pack: 'grain', want: { food: 10 }, alt: { pack: 'wine', want: { amphora: 10 } }, give: { papyrus: 10 }, deals: 0 };
+  assert.deepEqual([...G.shipStatus().offers.map(o => o.pack)], ['grain', 'wine']);
+  const amph = s.res.amphora; assert.ok(G.shipLoad(1)); assert.equal(s.res.amphora, amph - 10);
 });
 
 test('обряды: «Всей семьёй» не дорожает с эпохами и длится 30/35/40/45 минут; «Сбор припасов» — 3/4/5/6 минут выпуска', () => {

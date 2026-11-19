@@ -64,18 +64,19 @@ const BALANCE = {
   // Корабли (эллинский Кипр, знание «Корабли в Пирей»): через every секунд после ухода прежнего в гавань приходит корабль
   // (время идёт и без игрока) и ждёт сколько угодно. Он просит один из пакетов (packs) и даёт за него give; give можно и купить за buy.
   // Сделок за стоянку — deals; после последней корабль отчаливает сам. Чудеса (effect.ships) улучшают: every — свой срок (берётся
-  // меньший), deals — сделок больше (складываются), choice — из скольких грузов выбрать. Гавань Нового Пафоса: +2 сделки и выбор
-  // из двух; Корабельные сараи Китиона: раз в 5 минут и +1 сделка.
+  // меньший), deals — сделок больше, choice — ещё грузов на выбор (то и другое складывается), buy — своя цена 10 листов (меньшая).
+  // Гавань Нового Пафоса: +2 сделки и +1 груз; Корабельные сараи Китиона: раз в 5 минут, +1 сделка и +1 груз; Дворец Вуни: 600 монет.
   // Папирус не производится: его привозят только корабли. «Настоящая» цена листа — price монет (по ней считает балансер);
-  // пакет — по курсу эллинского Кипра ≈ 400 монет (≈40 за лист, проверяет балансер), за монеты — 600 (60 за лист).
+  // пакет — по курсу эллинского Кипра ≈ 400 монет (≈40 за лист, проверяет балансер), за монеты — 700 (70 за лист).
   ships: {
-    every: 360, deals: 3, give: { papyrus: 10 }, buy: { silver: 600 }, price: 50,
+    every: 360, deals: 3, give: { papyrus: 10 }, buy: { silver: 700 }, price: 50,
+    // каждый груз — ≈40 монет за лист по курсу эпохи (балансер, строка «корабли»); за монеты — 70 за лист (с Дворцом Вуни — 60)
     packs: [
-      { id: 'grain', want: { food: 5000, amphora: 400 } },
-      { id: 'wine', want: { amphora: 900, food: 1700 } },
-      { id: 'iron', want: { iron: 200, food: 2500 } },
-      { id: 'timber', want: { wood: 3000, amphora: 400 } },
-      { id: 'stone', want: { stone: 2000, wood: 1600 } },
+      { id: 'grain', want: { food: 5500, amphora: 400 } },
+      { id: 'wine', want: { amphora: 1000, food: 2200 } },
+      { id: 'iron', want: { iron: 240, food: 3000 } },
+      { id: 'timber', want: { wood: 3300, amphora: 400 } },
+      { id: 'stone', want: { stone: 2000, wood: 1800 } },
     ],
   },
 };
@@ -199,16 +200,19 @@ const BUILDINGS = {
   // новое чудо за λ — обязательное для перехода в следующую эпоху
   sp_salamis: { special: true, epoch: 2, tech: 'iron', terrain: ['plain'], cost: { stone: 10000, iron: 2500, cheese: 8000, wood: 10000, copper: 1500 }, logos: 450, effect: { all: 0.1, mult: { silver: 0.2 } } },
   // пятое чудо — новое, без λ: каменная ваза Амафунта (VI в. до н. э., 14 т, из одного камня) — склады +25%
-  // Эллинский Кипр. ships — корабли (BALANCE.ships): deals — ещё сделок за стоянку, choice — из скольких грузов выбрать, every — свой срок
+  // Эллинский Кипр. ships — корабли (BALANCE.ships): deals — ещё сделок за стоянку, choice — ещё грузов на выбор, every — свой срок,
+  //   buy — своя цена 10 листов в монетах. У нескольких чудес сделки и грузы складываются, срок и цена — наименьшие (Game.shipRules).
   sp_neapaphos: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 16000, wood: 8000, silver: 800 }, logos: 0,
-    effect: { bmult: { port: 0.25 }, ships: { deals: 2, choice: 2 } } },
+    effect: { bmult: { port: 0.25 }, ships: { deals: 2, choice: 1 } } },
   // Вторая треть. Дворец Вуни (V–IV вв. до н. э.) — улучшение Дворца правителя Аласии на том же месте; нужен для «Цистерн и бань Вуни»,
-  //   а значит, и для перехода. Кладовые под пифосы и цистерны — склады +20%; дворцовое хозяйство — +25% ко всему (было +15%).
+  //   а значит, и для перехода. Кладовые под пифосы и цистерны — склады +40%; дворцовое хозяйство — +20% ко всему (было +15%);
+  //   царская казна покупает папирус дешевле — 600 монет за 10 листов, а не 700.
   sp_vouni: { special: true, epoch: 3, upgradeOf: 'sp_palace', tech: 'alphabet', terrain: ['plain'], cost: { stone: 20000, wood: 12000, iron: 3000, amphora: 8000 }, logos: 0,
-    effect: { all: 0.25, storage: 2000, storagePct: 0.2 } },
-  // Корабельные сараи Китиона (IV в. до н. э., военная гавань финикийских царей Китиона, для триер) — за λ: корабли раз в 5 минут и +1 сделка
+    effect: { all: 0.2, storage: 2000, storagePct: 0.4, ships: { buy: 600 } } },
+  // Корабельные сараи Китиона (IV в. до н. э., военная гавань финикийских царей Китиона, для триер) — за λ: корабли раз в 5 минут,
+  //   +1 сделка и +1 груз на выбор
   sp_kition: { special: true, epoch: 3, tech: 'piraeus', terrain: ['plain'], coast: true, cost: { stone: 8000, wood: 8000, iron: 600 }, logos: 120,
-    effect: { ships: { every: 300, deals: 1 } } },
+    effect: { ships: { every: 300, deals: 1, choice: 1 } } },
   sp_amathus: { special: true, epoch: 2, tech: 'irontools', terrain: ['hill', 'plain'], cost: { stone: 5000, iron: 200, silver: 120 }, logos: 0, effect: { storagePct: 0.25 } },
 };
 
@@ -265,31 +269,33 @@ const TECHS = [
   //   вполсилы — 6 : 1); рудники доживают (sunset): работают, но новых не строят, не улучшают, можно продать как устаревшие.
   //   Гавань больше не меняет медь на зерно и товары — только продаёт амфоры, ещё на 25% дороже (итого +50%). Монет ещё +25%.
   // piraeus: корабли и папирус (BALANCE.ships); alphabet: писцам открыты 12-й и 13-й уровни (levelTech у здания), их дом — гимнасий.
-  //   «Через силу» алфавит — 120 папируса (три полных корабля по 4 сделки) и монеты, всего ≈300 тыс. зерна (папирус по 50 монет);
-  //   λ «с умом» по курсу — 80: знание лёгкое, тяжесть — в самих кораблях.
+  //   «Через силу» алфавит — 90 папируса (три полных корабля по 3 сделки) и монеты, всего ≈300 тыс. зерна (папирус по 50 монет);
+  //   «с умом» — 30 папируса (один корабль), монеты и λ по курсу.
   { id: 'coinage', epoch: 3, logos: 65, laborLogos: 300, cost: { silver: 1760, copper: 2800, iron: 400 }, laborBase: { silver: 440, copper: 700, iron: 100 }, buy: { silver: 12, copper: 6 }, effect: { mult: { silver: 0.25 }, trade: { port: 0.25 } } },
   { id: 'coppercoin', epoch: 3, logos: 70, laborLogos: 300, cost: { silver: 1200, copper: 6000, iron: 600 }, laborBase: { silver: 300, copper: 1500, iron: 150 }, buy: { silver: 13.5, copper: 4 }, req: ['coinage'],
     effect: { mult: { silver: 0.25 }, trade: { port: 0.25 }, scale: { mine: 0.5 } },
     retire: { res: { copper: { into: 'silver', rate: 1 / 3, prodToo: true } }, sunset: ['mine'] } },
   { id: 'piraeus', epoch: 3, logos: 80, laborLogos: 320, cost: { food: 12000, wood: 10000, amphora: 2400 }, laborBase: { food: 3000, wood: 2500, amphora: 600 }, buy: { silver: 17.5, amphora: 3 }, req: ['coinage'] },
-  { id: 'alphabet', epoch: 3, logos: 80, laborLogos: 340, cost: { papyrus: 10, silver: 800 }, laborBase: { papyrus: 10, silver: 200 }, buy: { silver: 13, papyrus: 0.029 }, req: ['piraeus'] },
-  // Эллинский Кипр, вторая треть (≈410–323 до н. э.): «через силу» ≈1.7 млн зерна, ресурсы «с умом» ≈250 тыс.; 1 λ — по курсу начала эпохи
-  //   (≈3500 зерна, внутри эпохи не пересчитывается). Папирус — там, где к месту (тексты пьес, письма Александру): дорогой лист
-  //   собирает цену в немного единиц. Три знания улучшают медно-каменные обряды (rite: tech / untilTech).
-  // symposion — «Симпосий»: виноградники +30%; «Обряд урожая» → «Фалисии»
-  { id: 'symposion', epoch: 3, logos: 75, laborLogos: 300, cost: { amphora: 2800, wood: 6000, silver: 750 }, laborBase: { amphora: 600, wood: 1500, silver: 200 }, buy: { silver: 17, amphora: 3 }, req: ['alphabet'],
+  { id: 'alphabet', epoch: 3, logos: 75, laborLogos: 340, cost: { papyrus: 30, silver: 800 }, laborBase: { papyrus: 10, silver: 200 }, buy: { silver: 13, papyrus: 0.029 }, req: ['piraeus'] },
+  // Эллинский Кипр, вторая треть (≈410–323 до н. э.). «Через силу» здесь — импорт: чужие мастера, книги и договоры, поэтому
+  //   половину цены (по 50 монет за лист) делает папирус; цена задана прямо числами (labor), всего ≈1.69 млн зерна, как прежде.
+  //   «С умом» — λ и ресурсы ≈250 тыс.; папирус — где к месту, один корабль (30 листов): тексты пьес, письма Александру.
+  //   1 λ — по курсу начала эпохи (≈3500 зерна, внутри эпохи не пересчитывается). Два знания приносят и праздник —
+  //   его имя в названии знания; три знания улучшают медно-каменные обряды (rite: tech / untilTech).
+  // symposion — «Симпосий и Фалисии»: виноградники +30%; «Обряд урожая» → «Фалисии»
+  { id: 'symposion', epoch: 3, logos: 75, cost: { amphora: 2800, wood: 6000, silver: 750 }, labor: { amphora: 6000, wood: 10000, silver: 5400, papyrus: 150 }, req: ['alphabet'],
     effect: { bmult: { vineyard: 0.3 } } },
   // kitionsword — «Меч царя Китиона»: кузницы +30%
-  { id: 'kitionsword', epoch: 3, logos: 80, laborLogos: 320, cost: { iron: 1000, wood: 5000, silver: 800 }, laborBase: { iron: 225, wood: 1000, silver: 200 }, buy: { silver: 17, iron: 1 }, req: ['alphabet'],
+  { id: 'kitionsword', epoch: 3, logos: 80, cost: { iron: 1000, wood: 5000, silver: 800 }, labor: { iron: 2200, wood: 7000, silver: 5600, papyrus: 160 }, req: ['alphabet'],
     effect: { bmult: { forge: 0.3 } } },
   // vounibaths — «Цистерны и бани Вуни» (нужен Дворец Вуни): жители прибывают на 50% быстрее, склады +50% (вместо Циклопических стен —
   //   они становятся складом), «Обряд труда» → «Халкеи»
-  { id: 'vounibaths', epoch: 3, logos: 85, laborLogos: 340, cost: { stone: 8000, wood: 6000, silver: 1100 }, laborBase: { stone: 2000, wood: 1500, silver: 275 }, buy: { silver: 17.5 }, req: ['alphabet'], reqWonder: 'sp_vouni',
+  { id: 'vounibaths', epoch: 3, logos: 85, cost: { stone: 8000, wood: 6000, silver: 1100 }, labor: { stone: 13500, wood: 10000, silver: 6300, papyrus: 180 }, req: ['alphabet'], reqWonder: 'sp_vouni',
     effect: { growth: 0.5, storagePct: 0.5 } },
-  // choregia — «Хорегия»: «Праздник плодородия» → «Афродисии»
-  { id: 'choregia', epoch: 3, logos: 90, laborLogos: 360, cost: { amphora: 2500, silver: 1100, papyrus: 20 }, laborBase: { amphora: 625, silver: 250, papyrus: 5 }, buy: { silver: 16, papyrus: 0.032 }, req: ['symposion'] },
+  // choregia — «Хорегия и Афродисии»: «Праздник плодородия» → «Афродисии» (хоры и состязания на празднике оплачивают хореги)
+  { id: 'choregia', epoch: 3, logos: 85, cost: { amphora: 2500, silver: 1100, papyrus: 30 }, labor: { amphora: 4200, silver: 8200, papyrus: 190 }, req: ['symposion'] },
   // alexander — «Поддержка Александра»: дани больше нет
-  { id: 'alexander', epoch: 3, logos: 90, laborLogos: 380, cost: { food: 12000, iron: 800, silver: 1150, papyrus: 10 }, laborBase: { food: 3000, iron: 200, silver: 240 }, buy: { silver: 13, papyrus: 0.105 }, req: ['choregia', 'kitionsword'],
+  { id: 'alexander', epoch: 3, logos: 85, cost: { food: 12000, iron: 800, silver: 1150, papyrus: 30 }, labor: { food: 20000, iron: 1400, silver: 7200, papyrus: 200 }, req: ['choregia', 'kitionsword'],
     effect: { noTribute: true } },
 ];
 const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
@@ -334,8 +340,8 @@ const RITUALS = [
   // Эллинский Кипр, вторая треть: улучшенные медно-каменные обряды — сильнее и дольше (×3, а не ×2). Знание приносит новый обряд
   // и уносит старый (untilTech у старого). Цена — по курсу обрядов эпохи: 3.6 λ за каждую минуту выпуска города, которую обряд
   // прибавляет (зерно вполцены, вывоз амфор — не прибыль), по городу балансера в начале эпохи и в конце описанной части:
-  // Фалисии ≈2 мин выпуска → 8 λ, Халкеи ≈10 мин → 35 λ, Афродисии ≈40 мин → 140 λ (втрое ценнее прежних обрядов по курсу).
-  { id: 'thalysia', epoch: 3, logos: 8, cost: { food: 150, amphora: 30 }, tech: 'symposion', buff: { mult: { food: 2 } }, dur: 900 },
+  // Фалисии (зерно и виноградники) ≈3.5 мин выпуска → 13 λ, Халкеи ≈10 мин → 35 λ, Афродисии ≈40 мин → 140 λ.
+  { id: 'thalysia', epoch: 3, logos: 13, cost: { amphora: 60 }, tech: 'symposion', buff: { mult: { food: 2 }, bmult: { vineyard: 2 } }, dur: 900 },
   { id: 'chalkeia', epoch: 3, logos: 35, cost: { iron: 20 }, tech: 'vounibaths', buff: { mult: { wood: 2, stone: 2 } }, dur: 900 },
   { id: 'aphrodisia', epoch: 3, logos: 140, cost: { amphora: 200, silver: 50 }, req: 'shrine1', tech: 'choregia', buff: { all: 2, growth: 3 }, dur: 1200 },
 ];

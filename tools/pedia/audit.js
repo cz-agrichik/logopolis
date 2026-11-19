@@ -49,7 +49,8 @@ const ROOT = path.join(__dirname, '..', '..');
       // 3. обряды
       const rel = body('a:religion');
       Cat.rites.filter(R => R.epoch <= ep).forEach(R => {
-        const row = [...rel.querySelectorAll('table tr')].find(tr => tr.textContent.includes(R.name));
+        // по первой ячейке: имя обряда может стоять и в чужой строке («уходит после знания «Симпосий и Фалисии»»)
+        const row = [...rel.querySelectorAll('table tr')].find(tr => tr.cells[0] && tr.cells[0].textContent.trim() === R.name);
         if (!row) bad.push('нет обряда ' + R.id);
         else if (R.logos && !row.textContent.includes('λ ' + Game.ritualLogos(R))) bad.push(`обряд ${R.id}: «${row.textContent.slice(-60)}», в ядре λ ${Game.ritualLogos(R)}`);
       });

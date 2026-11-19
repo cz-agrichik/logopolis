@@ -193,7 +193,7 @@ const Balancer = (() => {
       };
       for (let pass = 0; pass < 3; pass++) for (const [t, k] of [['lumber', 'wood'], ['quarry', 'stone'], ['mine', 'copper'], ['workshop', 'goods'], ['workshop', 'silver'],
         ['goatpen', 'cheese'], ['foundry', 'bronze'], ['forge', 'iron'], ['vineyard', 'amphora'], ['olivegrove', 'amphora']]) solve(t, k);
-      // папирус не производится: его «настоящая» цена — BALANCE.ships.price монет за лист (грузом выходит ≈40, за монеты — 60)
+      // папирус не производится: его «настоящая» цена — BALANCE.ships.price монет за лист (грузом выходит ≈40, за монеты — 70, с Дворцом Вуни — 60)
       if (G.resVisible('papyrus') && BAL.ships && r.silver != null) r.papyrus = BAL.ships.price * r.silver;
       return r;
     }
