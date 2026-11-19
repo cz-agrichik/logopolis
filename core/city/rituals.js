@@ -14,7 +14,13 @@ Object.assign(Game, {
     return R.fixedPrice ? R.logos : Math.ceil(R.logos * Math.pow(1.5, Math.max(0, this.state.epoch - R.epoch)));
   },
   /** Сколько секунд длится благословение: у durPerEpoch — дольше с каждой эпохой. */
-  ritualDur(R) { return (R.dur || 0) + (R.durPerEpoch || 0) * Math.max(0, this.state.epoch - R.epoch); },
+  /** Сколько секунд длится благословение: своё dur, с эпохами — durPerEpoch, и чудеса, которые его продлевают (effect.riteDur). */
+  ritualDur(R) {
+    const extra = ((this.fx || this.effects()).riteDur || {})[R.id] || 0;
+    return (R.dur || 0) + (R.durPerEpoch || 0) * Math.max(0, this.state.epoch - R.epoch) + (R.dur ? extra : 0);
+  },
+  /** «Учение Зенона»: сколько λ даёт задание, в котором была ошибка (без бонусов; без знания — 0). */
+  mistakeLogos() { return (this.fx || this.effects()).mistakeLogos || 0; },
   /** Курс обрядов эпохи: сколько номинальных λ стоит минута выпуска (медные λ эпохи × инфляция λ); null — курс не задан. */
   riteRate() {
     const e = this.state.epoch, infl = BALANCE.logosInflation[e], rr = BALANCE.riteRate;

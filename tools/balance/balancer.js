@@ -2,7 +2,7 @@
 // Балансер в консоли: короткая сводка по эпохам. Полный отчёт — страница tools/balance/balancer.html (открыть с диска).
 //
 //   node tools/balance/balancer.js            эпохи 0–2
-//   node tools/balance/balancer.js --peek     ещё и эллинский Кипр (описанные две трети)
+//   node tools/balance/balancer.js --peek     ещё и эллинский Кипр
 //
 // Расчёт — tools/balance/balancer-core.js (общий для страницы и консоли), поверх ядра игры.
 const path = require('path');

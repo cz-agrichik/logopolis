@@ -129,7 +129,7 @@ Object.assign(Game, {
   upgradeCost(type, target) {
     const B = BUILDINGS[type];
     if (this.needsLogos(target)) return { cost: {}, logos: this.upgradeLogos(type, target) };   // λ-уровень: только λ
-    const k = BALANCE.upCostBase * Math.pow(BALANCE.upCostGrowth, target - 2);   // ×1.5 за каждый уровень
+    const k = BALANCE.upCostBase * Math.pow(BALANCE.upCostGrowth, target - 2);   // ×upCostGrowth (1.65) за каждый уровень
     const cost = {};
     for (const [r, v] of Object.entries(B.cost)) cost[r] = Math.ceil(v * k);
     if (target >= BALANCE.goodsFromLevel) cost.goods = (cost.goods || 0) + Math.ceil(15 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.goodsFromLevel));

@@ -44,11 +44,12 @@ const Study = {
   },
 
   grade(p, correct, type = 'gr2ru') {
-    const { event: ev, gain } = Lesson.answer(Learn.state, p, correct, type, Game.logosMult());
+    const { event: ev, gain } = Lesson.answer(Learn.state, p, correct, type, Game.logosMult(), Game.mistakeLogos());
     if (ev === 'needtype') this.needType = true;
     if (ev === 'learned') { this.learnedNow++; this.justLearned = (this.justLearned || 0) + 1; }
-    if (correct) { this.right++; Game.addLogos(gain); this.earned += gain; }
+    if (correct) this.right++;
     else this.wrong++;
+    if (gain) { Game.addLogos(gain); this.earned += gain; }   // с «Учением Зенона» и ошибка приносит 1 λ
     this.renderHead();
     if (gain) {
       const el = $('#stEarned');

@@ -912,6 +912,20 @@ const Art = (() => {
         <path d="M${x + 2} 40 L${x + 14} 40 L${x + 16} 50 L${x} 50Z" fill="${C.stone}" ${st(1.1)}/>`).join('')}
       <path d="M26 44 L38 44 L42 40 L44 42 L40 49 L28 49Z" fill="${C.wood}" ${st(1.3)}/><circle cx="38.5" cy="45" r="1.1" fill="${C.white}"/>
       <path d="M44 42 L48 43" stroke="#8e979e" stroke-width="2" stroke-linecap="round"/>`,
+    // Стоя Зенона: длинная колоннада под черепицей на ступенях, на задней стене — расписные панели (как в Расписной стое)
+    sp_stoa: shadow(30) + `<rect x="4" y="50" width="56" height="4" fill="${CALC}" ${st(1.3)}/><rect x="6" y="47" width="52" height="3.4" fill="${CALC}" ${st(1.2)}/>
+      <rect x="7" y="27" width="50" height="20" fill="${STUD}" ${st(1.2)}/>
+      ${[[11, OCH], [19, WINE], [27, C.water], [35, OCH], [43, WINE], [51, C.green]].map(([x, c]) => `<rect x="${x}" y="31" width="6" height="11" fill="${c}" opacity=".7"/>`).join('')}` +
+      [9, 17, 25, 33, 41, 49, 55].map(x => doric(x, 27, 20, .95)).join('') +
+      `<rect x="5" y="22" width="54" height="5" fill="${STU}" ${st(1.3)}/><path d="M6 24.5 L58 24.5" stroke="${WINE}" stroke-width="1.6"/>` + tiles(3, 61, 22, 8, 4),
+    // Театр Нового Пафоса: полукруг рядов на склоне холма, орхестра и сцена со входами
+    sp_theatre: shadow(30) + `<path d="M2 52 Q3 16 32 12 Q61 16 62 52Z" fill="${C.furrow}" ${st(1.5)}/>
+      <path d="M6 46 A26 28 0 0 1 58 46 L46 46 A14 15 0 0 0 18 46Z" fill="${CALC}" ${st(1.4)}/>
+      ${[17, 20, 23].map(r => `<path d="M${32 - r * 26 / 26 - (r - 14) * .5} 46 A${r + 3} ${r + 4} 0 0 1 ${32 + r * 26 / 26 + (r - 14) * .5} 46" fill="none" stroke="${CALCD}" stroke-width="1"/>`).join('')}
+      ${[-60, -30, 0, 30, 60].map(a => { const r = a * Math.PI / 180; return `<path d="M${(32 + Math.sin(r) * 14).toFixed(1)} ${(46 - Math.cos(r) * 15).toFixed(1)} L${(32 + Math.sin(r) * 26).toFixed(1)} ${(46 - Math.cos(r) * 28).toFixed(1)}" stroke="${CALCD}" stroke-width="1.2"/>`; }).join('')}
+      <path d="M18 46 A14 15 0 0 1 46 46Z" fill="${STU}" ${st(1.2)}/><circle cx="32" cy="41" r="1.8" fill="${CALC}" ${st(.9)}/>
+      <rect x="10" y="46" width="44" height="9" fill="${STU}" ${st(1.4)}/><rect x="9" y="44.5" width="46" height="2.4" fill="${STUD}" ${st(1)}/>
+      <rect x="18" y="48.5" width="4" height="6.5" fill="${C.dark}"/><rect x="30" y="48" width="4.4" height="7" fill="${C.dark}"/><rect x="42" y="48.5" width="4" height="6.5" fill="${C.dark}"/>`,
     // Палеопафос: двор с колоннами, конический камень богини, голуби
     sp_aphrodite: shadow(28) + `
       <rect x="6" y="46" width="52" height="9" fill="${C.stone}" ${st()}/>
@@ -1235,6 +1249,50 @@ const Art = (() => {
       <path d="M46 42 Q52 38 50 30" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
       <circle cx="34" cy="22" r="5" fill="${C.wheat}" ${st(1.4)}/>
       ${Array.from({ length: 16 }, (_, i) => { const a = i * Math.PI / 8, r1 = 6.5, r2 = i % 2 ? 11 : 14; return `<path d="M${34 + Math.cos(a) * r1} ${22 + Math.sin(a) * r1} L${34 + Math.cos(a) * r2} ${22 + Math.sin(a) * r2}" stroke="${C.wheatD}" stroke-width="1.8" stroke-linecap="round"/>`; }).join('')}`,
+    // гелеполь Деметрия: девятиярусная осадная башня на колёсах у крепостной стены, летит камень из катапульты
+    t_demetrius: tdisc + `<path d="M43 54 L43 30 L46 30 L46 27 L49 27 L49 30 L52 30 L52 27 L55 27 L55 30 L58 30 L58 54Z" fill="${C.stone}" ${st(1.5)}/>
+      <path d="M43 38 L58 38 M43 46 L58 46 M50 30 L50 38 M47 38 L47 46 M54 38 L54 46 M50 46 L50 54" stroke="${C.stoneD}" stroke-width="1"/>
+      <path d="M18 54 L22 10 L36 10 L40 54Z" fill="${C.wood}" ${st(1.7)}/>
+      ${[15, 20, 25, 30, 35, 40, 45, 50].map(y => { const d = (54 - y) * 4 / 44; return `<path d="M${(18 + d).toFixed(1)} ${y} L${(40 - d).toFixed(1)} ${y}" stroke="${C.woodD}" stroke-width="1.1"/>`; }).join('')}
+      ${[17.5, 27.5, 37.5, 47.5].map(y => `<rect x="27" y="${y - 1.6}" width="4" height="3.2" fill="${C.dark}"/>`).join('')}
+      <path d="M22 10 L29 5 L36 10Z" fill="${C.woodD}" ${st(1.3)}/>
+      <circle cx="22" cy="55" r="3.4" fill="${C.woodD}" ${st(1.2)}/><circle cx="36" cy="55" r="3.4" fill="${C.woodD}" ${st(1.2)}/>
+      <path d="M33 22 Q40 14 46 19" fill="none" stroke="${C.dark}" stroke-width="1.1" stroke-dasharray="1.6 1.8"/><circle cx="47" cy="20" r="2.4" fill="${C.stone}" ${st(1.1)}/>`,
+    // стратег и наварх: серебряная монета Птолемеев — орёл на перуне
+    t_strategos: tdisc + `<circle cx="32" cy="32" r="21" fill="${SLV}" ${st(1.8)}/><circle cx="32" cy="32" r="17.5" fill="none" stroke="#b6bdc3" stroke-width="1.1" stroke-dasharray="1.4 1.6"/>
+      <path d="M20 45 L28 42 L26 46 L36 42 L34 46 L44 43" fill="none" stroke="${C.bronzeD}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 41 Q22 30 30 25 Q36 22 40 27 Q42 33 38 38 Q34 42 28 42Z" fill="#7d858b" ${st(1.4)}/>
+      <path d="M27 40 Q30 32 37 30 M28 37 Q31 31 36 29.5 M24 41 L19 44 M25 42 L21 46" fill="none" stroke="#c3cad0" stroke-width="1.2"/>
+      <path d="M24 41 L19 44 L21 46 L26 42Z" fill="#7d858b" ${st(1.1)}/>
+      <circle cx="38" cy="21" r="3.6" fill="#7d858b" ${st(1.3)}/><path d="M41 19.4 Q46.4 19.2 45.4 23.6 Q44.6 22 41.4 22.6Z" fill="${C.bronze}" ${st(.9)}/><circle cx="38.6" cy="20.4" r=".7" fill="${C.white}"/>
+      <path d="M28 42 L27 45 M32 42 L32 45" stroke="${O}" stroke-width="1.4" stroke-linecap="round"/>`,
+    // учение Зенона: дорическая колонна расписной стои, раскрытый свиток и золотая λ — логос
+    t_zeno: tdisc + doric(22, 14, 34, 1.2) + `<rect x="10" y="54" width="24" height="3.6" fill="${CALC}" ${st(1.2)}/>
+      <rect x="13" y="10" width="18" height="4" fill="${STU}" ${st(1.2)}/><path d="M14 12 L30 12" stroke="${WINE}" stroke-width="1.4"/>` + scroll(44, 42, 1.25) +
+      `<path d="M40 11 Q44 11 46 16 L53 31 M47 19 L41 31" fill="none" stroke="${C.bronzeD}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M40 11 Q44 11 46 16 L53 31 M47 19 L41 31" fill="none" stroke="${C.wheat}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`,
+    // койнон киприотов: почётная стела с декретом под оливковым венком
+    t_koinon: tdisc + `<path d="M20 56 L21 22 L43 22 L44 56Z" fill="${STU}" ${st(1.7)}/><path d="M19 22 L32 14 L45 22Z" fill="${CALC}" ${st(1.5)}/>
+      ${[28, 32, 36, 40, 44, 48].map((y, i) => `<path d="M24 ${y} L${i % 3 === 2 ? 34 : 40} ${y}" stroke="${C.stoneD}" stroke-width="1.3" stroke-linecap="round"/>`).join('')}
+      <rect x="17" y="55" width="30" height="3.4" fill="${CALC}" ${st(1.2)}/>
+      <path d="M22 10 Q32 2 42 10" fill="none" stroke="${C.greenD}" stroke-width="1.6"/>
+      ${[[23, 8.5], [27, 6], [32, 5], [37, 6], [41, 8.5]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="2.4" ry="1.1" transform="rotate(${(x - 32) * 3} ${x} ${y})" fill="#b3bf86" stroke="#2a2a1c" stroke-width=".7"/>`).join('')}`,
+    // папирус Александрии: маяк Фарос с огнём и стебли папируса у его подножия
+    t_alexandria: tdisc + `<rect x="22" y="38" width="20" height="16" fill="${STU}" ${st(1.6)}/><path d="M24 54 L24 44 L28 44 L28 54" fill="${C.dark}" opacity=".7"/>
+      <path d="M25 38 L26 26 L38 26 L39 38Z" fill="${STU}" ${st(1.5)}/><rect x="21" y="36" width="22" height="2.6" fill="${STUD}" ${st(1)}/>
+      <path d="M28.5 26 L29 17 L35 17 L35.5 26Z" fill="${STU}" ${st(1.4)}/><rect x="24.5" y="24.4" width="15" height="2.2" fill="${STUD}" ${st(.9)}/>` + flame(32, 16, .8) +
+      `${[[10, 56, 12, 40], [14, 56, 15, 36], [50, 56, 49, 38], [54, 56, 53, 42]].map(([x1, y1, x2, y2]) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${C.greenD}" stroke-width="1.5"/>
+        <path d="M${x2} ${y2} l-4 -4 M${x2} ${y2} l-2 -5 M${x2} ${y2} l0 -5.5 M${x2} ${y2} l2 -5 M${x2} ${y2} l4 -4" stroke="${C.green}" stroke-width="1.2" stroke-linecap="round"/>`).join('')}
+      <path d="M6 57 L58 57" stroke="${C.water}" stroke-width="2.4" stroke-linecap="round"/>`,
+    // Помпей и пираты: римская военная галера с тараном и значок-вексиллум на корме
+    t_pompey: tdisc + `<path d="M6 40 L50 40 Q49 48 40 50 L14 50 Q8 48 6 40Z" fill="${C.woodD}" ${st(1.8)}/>
+      <path d="M6 40 L2 44 L8 46" fill="#8e979e" ${st(1.2)}/><path d="M10 43 L46 43" stroke="${C.red}" stroke-width="2"/>
+      ${[14, 20, 26, 32, 38].map(x => `<path d="M${x} 48 L${x - 4} 57" stroke="${C.wood}" stroke-width="1.6"/>`).join('')}
+      <path d="M28 40 L28 14" stroke="${C.dark}" stroke-width="2"/><path d="M18 16 L38 16 L36 34 L20 34Z" fill="${C.red}" ${st(1.4)}/>
+      <path d="M50 40 Q56 36 55 26" fill="none" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M46 40 L46 16" stroke="${C.dark}" stroke-width="1.6"/><path d="M42 18 L50 18" stroke="${C.dark}" stroke-width="1.6"/>
+      <rect x="42.6" y="18.6" width="6.8" height="8" fill="${C.red}" ${st(1)}/><path d="M42.6 26.6 l1.2 2 M45.2 26.6 l.8 2 M47.6 26.6 l.4 2" stroke="${C.wheatD}" stroke-width="1"/>
+      <circle cx="46" cy="14.6" r="1.8" fill="${C.wheat}" ${st(.9)}/>`,
     t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
       <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
 

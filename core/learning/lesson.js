@@ -195,13 +195,14 @@ const Lesson = {
   /**
    * Засчитать ответ: прогресс слова, статистика, журнал дня.
    * Возвращает { event: 'learned' | 'needtype' | null, gain } — gain (λ) начисляет тот, кто ведёт игру.
+   * consolation — λ за задание с ошибкой (город: «Учение Зенона»), без множителей; «вспомнить самому» (flip) — без него.
    */
-  answer(state, p, correct, type, mult = 1) {
+  answer(state, p, correct, type, mult = 1, consolation = 0) {
     const ev = Decks.grade(state, p.card, correct, p.kind, type);
     if (ev === 'learned') state.stats.learned = (state.stats.learned || 0) + 1;
     let gain = 0;
     if (correct) { state.stats.right++; gain = this.reward(type, p, mult); }
-    else state.stats.wrong++;
+    else { state.stats.wrong++; if (type !== 'flip') gain = consolation; }
     Decks.logDay(state, { a: 1, r: correct ? 1 : 0, x: gain, l: ev === 'learned' ? 1 : 0, n: p.kind === 'new' ? 1 : 0 });
     return { event: ev, gain };
   },

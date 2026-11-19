@@ -42,7 +42,7 @@
   поменяли числа в игре — обновите страницу. Сколько зданий стоит к концу эпохи — допущение, правится прямо в разделе 1.</p>
 </header>
 <div class="bar">
-  <label><input type="checkbox" id="peek"> + эллинский Кипр (две трети)</label>
+  <label><input type="checkbox" id="peek"> + эллинский Кипр</label>
   <a href="#s1">1 здания</a><a href="#s2">2 население</a><a href="#s3">3 λ</a><a href="#s4">4 курсы</a><a href="#s5">5 выпуск</a>
   <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a><a href="#s11">11 чудеса</a>
   <span class="sp"></span><span id="status" class="dim"></span>
@@ -74,7 +74,9 @@
 'use strict';
 (() => {
   const $ = s => document.querySelector(s);
-  const KEY = 'greekgame.balancer.plan6';
+  // Ничего не запоминаем в браузере: числа на странице — всегда из кода (balancer-core.js), правки живут до перезагрузки.
+  // Старые сохранения прежних версий страницы (план, бюджет, окупаемость) стираем, чтобы они нигде не всплыли.
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith('greekgame.balancer.')) localStorage.removeItem(k); } catch (e) {}
   const nf = (x, d) => x.toLocaleString('ru-RU', { maximumFractionDigits: d, minimumFractionDigits: 0 });
   const fmt = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? nf(Math.round(x), 0) : Math.abs(x) >= 10 ? nf(x, 1) : nf(x, 2);
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -94,30 +96,27 @@
 
   // ---------- допущения: сколько зданий к концу эпохи (правится в разделе 1) ----------
   const fresh = () => JSON.parse(JSON.stringify(Balancer.PLAN));
-  let plan = (() => { try { const p = JSON.parse(localStorage.getItem(KEY)); if (p) return p; } catch (e) {} return fresh(); })();
+  let plan = fresh();
   // бюджет λ на уровни зданий за эпоху (правится в разделе 8)
-  const KEY_B = 'greekgame.balancer.budget4', freshB = () => Object.assign({}, Balancer.BUDGET);
-  let budget = (() => { try { const p = JSON.parse(localStorage.getItem(KEY_B)); if (p) return p; } catch (e) {} return freshB(); })();
-  const savePlan = () => { try { localStorage.setItem(KEY, JSON.stringify(plan)); localStorage.setItem(KEY_B, JSON.stringify(budget)); } catch (e) {} };
+  const freshB = () => Object.assign({}, Balancer.BUDGET);
+  let budget = freshB();
   $('#out').addEventListener('change', ev => {
     const i = ev.target.closest('input[data-t]'), bi = ev.target.closest('input[data-budget]');
     if (i) (plan[i.dataset.e] = plan[i.dataset.e] || {})[i.dataset.t] = Math.max(0, Math.min(40, Math.round(+i.value) || 0));
     else if (bi) budget[bi.dataset.budget] = Math.max(0, Math.min(100000, Math.round(+bi.value) || 0));
     else return;
-    savePlan(); go();
+    go();
   });
   // за сколько часов должно окупаться необязательное чудо (раздел 11)
-  const KEY_P = 'greekgame.balancer.payback';
-  let PB = (() => { try { const v = +localStorage.getItem(KEY_P); if (v > 0) return v; } catch (e) {} return Balancer.DEFAULTS.payback; })();
+  let PB = Balancer.DEFAULTS.payback;
   $('#out').addEventListener('change', ev => {
     if (ev.target.id !== 'payback') return;
     PB = Math.max(0.25, +ev.target.value || Balancer.DEFAULTS.payback);
-    try { localStorage.setItem(KEY_P, PB); } catch (e) {}
     go();
   });
   $('#out').addEventListener('click', ev => {
-    if (ev.target.id === 'reset') { plan = fresh(); savePlan(); go(); }
-    if (ev.target.id === 'resetB') { budget = freshB(); savePlan(); go(); }
+    if (ev.target.id === 'reset') { plan = fresh(); go(); }
+    if (ev.target.id === 'resetB') { budget = freshB(); go(); }
   });
   $('#peek').addEventListener('change', go);
 
@@ -133,7 +132,7 @@
 
     // ---------- 1. здания и бонусы ----------
     h += `<h2 id="s1">1. Ожидаемое количество зданий и бонусы-множители</h2>
-      <p class="note">Сколько зданий каждого типа стоит к концу эпохи — допущение, его можно менять прямо в таблице (запоминается в этом браузере).
+      <p class="note">Сколько зданий каждого типа стоит к концу эпохи — допущение, его можно менять прямо в таблице (до перезагрузки страницы; после — снова как в коде).
       Бывшие чудеса прошлой эпохи (Лемба → жилище…) прибавляются сами (серое «+1»). Уровни — не предел эпохи, а сколько позволит
       бюджет λ на уровни (раздел 8): серым под числом — какие уровни у зданий к концу эпохи.</p>`;
     const types = Object.keys(BUILDINGS).filter(t => !BUILDINGS[t].special && BUILDINGS[t].epoch <= last);
