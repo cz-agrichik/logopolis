@@ -645,9 +645,9 @@ test('колоды v4: большую колоду A1 поделили надв�
   assert.ok(s.progress[stay.id], 'прогресс оставшихся слов на месте');
   assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
   assert.ok(['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].every(id => s.decks.find(d => d.id === id).active), 'новые колоды A1 включены');
-  // колоды по 15–70 слов; в версиях 5 и 6 — ещё по 100 новых слов (и реквалификация: в v6 в A1 — 3 из A2 и 4 из B1, в A2 — 2 из B1)
+  // колоды по 15–70 слов; в версиях 5 и 6 — ещё по 100 новых слов (и реквалификация: в v6 в A1 — 3 из A2 и 4 из B1, в A2 — 2 из B1), в v7 — 100 в B1
   const lvl = l => s.decks.filter(d => D.levelOf(d) === l).reduce((t, d) => t + d.cards.length, 0);
-  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [696, 500, 457]);
+  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [696, 500, 557]);
   assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length >= 15 && d.cards.length <= 70));
 });
 
@@ -706,6 +706,20 @@ test('колоды v6: тематические колоды — слова св
   assert.ok(['b1-work', 'b1-society', 'b1-eco'].every(id => !deck(id).active), 'B1 выключен — новые колоды B1 тоже');
   assert.deepEqual([...deck('a1-time').cards.slice(0, 3).map(c => c.front)], ['Δευτέρα', 'Τρίτη', 'Τετάρτη'], 'дни — по порядку');
   assert.ok(['a1-time', 'a1-food', 'a1-home', 'a1-body', 'a1-city'].every(id => C.get('LEARN_PLANS').a1start.decks.includes(id)), '«A1 · начинающий» — с тематическими колодами');
+});
+
+test('колоды v7: +100 слов B1 и четыре тематические колоды B1; включённый B1 — новые колоды тоже включены', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  const NEWD = ['b1-edu', 'b1-media', 'b1-feel', 'b1-law'];
+  // сохранение v6: новых колод B1 ещё нет, игрок включил B1
+  s.decks = s.decks.filter(d => !NEWD.includes(d.id));
+  for (const d of s.decks) if (D.levelOf(d) === 'B1') d.active = true;
+  assert.equal(D.ensureBuiltins(s), NEWD.length, 'добавились все новые колоды B1');
+  const deck = id => s.decks.find(d => d.id === id);
+  assert.ok(NEWD.every(id => deck(id).active && D.levelOf(deck(id)) === 'B1'), 'B1 включён — новые колоды B1 тоже');
+  assert.deepEqual(NEWD.map(id => deck(id).cards.length), [17, 17, 18, 15]);
+  assert.ok(deck('b1-verbs').cards.some(c => c.front === 'αναλύω') && deck('b1-conn').cards.some(c => c.front === 'σύμφωνα με'));
 });
 
 test('сохранение: старое общее сохранение делится на город и обучение', () => {
