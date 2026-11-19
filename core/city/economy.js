@@ -45,6 +45,7 @@ Object.assign(Game, {
       if (e.ships) {   // корабли эллинского Кипра (core/city/ships.js): срок и цена листов — меньшие, сделки и грузы на выбор складываются
         const w = fx.ships = fx.ships || {};
         if (e.ships.every) w.every = Math.min(w.every || Infinity, e.ships.every);
+        if (e.ships.faster) w.faster = (w.faster || 0) + e.ships.faster;   // «на минуту чаще» — складывается
         if (e.ships.deals) w.deals = (w.deals || 0) + e.ships.deals;
         if (e.ships.choice) w.choice = (w.choice || 0) + e.ships.choice;
         if (e.ships.buy) w.buy = Math.min(w.buy || Infinity, e.ships.buy);
