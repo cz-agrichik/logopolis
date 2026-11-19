@@ -22,6 +22,8 @@ body[data-epoch="1"] { --accent: #a8641e; --head-bg: linear-gradient(180deg, #8a
 body[data-epoch="2"] { --accent: #2c6e95; --head-bg: linear-gradient(180deg, #2f6d93, #1e4a66); }
 /* эллинский Кипр: винно-пурпурный — вино, крашеная шерсть и порфира царей */
 body[data-epoch="3"] { --accent: #7d2e52; --head-bg: linear-gradient(180deg, #7a2d51, #4f1a35); }
+/* Римский Кипр: ярь-медянка — патина кипрской меди (aes cyprium, рудники Соли) и бронзы римских статуй */
+body[data-epoch="4"] { --accent: #2e6b57; --head-bg: linear-gradient(180deg, #2f6c58, #1b4336); }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }

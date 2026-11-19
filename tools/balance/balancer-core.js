@@ -25,23 +25,27 @@ const Balancer = (() => {
     1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
     2: { house: 12, field: 4, lumber: 10, quarry: 6, workshop: 10, storehouse: 6, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
     3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
+    // Римский Кипр — в разработке (EPOCHS[4].locked): пока город начала эпохи — тот же, что в конце эллинского
+    4: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
-  const BUDGET = { 0: 100, 1: 300, 2: 500, 3: 1100 };   // эллинский — на всю эпоху
+  const BUDGET = { 0: 100, 1: 300, 2: 500, 3: 1100, 4: 0 };   // римский — пока ничего
   // Цель пути «ресурсами» на всю эпоху (зерно) и какая часть эпохи уже описана в игре. Для недописанной эпохи цель части —
   // доля по выпуску: части равны по времени, мощь растёт как в описанной части (геометрически), значит, на первую из n частей
   // приходится (g − 1) / (gⁿ − 1), где g — во сколько раз вырос город за описанную часть.
   const TARGET = { 3: { labor: 7e6, techs: 5e6, part: 1 } };   // labor — весь путь «ресурсами», techs — из него знания «через силу»
   // курс обрядов — BALANCE.riteRate медных λ за минуту выпуска на начало эпохи × BALANCE.logosInflation (дальше заданных — последняя)
   // payback — за сколько часов должно окупаться необязательное чудо; raidStock — какая доля склада в среднем лежит в запасах (для стен)
-  const DEFAULTS = { last: 2, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
+  // last — последняя эпоха расчёта: по умолчанию все готовые (эллинский Кипр), last: 4 — ещё и римский Кипр в разработке
+  const DEFAULTS = { last: 3, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
 
   function run(opts = {}) {
     const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN, budget = Object.assign({}, BUDGET, o.budget || {});
     const G = Game, B = BUILDINGS, T = TECHS, E = EPOCHS, BAL = BALANCE, W = BAL.worth;
     if (!G.map || !G.map.length) G.genMap();
     G.state = G.newState();
-    const LEVEL = e => E[e].maxLevel;
+    // эпоха в разработке (locked: ещё нет ни предела уровня, ни перехода) — предел прошлой эпохи
+    const LEVEL = e => E[e].maxLevel || (e > 0 ? LEVEL(e - 1) : 1);
     const techsUpTo = e => T.filter(t => t.epoch <= e).map(t => t.id);
     const wonders = (e, withLogos) => {
       const must = new Set(E.slice(0, e + 1).flatMap(x => (x.advance && x.advance.specials) || []));
@@ -344,7 +348,7 @@ const Balancer = (() => {
     const first = { epoch: 0, techs: [], buildings: copy(G.newState().buildings), first: true, L: 1 };
     const cities = [first], ends = [];
     for (let e = 0; e <= o.last && e < E.length; e++) {
-      if (!E[e].maxLevel) break;
+      if (!E[e].maxLevel && !E[e].locked) break;
       const end = buildEnd(e, cities[cities.length - 1]); ends.push(end); cities.push(end);
     }
     const stages = cities.map((c, i) => ({ index: i, first: !!c.first, endOf: c.first ? null : c.epoch, target: c.target || null,
@@ -440,7 +444,7 @@ const Balancer = (() => {
           earn, rest, fairW, fairL: logos ? Math.max(0, (fairW - resW) / x.riteL) : null, retire: R || null };
       }) };
     });
-    return { stages, epochs, worth: W };
+    return { stages, epochs, worth: W, draft: E.map(x => !!x.locked) };
   }
   return { run, PLAN, BUDGET, DEFAULTS, TARGET };
 })();

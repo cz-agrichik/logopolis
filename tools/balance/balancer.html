@@ -42,7 +42,7 @@
   поменяли числа в игре — обновите страницу. Сколько зданий стоит к концу эпохи — допущение, правится прямо в разделе 1.</p>
 </header>
 <div class="bar">
-  <label><input type="checkbox" id="peek"> + эллинский Кипр</label>
+  <label title="Эпоха в разработке: пока — город начала эпохи (конец эллинского)"><input type="checkbox" id="peek"> + римский Кипр (в разработке)</label>
   <a href="#s1">1 здания</a><a href="#s2">2 население</a><a href="#s3">3 λ</a><a href="#s4">4 курсы</a><a href="#s5">5 выпуск</a>
   <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a><a href="#s11">11 чудеса</a>
   <span class="sp"></span><span id="status" class="dim"></span>
@@ -122,7 +122,8 @@
 
   function render(R) {
     const S = R.stages, EP = R.epochs, last = EP.length - 1;
-    const col = st => st.first ? `начало: ${esc(en(0))}` : `конец: ${esc(en(st.endOf))}${EPOCHS[st.endOf + 1] ? `<br>${dim('= начало: ' + esc(en(st.endOf + 1)))}` : ''}`;
+    const col = st => st.first ? `начало: ${esc(en(0))}` : EPOCHS[st.endOf].locked ? `${esc(en(st.endOf))}<br>${dim('в разработке: пока город начала эпохи')}`
+      : `конец: ${esc(en(st.endOf))}${EPOCHS[st.endOf + 1] ? `<br>${dim('= начало: ' + esc(en(st.endOf + 1)))}` : ''}`;
     const cols = ['', ...S.map(col)];
     const pct = v => (v > 0 ? '+' : '−') + nf(Math.abs(v) * 100, 0) + '%';
     const src = s => s.kind === 'tech' ? `«${esc(tn(s.id))}»` : esc(bn(s.id));
@@ -137,7 +138,7 @@
       бюджет λ на уровни (раздел 8): серым под числом — какие уровни у зданий к концу эпохи.</p>`;
     const types = Object.keys(BUILDINGS).filter(t => !BUILDINGS[t].special && BUILDINGS[t].epoch <= last);
     const lvls = c => { const m = {}; for (const l of c.levels) m[l] = (m[l] || 0) + 1; return Object.entries(m).sort((a, b) => b[0] - a[0]).map(([l, n]) => `${n}×${l}`).join(' '); };
-    h += tbl(cols, [['предел уровня в эпоху', ...S.map(st => st.first ? 1 : EPOCHS[st.endOf].maxLevel)]].concat(types.map(t => [esc(bn(t)), ...S.map(st => {
+    h += tbl(cols, [['предел уровня в эпоху', ...S.map(st => st.first ? 1 : EPOCHS[st.endOf].maxLevel || dim('—'))]].concat(types.map(t => [esc(bn(t)), ...S.map(st => {
       const c = st.a.counts[t], extra = c ? c.n - ((plan[st.endOf] || {})[t] || 0) : 0;
       if (st.first) return c ? `${c.n}<br>${dim('ур. ' + lvls(c))}` : dim('—');
       if (BUILDINGS[t].epoch > st.endOf) return dim('—');
@@ -300,7 +301,7 @@
       для чуда за λ — сколько это λ сверх его ресурсов. Остаток в цену не входит — по нему проверяем, что переход не обидный (остаток не намного меньше цены).
       Стены: сколько в среднем уносили бы «народы моря» — ${fmt((BALANCE.raidLoot[0] + BALANCE.raidLoot[1]) / 2 * 100)}% запасов раз в ${fmt((BALANCE.raidEvery[0] + BALANCE.raidEvery[1]) / 2 / 60)} минут,
       если в запасах лежит треть склада (а таймер набега виден — кто тратит заранее, теряет меньше). Прибавка склада, +% к λ, рост жителей и козы Троодоса не оцениваются.</p>`;
-    const restCell = w => !w.rest ? dim('—') : L(`${esc(bn(w.rest.into))} ${w.rest.level}-го уровня (с эпохи «${esc(en(w.rest.epoch))}»)` +
+    const restCell = w => !w.rest ? dim('—') : L(`${esc(bn(w.rest.into))} ${w.rest.level}-го уровня (${w.rest.epoch != null ? `с эпохи «${esc(en(w.rest.epoch))}»` : `после «${esc(tn(w.retire.tech))}»`})` +
       (w.rest.obsolete ? `, там устаревает — продажа вернёт λ ${fmt(w.rest.logos)} + ${costH(w.rest.res)}${w.rest.successor ? ` (или перестройка в ${esc(bn(w.rest.successor)).toLowerCase()})` : ''}`
         : `: ${costH(w.rest.res)} + λ ${fmt(w.rest.logos)}`) + ` = <b>${fmt(w.rest.w)}</b> зерна`);
     h += EP.map(p => `<h3>${ep(p)} · мощь на середине ${fmt(p.payback.mid)} зерна/с, 1 λ ≈ ${fmt(p.riteL)} зерна</h3>` + tbl(
@@ -327,7 +328,7 @@
     setTimeout(() => {
       const t0 = performance.now();
       try {
-        const R = Balancer.run({ plan, budget, payback: PB, last: $('#peek').checked ? 3 : 2 });
+        const R = Balancer.run({ plan, budget, payback: PB, last: $('#peek').checked ? 4 : 3 });
         $('#out').innerHTML = render(R);
         window.scrollTo(0, y);
         $('#status').textContent = `посчитано за ${Math.round(performance.now() - t0)} мс`;
