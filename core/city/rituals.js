@@ -31,7 +31,7 @@ Object.assign(Game, {
   ritualStatus(R) {
     const s = this.state;
     if (R.epoch > s.epoch) return { hidden: true };
-    if (R.tech && !this.hasTech(R.tech)) return { hidden: true };            // обряд нового знания (праздник сбора винограда)
+    if (R.tech && !this.hasTech(R.tech)) return { hidden: true };            // обряд нового знания (праздник лозы и оливы)
     if (R.untilTech && this.hasTech(R.untilTech)) return { hidden: true };   // уступил место новому
     if (R.until && this.hasWonder(R.until)) return { hidden: true };         // святилище улучшено — обряд сменился
     const req = R.req && !(R.reqUntil != null && s.epoch >= R.reqUntil) ? R.req : null;   // reqUntil: с этой эпохи чудо не нужно

@@ -531,7 +531,7 @@ const UI = {
     let h = `<div class="supply">${this.riteCard(Cat.rite.elders)}</div>`;
     h += `<h3>Обряды <small>благословения на время</small> ${this.pediaBtn('a:religion')}</h3>`;
     for (let e = s.epoch; e >= 0; e--) {
-      // обряды, которые сменились новыми (стада → сбор винограда, звёзды → Утренняя звезда), прячем — если только они не идут прямо сейчас
+      // обряды, которые сменились новыми (стада → праздник лозы и оливы, звёзды → Утренняя звезда), прячем — если только они не идут прямо сейчас
       const list = Cat.rites.filter(r => r.epoch === e && !r.instant && (!Game.ritualStatus(r).hidden || s.buffs[r.id]));
       if (!list.length) continue;
       if (s.epoch > 0) h += `<div class="sub-h">${esc(Cat.epochs[e].name)}</div>`;

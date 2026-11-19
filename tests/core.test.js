@@ -1069,6 +1069,10 @@ test('эллинский Кипр, вторая треть: пять знани�
   assert.ok(Math.abs(G.bonusMult('vineyard', 'amphora') - vb - 0.3) < 1e-9 && Math.abs(G.bonusMult('olivegrove', 'amphora') - ob) < 1e-9);
   assert.equal(G.ritualStatus(R.harvest).hidden, true); assert.notEqual(G.ritualStatus(R.thalysia).hidden, true);
   assert.equal(R.thalysia.buff.mult.food, 2); assert.equal(R.thalysia.buff.bmult.vineyard, 2); assert.ok(!R.thalysia.buff.bmult.olivegrove);
+  // Фалисии не сменяют «Праздник лозы и оливы», а дополняют: виноградники под обоими — ×4
+  assert.notEqual(G.ritualStatus(R.vintage).hidden, true, 'праздник лозы и оливы остаётся');
+  s.buffs = { thalysia: 600, vintage: 600 }; const fx = G.effects(); s.buffs = {};
+  assert.equal(fx.bbuff.vineyard, 3, '+2 и +1 — виноградники ×4'); assert.equal(fx.bbuff.olivegrove, 1);
   assert.ok(!R.thalysia.cost.food, 'зерна в подношениях нет'); assert.equal(G.ritualDur(R.thalysia), 900);
   // Меч царя Китиона: кузницы +30%
   const fb = G.bonusMult('forge', 'iron'); assert.ok(G.research('kitionsword')); assert.ok(Math.abs(G.bonusMult('forge', 'iron') - fb - 0.3) < 1e-9);

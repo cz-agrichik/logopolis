@@ -1270,7 +1270,11 @@ const Art = (() => {
       `<path d="M24 30 Q24 20 32 20 Q40 20 40 30 L40 40 Q32 46 24 40Z" fill="${C.bronze}" ${st(1.6)}/>
       <path d="M24 26 Q12 24 12 12 Q18 20 26 22 M40 26 Q52 24 52 12 Q46 20 38 22" fill="${C.white}" ${st(1.4)}/>
       <path d="M28 32 l3 0 M33 32 l3 0" stroke="${O}" stroke-width="1.6"/>`,
-    r_vintage: rdisc + grapes(32, 30, 1.25) + `<circle cx="16" cy="44" r="7" fill="${C.thatch}" ${st(1.4)}/><circle cx="16" cy="44" r="3.4" fill="none" stroke="${C.thatchD}" stroke-width="1.2"/>
+    // лоза и олива: гроздь, веточка оливы с плодами, тимпан вакханок и амфора
+    r_vintage: rdisc + grapes(32, 30, 1.25) + `<g transform="translate(9 20)">
+      <path d="M2 14 Q3 6 12 -1" stroke="${C.woodD}" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+      ${[[3, 9, -70], [6, 4, -15], [6.5, 9.5, 35], [10, 1, -60], [11, 5, 20]].map(([x, y, a]) => `<ellipse cx="${x}" cy="${y}" rx="4.8" ry="1.3" transform="rotate(${a} ${x} ${y})" fill="#b3bf86" stroke="#2a2a1c" stroke-width=".8"/>`).join('')}
+      <ellipse cx="1.5" cy="5" rx="2.4" ry="1.8" fill="#8f9c3e" stroke="#2a2a1c" stroke-width=".8"/><ellipse cx="9" cy="12.5" rx="2.4" ry="1.8" fill="#6d5a86" stroke="#2a2a1c" stroke-width=".8"/><circle cx="8.3" cy="11.9" r=".6" fill="#fff" opacity=".6"/></g>` + `<circle cx="16" cy="44" r="7" fill="${C.thatch}" ${st(1.4)}/><circle cx="16" cy="44" r="3.4" fill="none" stroke="${C.thatchD}" stroke-width="1.2"/>
       ${[0, 90, 180, 270].map(a => { const r = a * Math.PI / 180; return `<circle cx="${16 + Math.cos(r) * 7}" cy="${44 + Math.sin(r) * 7}" r="1.3" fill="${C.bronze}"/>`; }).join('')}` + amphoraShape(48, 44, .55),
     // Утренняя звезда — Венера, звезда Афродиты, над морем перед рассветом
     r_morningstar: rdisc + `<path d="M6 44 Q32 38 58 44 L58 50 Q32 46 6 50Z" fill="#e9a06b" opacity=".75"/>
