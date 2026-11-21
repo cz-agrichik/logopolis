@@ -54,3 +54,34 @@ test('библиотека: каталог и словарь сайта на м�
   assert.ok(dict.phrases.every(p => p[0].length >= 2 && p[0].length <= 5));
   assert.ok(!('sentences' in dict) && !('text' in dict));
 });
+
+test('мои тексты: хранилище в браузере — сохранить, править, удалить, вернуть, перенос старого, копия и загрузка', () => {
+  const mem = {};
+  const storage = { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } };
+  mem['greek-reader:own-text'] = 'Παλιό κείμενο.';
+  const S = Own.Store(storage);
+  assert.strictEqual(S.migrate().title, 'Παλιό κείμενο.');
+  assert.ok(!('greek-reader:own-text' in mem) && S.migrate() === null, 'старый ключ перенесён один раз');
+  const a = S.put({ title: '', text: 'Πρώτη γραμμή\nκαι άλλη', stats: { known: 3, total: 4, phrases: 0 } });
+  assert.strictEqual(a.title, 'Πρώτη γραμμή', 'название по умолчанию — первая строка');
+  const b = S.put({ id: a.id, title: 'Моё', text: 'Νέο κείμενο' });
+  assert.strictEqual(b.id, a.id); assert.strictEqual(b.created, a.created); assert.strictEqual(S.get(a.id).title, 'Моё');
+  assert.strictEqual(S.list().length, 2);
+  const removed = S.remove(a.id); assert.strictEqual(S.list().length, 1);
+  S.restore(removed); assert.strictEqual(S.get(a.id).text, 'Νέο κείμενο');
+  // копия → в чистый браузер; повторная загрузка ничего не дублирует; свежая правка из копии обновляет
+  const backup = S.exportJson();
+  const mem2 = {};
+  const S2 = Own.Store({ getItem: k => (k in mem2 ? mem2[k] : null), setItem: (k, v) => { mem2[k] = String(v); }, removeItem: k => { delete mem2[k]; } });
+  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 2, updated: 0, skipped: 0 });
+  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 0, updated: 0, skipped: 2 });
+  const newer = JSON.parse(backup); newer.texts[0].text = 'Αλλαγμένο'; newer.texts[0].updated = '2999-01-01T00:00:00.000Z';
+  assert.deepStrictEqual(S2.importFile('copy.json', JSON.stringify(newer)), { added: 0, updated: 1, skipped: 1 });
+  assert.deepStrictEqual(S2.importFile('Σημειώσεις.txt', 'Ένα κείμενο.'), { added: 1, updated: 0, skipped: 0 });
+  assert.ok(S2.list().some(t => t.title === 'Σημειώσεις'));
+  assert.throws(() => S2.importFile('x.json', '{"texts": []}'), /не копия/);
+  assert.throws(() => S2.importFile('ru.txt', 'по-русски'), /нет греческого/);
+  // хранилище испорчено — начинаем с пустого, а не падаем
+  mem2['greek-reader:own-texts:v1'] = '{oops';
+  assert.deepStrictEqual(S2.list(), []);
+});

@@ -105,6 +105,13 @@
     return found;
   }
 
+  /** Название по умолчанию — первая непустая строка (до 60 символов). */
+  function titleOf(text) {
+    const first = String(text || "").split("\n").map(line => line.trim()).find(Boolean) || "";
+    const chars = Array.from(first);
+    return (chars.length > 60 ? `${chars.slice(0, 57).join("")}…` : first) || "Свой текст";
+  }
+
   /** Данные для GreekReader.start — тот же формат, что у книги (версия 3), плюс сводка в meta. */
   function build(input, dict, title) {
     indexes(dict);
@@ -143,10 +150,9 @@
       words.push(word);
     }
     const phrases = matchPhrases(words, spans.length, dict);
-    const firstLine = text.split("\n").map(line => line.trim()).find(Boolean) || "";
     return {
       version: 3,
-      title: title || (firstLine.length > 60 ? `${Array.from(firstLine).slice(0, 57).join("")}…` : firstLine) || "Свой текст",
+      title: title || titleOf(text),
       text,
       chapters: [{ title: "Свой текст", start: 0, end: chars.length }],
       sentences: spans.map(([a, b]) => [a, b, ""]),
@@ -157,7 +163,97 @@
     };
   }
 
-  const api = { build, fold, splitSentences };
+  // ───────────── «Мои тексты»: хранилище в браузере пользователя ─────────────
+  // localStorage (на сайте — у каждого посетителя свой, на сервер ничего не уходит). storage — объект
+  // с getItem/setItem/removeItem (в браузере — localStorage, в тестах — подделка). Запись может бросить
+  // исключение (приватный режим, нет места) — его ловит страница.
+  const STORE_KEY = "greek-reader:own-texts:v1";
+  const LEGACY_KEY = "greek-reader:own-text";   // прежняя версия: один текст без названия
+  const BACKUP_APP = "logos-own-texts";
+  const hasGreek = text => /[\u0370-\u03ff\u1f00-\u1fff]/.test(String(text || ""));
+
+  function Store(storage) {
+    const read = () => {
+      try {
+        const db = JSON.parse(storage.getItem(STORE_KEY) || "null");
+        if (db && db.texts && typeof db.texts === "object") return db;
+      } catch (error) { /* испорчено или недоступно — начинаем с пустого */ }
+      return { version: 1, texts: {} };
+    };
+    const write = db => storage.setItem(STORE_KEY, JSON.stringify(db));
+    const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const clean = item => ({
+      id: String(item.id), title: String(item.title || titleOf(item.text)), text: String(item.text),
+      created: String(item.created || item.updated || new Date().toISOString()),
+      updated: String(item.updated || item.created || new Date().toISOString()),
+      stats: item.stats && typeof item.stats === "object" ? item.stats : null,
+    });
+
+    const api = {
+      list: () => Object.values(read().texts).sort((a, b) => String(b.updated).localeCompare(String(a.updated))),
+      get: id => read().texts[id] || null,
+      /** Сохранить новый (без id) или исправленный текст; stats — сводка разбора для полки. */
+      put({ id, title, text, stats }) {
+        const db = read();
+        const old = id && db.texts[id];
+        const now = new Date().toISOString();
+        const item = clean({ id: old ? id : newId(), title: String(title || "").trim() || titleOf(text), text,
+          created: old ? old.created : now, updated: now, stats: stats || null });
+        db.texts[item.id] = item;
+        write(db);
+        return item;
+      },
+      remove(id) {
+        const db = read();
+        const removed = db.texts[id] || null;
+        if (removed) { delete db.texts[id]; write(db); }
+        return removed;
+      },
+      restore(item) {
+        const db = read();
+        db.texts[item.id] = clean(item);
+        write(db);
+      },
+      /** Прежняя версия хранила один текст без названия — переносим его в список (один раз). */
+      migrate() {
+        let legacy = null;
+        try { legacy = storage.getItem(LEGACY_KEY); } catch (error) { return null; }
+        if (!legacy) return null;
+        const item = hasGreek(legacy) ? api.put({ text: legacy }) : null;
+        storage.removeItem(LEGACY_KEY);
+        return item;
+      },
+      /** Копия всех текстов одним файлом JSON. */
+      exportJson: () => JSON.stringify({ app: BACKUP_APP, version: 1, exported: new Date().toISOString(), texts: api.list() }, null, 2),
+      /** Загрузка файла: копия (.json) — добавляет новые тексты и обновляет те, что в копии свежее;
+       *  обычный текст (.txt) — новый текст с названием по имени файла. Возвращает { added, updated, skipped }. */
+      importFile(name, content) {
+        const out = { added: 0, updated: 0, skipped: 0 };
+        if (/\.json$/i.test(name)) {
+          let parsed;
+          try { parsed = JSON.parse(content); } catch (error) { throw new Error("Это не копия «Моих текстов»: файл не читается как JSON."); }
+          if (!parsed || parsed.app !== BACKUP_APP || !Array.isArray(parsed.texts)) throw new Error("Это не копия «Моих текстов».");
+          const db = read();
+          for (const item of parsed.texts) {
+            if (!item || !item.id || !hasGreek(item.text)) { out.skipped += 1; continue; }
+            const have = db.texts[item.id];
+            if (!have) { db.texts[item.id] = clean(item); out.added += 1; }
+            else if (String(item.updated) > String(have.updated)) { db.texts[item.id] = clean(item); out.updated += 1; }
+            else out.skipped += 1;
+          }
+          write(db);
+          return out;
+        }
+        if (!hasGreek(content)) throw new Error(`В файле «${name}» нет греческого текста.`);
+        api.put({ title: String(name).replace(/\.[^.]+$/, ""), text: content });
+        out.added = 1;
+        return out;
+      },
+    };
+    return api;
+  }
+
+  const api = { build, fold, splitSentences, titleOf, Store, hasGreek };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OwnText = api;
 })(typeof window !== "undefined" ? window : globalThis);

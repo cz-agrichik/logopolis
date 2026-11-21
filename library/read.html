@@ -8,13 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Caveat:wght@500;600&display=swap">
-  <link rel="stylesheet" href="reader.css">
+  <link rel="stylesheet" href="reader.css?v=2">
   <!-- Читалка библиотеки: ?book=<id> — книга из каталога, ?own — свой текст по словарю сайта -->
   <script src="catalog.js"></script>
   <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
-  <script src="reader.js" defer></script>
-  <script src="owntext.js" defer></script>
-  <script src="library.js" defer></script>
+  <script src="reader.js?v=2" defer></script>
+  <script src="owntext.js?v=2" defer></script>
+  <script src="library.js?v=2" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -24,7 +24,7 @@
         <div class="topbar__title" id="book-title">Греческая читалка</div>
         <div class="topbar__meta" id="book-meta"></div>
       </div>
-      <a class="link-button own-again" id="own-again" href="read.html?own" hidden>Другой текст</a>
+      <a class="link-button own-again" id="own-again" href="read.html?own" hidden>Править текст</a>
       <select class="chapter-select" id="chapter-select" aria-label="Перейти к главе" hidden></select>
       <button type="button" class="margin-toggle" id="margin-toggle" aria-pressed="true"
               title="Показывать переводы запомненных слов на полях">
@@ -47,16 +47,18 @@
   <div class="notice" id="notice" hidden></div>
 
   <section class="own" id="own" hidden>
-    <h1 class="own__title">Свой текст</h1>
+    <h1 class="own__title" id="own-heading">Свой текст</h1>
     <p class="own__lead">Вставьте любой греческий текст или откройте файл .txt. Каждое слово ищется в словаре сайта —
       он собран из всех книг библиотеки: форма слова, лемма и грамматика, значения и <b>обороты</b>
       (<span lang="el">ρίχνω μια ματιά</span> — «взглянуть»). Перевода предложений здесь нет.
-      Текст остаётся в вашем браузере и никуда не отправляется.</p>
+      Текст сохранится в «Моих текстах» — только в этом браузере, никуда не отправляется.</p>
+    <input type="text" class="own__name" id="own-name" maxlength="120" placeholder="Название (если пусто — первая строка текста)">
     <textarea class="own__text" id="own-text" lang="el" spellcheck="false" placeholder="Επικολλήστε εδώ ένα ελληνικό κείμενο…"></textarea>
     <div class="own__actions">
-      <button type="button" class="button" id="own-go">Разобрать</button>
+      <button type="button" class="button" id="own-go">Разобрать и сохранить</button>
       <label class="button button--quiet">Открыть .txt<input type="file" id="own-file" accept=".txt,text/plain" hidden></label>
       <span class="own__status" id="own-status" role="status"></span>
+      <a class="link-button own__mine" href="index.html#mine">Мои тексты</a>
     </div>
   </section>
 
