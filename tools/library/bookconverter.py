@@ -483,10 +483,22 @@ def parse_json_reply(content: str) -> dict:
     if start < 0 or end <= start:
         raise ValueError("в ответе нет JSON-объекта" + (" (ответ оборван?)" if start >= 0 else ""))
     body = content[start:end + 1]
+    commas = lambda x: re.sub(r",(\s*[\]}])", r"\1", x)
     try:
         return json.loads(body, strict=False)
     except json.JSONDecodeError:
-        return json.loads(re.sub(r",(\s*[\]}])", r"\1", body), strict=False)
+        pass
+    try:
+        return json.loads(commas(body), strict=False)
+    except json.JSONDecodeError:
+        pass
+    try:   # ответ повторён дважды подряд ({…}{…}) — берём первый
+        return json.JSONDecoder(strict=False).raw_decode(content[start:])[0]
+    except json.JSONDecodeError:
+        pass
+    # у пункта списка потеряна открывающая скобка: [[[1, 2], "…", "…"], [3, 4], "…", "…"]] — возвращаем её
+    fixed = re.sub(r'("\s*\])\s*,\s*\[(\s*\d+(?:\s*,\s*\d+)*\s*)\]\s*,\s*"', r'\1, [[\2], "', body)
+    return json.loads(commas(fixed), strict=False)
 
 
 
@@ -643,6 +655,13 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
     спросить такие куски заново — --retry-bad."""
     reply = cache.get(key)
     if isinstance(reply, dict) and "_bad" in reply:
+        try:   # сырой ответ сохранён — может, теперь его получится разобрать (разбор стал терпимее)
+            salvaged = parse_json_reply(reply.get("raw") or "")
+        except (ValueError, KeyError, IndexError, TypeError):
+            salvaged = None
+        if isinstance(salvaged, dict) and salvaged:
+            cache.put(key, salvaged)
+            return salvaged, True
         if not getattr(client, "retry_bad", False) or client.offline:
             return {}, True
         reply = None
@@ -660,8 +679,8 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
         return None, False
     except BadReply as exc:
         log(f"   ! {what}: {exc} — запомнил, в следующий раз не спрашиваю (заново: --retry-bad)")
-        cache.put(key, {"_bad": str(exc)[:300], "when": datetime.now(timezone.utc).strftime("%Y-%m-%d")})
         raw = getattr(client, "last_bad", "")
+        cache.put(key, {"_bad": str(exc)[:300], "when": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "raw": raw[:20000]})
         if raw:
             with open(CACHE_DIR / "bad_replies.txt", "a", encoding="utf-8") as fh:
                 fh.write(f"\n===== {datetime.now(timezone.utc):%Y-%m-%d %H:%M} · {what} · {exc}\n--- запрос:\n{prompt[:3000]}\n--- ответ:\n{raw}\n")
@@ -904,6 +923,15 @@ def check_phrase(head: str, ru: str, members: list[dict]) -> str | None:
         return None
     if all(t in free for t in folded):
         return None
+    # лёгкая модель иногда пишет оборот без ударений («εκεινη τη στιγμη», «πολλες φορες») — берём ударение у слов текста
+    accented: dict[str, str] = {}
+    for x in [bare_lemma(m["lemma"]) for m in members] + [m["form"] for m in members]:
+        x = unicodedata.normalize("NFC", x).lower().strip("'")
+        if accents(x):
+            accented.setdefault(unaccent(norm(x)), x)
+    for i, t in enumerate(tokens):
+        if not accents(t) and len(re.findall(r"[αεηιουω]+", unaccent(norm(t)))) > 1 and unaccent(norm(t)) in accented:
+            tokens[i] = accented[unaccent(norm(t))]
     return " ".join(tokens)
 
 
