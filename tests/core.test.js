@@ -643,9 +643,9 @@ test('колоды v4: большую колоду A1 поделили надв�
   assert.ok(D.prog(s, s.decks.find(d => d.id === 'a1-fem').cards[0]), 'прогресс оставшихся слов на месте');
   assert.equal(D.learnedCount(s), learned, 'выученных слов не стало меньше');
   assert.ok(['a1-fem2', 'a1-neut', 'a1-adj', 'a1-conn'].every(id => s.decks.find(d => d.id === id).active), 'новые колоды A1 включены');
-  // колоды по 15–70 слов; в версиях 5 и 6 — ещё по 100 новых слов (и реквалификация: в v6 в A1 — 3 из A2 и 4 из B1, в A2 — 2 из B1), в v7 — 100 в B1
+  // колоды по 15–70 слов; в версиях 5 и 6 — ещё по 100 новых слов (и реквалификация: в v6 в A1 — 3 из A2 и 4 из B1, в A2 — 2 из B1), в v7 — 100 в B1, в v8 — 224 слова из библиотеки (A1 73, A2 65, B1 86)
   const lvl = l => s.decks.filter(d => D.levelOf(d) === l).reduce((t, d) => t + d.cards.length, 0);
-  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [696, 500, 557]);
+  assert.deepEqual([lvl('A1'), lvl('A2'), lvl('B1')], [769, 565, 643]);
   assert.ok(s.decks.filter(d => D.levelOf(d)).every(d => d.cards.length >= 15 && d.cards.length <= 70));
 });
 
@@ -716,7 +716,7 @@ test('колоды v7: +100 слов B1 и четыре тематические
   assert.equal(D.ensureBuiltins(s), NEWD.length, 'добавились все новые колоды B1');
   const deck = id => s.decks.find(d => d.id === id);
   assert.ok(NEWD.every(id => deck(id).active && D.levelOf(deck(id)) === 'B1'), 'B1 включён — новые колоды B1 тоже');
-  assert.deepEqual(NEWD.map(id => deck(id).cards.length), [17, 17, 18, 15]);
+  assert.deepEqual(NEWD.map(id => deck(id).cards.length), [17, 18, 19, 16]);   // в v8 — ещё по слову из библиотеки
   assert.ok(deck('b1-verbs').cards.some(c => c.front === 'αναλύω') && deck('b1-conn').cards.some(c => c.front === 'σύμφωνα με'));
 });
 
@@ -1385,9 +1385,9 @@ test('прогресс по слову: сохранение v1 (по карто
   D.restore(s, old);
   assert.ok(s.v === 2 && s.progress['ήλιος'] && !s.progress[b.id]);
   // удаление своей колоды: прогресс слов, которые есть в других колодах, остаётся
-  const mine = D.makeDeck('Моя', [{ front: 'ήλιος', back: 'солнце' }, { front: 'πολυθρόνα', back: 'кресло' }]);
+  const mine = D.makeDeck('Моя', [{ front: 'ήλιος', back: 'солнце' }, { front: 'αλεξίπτωτο', back: 'парашют' }]);
   s.decks.push(mine);
   D.grade(s, mine.cards[1], true, 'new', 'gr2ru');
   D.removeDeck(s, mine);
-  assert.ok(!s.decks.includes(mine) && s.progress['ήλιος'] && !s.progress['πολυθρόνα']);
+  assert.ok(!s.decks.includes(mine) && s.progress['ήλιος'] && !s.progress['αλεξίπτωτο']);
 });
