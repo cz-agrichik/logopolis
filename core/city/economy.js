@@ -51,6 +51,7 @@ Object.assign(Game, {
         if (e.ships.buy) w.buy = Math.min(w.buy || Infinity, e.ships.buy);
       }
       if (e.noTribute) fx.noTribute = true;
+      if (e.publicani) fx.publicani = fx.publicani ? Math.min(fx.publicani, e.publicani) : e.publicani;   // «Эдикт Цицерона»: откупщики берут твёрдую сумму
       // чудеса, которые продлевают обряды (Стоя Зенона — золотые часы, Театр Нового Пафоса — праздники): секунды сверх dur, складываются
       if (e.riteDur) { const d = fx.riteDur = fx.riteDur || {}; for (const [id, sec] of Object.entries(e.riteDur)) d[id] = (d[id] || 0) + sec; }
       if (e.mistakeLogos) fx.mistakeLogos = Math.max(fx.mistakeLogos || 0, e.mistakeLogos);   // «Учение Зенона»: λ за задание с ошибкой   // «Поддержка Александра»: дани больше нет

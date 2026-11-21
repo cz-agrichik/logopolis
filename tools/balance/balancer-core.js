@@ -25,7 +25,8 @@ const Balancer = (() => {
     1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
     2: { house: 12, field: 4, lumber: 10, quarry: 6, workshop: 10, storehouse: 6, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
     3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
-    // Римский Кипр — в разработке (EPOCHS[4].locked): пока город начала эпохи — тот же, что в конце эллинского
+    // Римский Кипр — описан на четверть, уровни — прежние (до 13-го): пока тот же город, что в конце эллинского.
+    //   Жилища в Риме выше 13-го не растут, даже когда предел остальных зданий поднимется
     4: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)
@@ -33,11 +34,12 @@ const Balancer = (() => {
   // Цель пути «ресурсами» на всю эпоху (зерно) и какая часть эпохи уже описана в игре. Для недописанной эпохи цель части —
   // доля по выпуску: части равны по времени, мощь растёт как в описанной части (геометрически), значит, на первую из n частей
   // приходится (g − 1) / (gⁿ − 1), где g — во сколько раз вырос город за описанную часть.
-  const TARGET = { 3: { labor: 7e6, techs: 5e6, part: 1 } };   // labor — весь путь «ресурсами», techs — из него знания «через силу»
+  // Римский Кипр описан на четверть (4 знания из ≈16 и одно обязательное чудо): цель части — по доле выпуска
+  const TARGET = { 3: { labor: 7e6, techs: 5e6, part: 1 }, 4: { labor: 16e6, techs: 13e6, part: 1 / 4 } };   // labor — весь путь «ресурсами», techs — из него знания «через силу»
   // курс обрядов — BALANCE.riteRate медных λ за минуту выпуска на начало эпохи × BALANCE.logosInflation (дальше заданных — последняя)
   // payback — за сколько часов должно окупаться необязательное чудо; raidStock — какая доля склада в среднем лежит в запасах (для стен)
-  // last — последняя эпоха расчёта: по умолчанию все готовые (эллинский Кипр), last: 4 — ещё и римский Кипр в разработке
-  const DEFAULTS = { last: 3, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
+  // last — последняя эпоха расчёта: по умолчанию все открытые в игре (до римского Кипра, он пока описан на четверть)
+  const DEFAULTS = { last: 4, stock: 0.6, payback: 1.5, raidStock: 1 / 3 };
 
   function run(opts = {}) {
     const o = Object.assign({}, DEFAULTS, opts), plan = o.plan || PLAN, budget = Object.assign({}, BUDGET, o.budget || {});
@@ -48,7 +50,7 @@ const Balancer = (() => {
     const LEVEL = e => E[e].maxLevel || (e > 0 ? LEVEL(e - 1) : 1);
     const techsUpTo = e => T.filter(t => t.epoch <= e).map(t => t.id);
     const wonders = (e, withLogos) => {
-      const must = new Set(E.slice(0, e + 1).flatMap(x => (x.advance && x.advance.specials) || []));
+      const must = new Set(E.slice(0, e + 1).flatMap(x => (x.advance && x.advance.specials) || x.must || []));
       let list = Object.keys(B).filter(t => B[t].special && B[t].epoch <= e && (must.has(t) || !B[t].logos || withLogos));
       return list.filter(t => !list.some(u => B[u].upgradeOf === t));   // заменённое улучшением чудо
     };
@@ -339,7 +341,7 @@ const Balancer = (() => {
     }
     function wonderCosts(e) {
       load({ epoch: e, techs: techsUpTo(e), buildings: [] });
-      const must = new Set((E[e].advance && E[e].advance.specials) || []);
+      const must = new Set((E[e].advance && E[e].advance.specials) || E[e].must || []);
       return Object.keys(B).filter(t => B[t].special && B[t].epoch === e)
         .map(t => ({ id: t, logos: B[t].logos || 0, cost: G.liveCost(B[t].cost), kind: must.has(t) ? 'must' : B[t].logos ? 'logos' : 'res' }));
     }
@@ -410,7 +412,7 @@ const Balancer = (() => {
     // доля выпуска конца эпохи переносится на мощь середины эпохи (между «началом» и концом, геометрически).
     // Стены (raidShield): сколько в среднем уносили бы «народы моря» — середина raidLoot от запасов (raidStock склада) раз в среднее raidEvery.
     epochs.forEach((x, e) => {
-      const full = withLogosWonders(cities[e + 1]), must = new Set((E[e].advance && E[e].advance.specials) || []);
+      const full = withLogosWonders(cities[e + 1]), must = new Set((E[e].advance && E[e].advance.specials) || E[e].must || []);
       const base = measure(full), rates = base.rates, val = r => RES_KEYS.reduce((v, k) => v + (r[k] || 0) * (rates[k] != null ? rates[k] : 0), 0);
       const net = val(base.net), mid = Math.sqrt(x.prod0 * x.prod1);
       x.payback = { hours: o.payback, mid, list: Object.keys(B).filter(t => B[t].special && B[t].epoch === e && !must.has(t) && full.buildings.some(b => b.type === t)).map(t => {

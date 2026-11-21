@@ -32,7 +32,10 @@ Object.assign(Game, {
     if (!reqs || !reqs.every(r => r.ok)) return false;
     const a = EPOCHS[this.state.epoch].advance;
     this.pay(this.liveCost(a.res), a.logos);
+    const kind = this.raidKind();
     this.state.epoch++;
+    // угроза сменилась (дань → откупщики Рима): срок — заново, по правилам новой эпохи
+    if (this.raidKind() !== kind && this.raidKind() === 'publicani') { this.state.timers.raid = null; this.state.publicaniDue = null; }
     this.log('epoch', { epoch: this.state.epoch });
     // чудеса прошлой эпохи становятся обычными зданиями (Лемба — домом 5-го уровня, Хала-Султан-Текке — гаванью 9-го…)
     for (const [from, into, level] of this.retireWonders()) this.log('retired', { from, into, level, epoch: this.state.epoch });

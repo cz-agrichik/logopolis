@@ -32,19 +32,31 @@ Object.assign(Decks, {
 
 const Lesson = {
   // ---------- состав раунда ----------
-  /** Новый раунд: { pool, tasks } или null, если активных карточек нет. */
+  /** Новый раунд: { pool, tasks } или null, если активных карточек нет.
+   *  Длина раунда — roundSize заданий; «Пары» (4 слова на одном экране) считаются за два задания —
+   *  если пары собрались, слов в раунд добирается, чтобы раунды были одной длины. */
   plan(state) {
+    const size = Decks.settings(state).roundSize, pool = Decks.activeCards(state);
+    const weight = tasks => tasks.reduce((t, x) => t + (x.type === 'match' ? 2 : 1), 0);
     const picks = Decks.selectRound(state);
     if (!picks.length) return null;
-    const pool = Decks.activeCards(state);
-    return { pool, tasks: this.buildTasks(state, pool, picks) };
+    let tasks = this.buildTasks(state, pool, picks);
+    const short = size - weight(tasks);
+    if (short > 0) {   // пары съели место — добираем повторением (новых не добавляем: их число уже решено)
+      const have = new Set(picks.map(p => p.card));
+      const extra = Decks.selectRound(state, size * 2).filter(p => p.kind !== 'new' && !have.has(p.card)).slice(0, short);
+      if (extra.length) tasks = this.buildTasks(state, pool, picks.concat(extra));
+      // добрать нечем (в начале учёбы есть только заучиваемые и новые) — без «Пар», каждое слово своим заданием
+      if (!extra.length) tasks = this.buildTasks(state, pool, picks, false);
+    }
+    return { pool, tasks };
   },
 
-  buildTasks(state, pool, picks) {
+  buildTasks(state, pool, picks, pairs = true) {
     const tasks = [], later = [];
     let rest = picks;
     const seasoned = picks.filter(p => p.kind !== 'new' && p.lvl >= 1 && !Decks.needsBuild(state, p.card));
-    if (seasoned.length >= 4 && this.distinct(pool, 'back') >= 4) {
+    if (pairs && seasoned.length >= 4 && this.distinct(pool, 'back') >= 4) {
       const m = shuffle(seasoned).slice(0, 4);
       tasks.push({ type: 'match', items: m });
       rest = picks.filter(p => !m.includes(p));

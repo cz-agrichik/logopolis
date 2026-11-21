@@ -42,9 +42,8 @@
   поменяли числа в игре — обновите страницу. Сколько зданий стоит к концу эпохи — допущение, правится прямо в разделе 1.</p>
 </header>
 <div class="bar">
-  <label title="Эпоха в разработке: пока — город начала эпохи (конец эллинского)"><input type="checkbox" id="peek"> + римский Кипр (в разработке)</label>
   <a href="#s1">1 здания</a><a href="#s2">2 население</a><a href="#s3">3 λ</a><a href="#s4">4 курсы</a><a href="#s5">5 выпуск</a>
-  <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a><a href="#s11">11 чудеса</a>
+  <a href="#s6">6 наука</a><a href="#s7">7 обязательное</a><a href="#s8">8 λ-бюджет улучшений</a><a href="#s9">9 λ ↔ ресурсы</a><a href="#s10">10 итог</a><a href="#s11">11 чудеса</a><a href="#s12">12 Рим</a>
   <span class="sp"></span><span id="status" class="dim"></span>
 </div>
 <main><div id="out">Считаю…</div></main>
@@ -70,6 +69,7 @@
 <script src="../../core/city/facts.js"></script>
 <script src="../../content/ru/lexicon.js"></script>
 <script src="balancer-core.js"></script>
+<script src="rome.js"></script>   <!-- Римский Кипр: договорённые числа и идеи (раздел 12) -->
 <script>
 'use strict';
 (() => {
@@ -118,7 +118,6 @@
     if (ev.target.id === 'reset') { plan = fresh(); go(); }
     if (ev.target.id === 'resetB') { budget = freshB(); go(); }
   });
-  $('#peek').addEventListener('change', go);
 
   function render(R) {
     const S = R.stages, EP = R.epochs, last = EP.length - 1;
@@ -310,6 +309,20 @@
         w.shield ? `${dim('набеги')} → ${fmt(w.gainMid)}` : `${fmt(w.share * 100)}% → ${fmt(w.gainMid)}`, `<b>${payH(w.hours)}</b>`, fmt(w.earn), restCell(w),
         w.logos ? `<b>${fmt(w.fairL)} λ</b> ${dim(`(${fmt(w.fairW)} зерна)`)}` : `<b>${fmt(w.fairW)}</b> зерна ${dim(`(сейчас ${fmt(w.priceW)})`)}`]))).join('');
 
+    // ---------- 12. Римский Кипр: заметки разработки (tools/balance/rome.js) ----------
+    if (typeof ROME !== 'undefined') {
+      const ST = { done: ['в игре', 'good'], take: ['берём', 'good'], think: ['думаем', ''], later: ['на стык с Восточным Римом', ''], cut: ['отсекли', 'bad'] };
+      h += `<h2 id="s12">12. Римский Кипр — в разработке</h2><p class="note">Договорённые числа и идеи эпохи; первая треть — уже в игре
+        (её числа — в разделах выше, эпоха «Римский Кипр»). Правятся в <code>tools/balance/rome.js</code>.</p>`;
+      h += tbl(['что', L('договорились')], ROME.numbers.map(([k, v]) => [esc(k), L(esc(v))]));
+      for (const k of Object.keys(ST)) {
+        const list = ROME.ideas.filter(i => i.s === k);
+        if (!list.length) continue;
+        h += `<h3 class="${ST[k][1]}">${ST[k][0]} · ${list.length}</h3>` + tbl(['идея', L('реалии и механика')], list.map(i => [`<b>${esc(i.t)}</b>`, L(esc(i.d))]));
+      }
+      h += `<h3>Приёмы из игр того же класса</h3>` + tbl(['игра', L('приём → у нас')], ROME.borrow.map(([g, v]) => [esc(g), L(esc(v))]));
+    }
+
     // ---------- дополнительно ----------
     const cs = st => st.a.coins, c0 = st => st.a.coins0, cell = v => v ? `${fmt(v.v)} ${dim(fmt(v.w))}` : dim('—');
     h += `<details class="extra"><summary>Дополнительно (не из списка): откуда монеты — мастерская, вино, медь</summary>
@@ -328,7 +341,7 @@
     setTimeout(() => {
       const t0 = performance.now();
       try {
-        const R = Balancer.run({ plan, budget, payback: PB, last: $('#peek').checked ? 4 : 3 });
+        const R = Balancer.run({ plan, budget, payback: PB, });
         $('#out').innerHTML = render(R);
         window.scrollTo(0, y);
         $('#status').textContent = `посчитано за ${Math.round(performance.now() - t0)} мс`;

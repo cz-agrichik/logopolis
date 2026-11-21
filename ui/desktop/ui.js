@@ -137,7 +137,14 @@ const UI = {
       const shield = (Game.fx || Game.effects()).raidShield, mm = `${Math.floor(raidIn / 60)}:${String(Math.floor(raidIn % 60)).padStart(2, '0')}`;
       const [a, b] = BALANCE.raidLoot;
       const lord = Game.overlord(), due = Game.tributeDue();
-      if (lord && due != null) {   // Египет и Персия: дань серебром — сумма видна заранее
+      if (lord === 'rome') {   // Римский Кипр: откупщики и ростовщики — сумма видна заранее
+        const P = BALANCE.publicani, have = Math.floor(Game.state.res.silver), fixed = (Game.fx || Game.effects()).publicani, coin = Msg.silverOf(due);
+        raid = `<span class="bf raid ${have >= due ? 'safe' : raidIn < 60 ? 'soon' : ''}" title="Откупщики и ростовщики придут через ${mm}: ${due} ${coin} (${fixed
+          ? `после «${esc(Cat.tech.cicero.name)}» — всегда ${fixed}`
+          : `каждый раз своя сумма — от ${P.due[0]} до ${P.due[1]}, эта уже названа; «${esc(Cat.tech.cicero.name)}» сделает её твёрдой — ${TECH_BY_ID.cicero.effect.publicani}`}).
+          ${have >= due ? 'Монет хватает.' : `Монет пока ${have} — не хватит: недоимку возьмут остальными запасами (кроме папируса) по ценнику, но вдвое дешевле — одной долей из каждого.`}">
+          <i class="bf-ic">${Cat.lords.rome.icon}</i><b>Откупщики</b><small>${Art.res('silver', 'inl')} ${due} · ${mm}</small></span>`;
+      } else if (lord && due != null) {   // Египет и Персия: дань серебром — сумма видна заранее
         const L = Cat.lords[lord], have = Math.floor(Game.state.res.silver), cut = (Game.fx || Game.effects()).tributeCut;
         const how = lord === 'egypt' ? `как средний ассирийский грабёж, но серебром: ${(BALANCE.raidLoot[0] + BALANCE.raidLoot[1]) / 2 * 100 / (shield ? 2 : 1)}% остальных запасов по ценнику — сумма растёт вместе с запасами` : 'твёрдая подать: сумма посчитана при присяге и не растёт вместе с городом';
         const miss = lord === 'egypt' ? `недостающее доберут грабежом${shield ? ' (Циклопические стены — вдвое)' : ''}` : 'недоимку возьмут другими запасами ровно по ценнику';
@@ -172,10 +179,10 @@ const UI = {
     }
 
     // кнопка «Учиться»: что ждёт в раунде — в подсказке; нечего повторять и учить — кнопка не мерцает
-    const p = Decks.roundPreview(Learn.state), newNow = p.newNow, key = p.due + '/' + newNow;
+    const p = Decks.roundPreview(Learn.state), newNow = p.newNow, key = p.due + '/' + newNow + '/' + p.inRotation;
     if (key !== this.lastStudyKey) {
       this.lastStudyKey = key;
-      $('#studyBtn').title = `Раунд карточек — единственный источник λ.\n${p.due ? `Пора повторить: ${p.due} ${plural(p.due, 'слово', 'слова', 'слов')}.` : 'Сейчас повторять нечего — можно повторить досрочно (λ меньше).'}\n${newNow ? `Новых слов в раунде: до ${newNow}.` : 'Новых слов нет: все уже в работе или колоды выключены.'}`;
+      $('#studyBtn').title = `Раунд карточек — единственный источник λ.\n${p.due ? `Пора повторить: ${p.due} ${plural(p.due, 'слово', 'слова', 'слов')}.` : 'Сейчас повторять нечего — можно повторить досрочно (λ меньше).'}\n${newNow ? `Новых слов в раунде: ${newNow}.` : p.pool && p.fresh && p.inRotation >= p.pool ? `Новых пока нет: заучивается ${p.inRotation} ${plural(p.inRotation, 'слово', 'слова', 'слов')} — новые придут, когда они выучатся.` : 'Новых слов нет: все уже в работе или колоды выключены.'}`;
       $('#studyBtn').classList.toggle('quiet', !p.due && !newNow);
     }
     this.fitRes();   // в самом конце: ширину ресурсам оставляют жители и кнопка «Учиться»
@@ -546,7 +553,7 @@ const UI = {
     let h = `<div class="epoch-card"><div class="epoch-title">${esc(E.name)}</div><div class="epoch-years">${esc(E.sub)}</div>
       ${intro}${E.maxLevel ? `<div class="dim">Предел улучшения зданий в эту эпоху: ${E.maxLevel}-й уровень.</div>` : ''}</div>`;
     const reqs = Game.epochReqs();
-    if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Последняя треть эпохи и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
+    if (!reqs && !E.locked) h += `<div class="item-retire">⏳ Эпоха описана пока не вся: остальные знания и чудеса и переход дальше — в следующей версии. Пока растите город до ${E.maxLevel}-го уровня и осваивайте новые знания.</div>`;
     if (reqs) {
       const next = Cat.epochs[s.epoch + 1];
       const done = reqs.filter(r => r.ok).length;
@@ -797,7 +804,11 @@ const UI = {
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
     if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Здания с 5-го уровня сменили облик на бронзовый, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
       Берегитесь набегов «народов моря» — от них спасут только Циклопические стены.</p>`;
-    if (!first && !E.locked && s.epoch >= 3) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; на 11-м и 13-м у зданий эллинский облик,
+    if (!first && !E.locked && s.epoch >= 4) h += `<p class="how">Дани больше нет: раз в ${BALANCE.publicani.every / 60} минут приходят <b>откупщики и ростовщики</b>.
+      Сколько монет они потребуют, видно заранее на плашке над картой — от ${BALANCE.publicani.due[0]} до ${BALANCE.publicani.due[1]};
+      монет не хватит — недоимку возьмут остальными запасами, кроме папируса, по полцены. «${esc(Cat.tech.cicero.name)}» сделает побор твёрдым.
+      Уровни зданий — прежние, до ${E.maxLevel}-го; остальная эпоха — в следующей версии.</p>`;
+    else if (!first && !E.locked && s.epoch >= 3) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; на 11-м и 13-м у зданий эллинский облик,
       13-й, как и 11-й, — за λ. 12-й уровень просит монет: сначала нужно знание «${esc(Cat.tech[BALANCE.coinTech].name)}».
       После «${esc(Cat.tech.piraeus.name)}» в гавань начнут заходить корабли: они просят груз и платят папирусом. Дань царю царей Кипр платит по-прежнему.</p>`;
     else if (!first && !E.locked && s.epoch >= 2) h += `<p class="how">Предел улучшения поднят до ${E.maxLevel}-го уровня; 10-й уровень просит железо, а на 9-м и 11-м у зданий железный облик.

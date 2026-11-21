@@ -77,6 +77,8 @@ Object.assign(Game, {
       result = { minutes: Math.round(s.buffs[id] / 60) };
     }
     if (R.goat && !this.goat) s.timers.goat = 0;
+    // Меркуралии: в гавань сразу приходит корабль (стоявший у причала уходит — новый приходит со всеми сделками)
+    if (R.ship && this.shipsOpen()) { this.shipArrive(); result.ship = true; }
     if (R.cooldown && R.realTime) (s.readyAt = s.readyAt || {})[id] = Date.now() + R.cooldown * 1000;
     else if (R.cooldown) s.cooldowns[id] = R.cooldown;
     this.log('rite', { id, result });

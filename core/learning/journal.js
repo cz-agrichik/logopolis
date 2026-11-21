@@ -105,7 +105,7 @@ Object.assign(Decks, {
       throw Object.assign(new Error('notBackup'), { code: 'notBackup' });
     state.decks = data.decks;
     state.progress = data.progress || {};
-    state.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
+    state.settings = Decks.fixSettings(data.settings);
     state.learnLog = data.learnLog || {};
     if (!(data.v >= 2)) this.progressByWord(state);   // копия до v2 — прогресс по карточкам
     state.v = 2;

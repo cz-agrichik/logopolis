@@ -122,6 +122,6 @@ Object.assign(Game, {
   },
   /** Знания, которым нужно это чудо (reqWonder): [id]. */
   wonderFor(type) { return TECHS.filter(t => t.reqWonder === type).map(t => t.id); },
-  /** Чудеса, нужные для переходов эпох: [типы] по порядку эпох. */
-  advanceWonders() { return EPOCHS.filter(E => E.advance).flatMap(E => E.advance.specials); },
+  /** Чудеса, нужные для переходов эпох: [типы] по порядку эпох (и обязательные чудеса эпохи, переход из которой ещё не описан — must). */
+  advanceWonders() { return EPOCHS.flatMap(E => E.advance ? E.advance.specials : E.must || []); },
 });

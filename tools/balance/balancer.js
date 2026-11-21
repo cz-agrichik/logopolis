@@ -1,8 +1,7 @@
 'use strict';
 // Балансер в консоли: короткая сводка по эпохам. Полный отчёт — страница tools/balance/balancer.html (открыть с диска).
 //
-//   node tools/balance/balancer.js            эпохи 0–3 (до эллинского Кипра включительно)
-//   node tools/balance/balancer.js --peek     ещё и римский Кипр (в разработке)
+//   node tools/balance/balancer.js            все открытые эпохи (0–4, римский Кипр — описанная четверть)
 //
 // Расчёт — tools/balance/balancer-core.js (общий для страницы и консоли), поверх ядра игры.
 const path = require('path');
@@ -13,7 +12,7 @@ const { loadCore } = require(path.join(__dirname, '..', '..', 'tests', 'load-cor
 const C = loadCore();
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'balancer-core.js'), 'utf8'), C.ctx, { filename: 'balancer-core.js' });
 const S = C.get('BALANCE').ships;
-const R = C.run(`Balancer.run({ last: ${process.argv.includes('--peek') ? 4 : 3} })`);
+const R = C.run('Balancer.run()');
 const f = x => x == null || !isFinite(x) ? '—' : Math.abs(x) >= 100 ? Math.round(x).toLocaleString('ru-RU') : x.toFixed(1);
 for (const x of R.epochs) {
   console.log(`эпоха ${x.e}: выпуск ${f(x.prod0)} → ${f(x.prod1)} зерна/с · 1 λ ≈ ${f(x.perL)} зерна (по курсу обрядов ${f(x.riteL)}) · ` +

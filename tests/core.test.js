@@ -490,6 +490,40 @@ test('обучение: срок повтора выученного — сту�
   assert.equal(JSON.stringify(s.progress), before, 'копия с разбросом восстанавливается как есть');
 });
 
+test('раунд: ровно roundSize заданий; новые — пока в заучивании меньше learnPool, не больше половины раунда, вперемешку с повторением', () => {
+  const C = fresh(); const D = C.get('Decks'), L = C.get('Learn'), Lesson = C.get('Lesson');
+  const s = L.state; s.progress = {}; Object.assign(s.settings, { roundSize: 8, learnPool: 8 });
+  const tasks = () => Lesson.buildTasks(s, D.activeCards(s), D.selectRound(s));
+  const kinds = picks => picks.reduce((o, p) => (o[p.kind] = (o[p.kind] || 0) + 1, o), {});
+  // первый раунд: 4 новых — знакомство и проверка, итого 8 заданий
+  let picks = D.selectRound(s);
+  assert.deepEqual(kinds(picks), { new: 4 });
+  assert.equal(Lesson.buildTasks(s, D.activeCards(s), picks).length, 8);
+  for (const p of picks) D.grade(s, p.card, true, 'new', 'gr2ru');
+  for (const p of Object.values(s.progress)) p.due = 0;   // прошло 30 секунд
+  // второй: 4 заучиваемых + 2 новых (место в заучивании есть, а в раунде — на двоих)
+  picks = D.selectRound(s);
+  assert.deepEqual(kinds(picks), { due: 4, new: 2 });
+  assert.ok(tasks().length <= 8);
+  assert.equal(D.roundPreview(s).newNow, 2);
+  // в заучивании уже 8 — новых нет, пока не выучатся
+  for (const c of D.activeCards(s).slice(10, 14)) D.grade(s, c, true, 'new', 'gr2ru');
+  for (const p of Object.values(s.progress)) p.due = Date.now() + 1e9;
+  assert.equal(D.roundPlan(s).inRotation, 8);
+  assert.equal(D.roundPlan(s).newCount, 0);
+  // много выученных пора повторить: половина раунда — повторению, остальное — новым
+  s.progress = {};
+  for (const c of D.activeCards(s).slice(0, 10)) s.progress[D.pkey(c)] = { step: 3, rev: 1, due: 0, right: 3, wrong: 0, built: true };
+  assert.deepEqual(kinds(D.selectRound(s)), { new: 2, due: 4 });
+  // только повторение
+  s.settings.learnPool = 0;
+  assert.deepEqual(kinds(D.selectRound(s)), { due: 8 });
+  // старое сохранение: «новых за раунд» становится «в заучивании одновременно»
+  const old = JSON.parse(JSON.stringify(s)); old.settings = { learnSteps: 3, appetite: 'normal', newPerRound: 5, roundSize: 12 };
+  L.migrate(old);
+  assert.ok(old.settings.learnPool === 5 && !('newPerRound' in old.settings) && old.settings.roundSize === 12);
+});
+
 test('обучение: ошибка в написании не откатывает шаг', () => {
   const C = fresh(); const D = C.get('Decks'), L = C.get('Learn');
   const card = L.state.decks[0].cards[0];
@@ -936,7 +970,7 @@ const addPort = G => {
 
 test('переход из железного века ведёт в эллинский Кипр — он открыт, игра не кончается; старое «конец прототипа» снимается', () => {
   const C = fresh(), G = ironAge(C), s = G.state, E = C.get('EPOCHS');
-  assert.equal(E[3].maxLevel, 13); assert.ok(!E[3].locked && E[3].advance && E[4].locked);
+  assert.equal(E[3].maxLevel, 13); assert.ok(!E[3].locked && E[3].advance && !E[4].locked && !E[4].advance && E[4].maxLevel === 13);
   s.techs.push(...C.get('TECHS').filter(t => t.epoch === 2).map(t => t.id));
   for (const [i, w] of ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].entries()) {   // обязательные чудеса царств
     const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(w, t));
@@ -1193,12 +1227,101 @@ test('эллинский Кипр, последняя треть: шесть з�
   assert.equal(G.ritualDur(R.aphrodisia), 1500, 'театр: Афродисии на 5 минут дольше'); assert.equal(G.ritualDur(R.thalysia), 1200);
   assert.equal(G.shipRules().buy.silver, 600, 'с Вуни и Александрией — меньшая цена');
   assert.equal(G.shipRules().every, 300, 'Помпей и Новый Пафос — на две минуты чаще');
-  // переход: 200 жителей, три обязательных чуда, все знания эпохи, 700 λ и ресурсы → Римский Кипр (пока — конец прототипа)
+  // переход: 200 жителей, три обязательных чуда, все знания эпохи, 700 λ и ресурсы → Римский Кипр (открыт, игра идёт дальше)
   const a = E[3].advance;
   assert.deepEqual([a.pop, a.logos, [...a.specials]], [200, 700, ['sp_stoa', 'sp_neapaphos', 'sp_vouni']]);
   s.pop = 250; s.logos = 5000; for (const k of Object.keys(s.res)) s.res[k] = 20000;
   const reqs = G.epochReqs(); assert.ok(reqs.every(r => r.ok), JSON.stringify(reqs.filter(r => !r.ok)));
-  assert.ok(G.advanceEpoch()); assert.equal(s.epoch, 4); assert.equal(s.finished, true);
+  s.timers.raid = 77;
+  assert.ok(G.advanceEpoch()); assert.equal(s.epoch, 4); assert.equal(s.finished, false);
+  assert.equal(s.timers.raid, null, 'дань сменили откупщики: срок — заново');
+  assert.equal(G.raidKind(), 'publicani'); assert.ok(G.raidsOn(), 'откупщикам «Поддержка Александра» не помеха');
+});
+
+test('Римский Кипр: откупщики раз в 20 минут — сумма заранее, 2000–10 000; недоимка — всеми запасами по полцены; Эдикт Цицерона — твёрдые 2500', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), W = BAL.worth, T = C.get('TECH_BY_ID');
+  s.techs = C.get('TECHS').filter(t => t.epoch < 4).map(t => t.id); s.epoch = 4; G.tick(0.001);
+  assert.equal(G.overlord(), 'rome'); assert.equal(G.nextRaidIn(), 1200);
+  assert.deepEqual([...BAL.riteRate].slice(4), [1.4]); assert.deepEqual([...BAL.logosInflation].slice(4), [2.3]); assert.equal(G.suppliesSec(), 7 * 60);
+  const due = G.tributeDue();
+  assert.ok(due >= 2000 && due <= 10000 && due % 10 === 0, 'сумма ' + due);
+  assert.equal(G.tributeDue(), due, 'сумма выпала заранее и не меняется');
+  // монет хватает — берут только монеты
+  for (const k of Object.keys(s.res)) s.res[k] = 1000; s.res.silver = due + 5;
+  let r = G.raid(true);
+  assert.equal(r.paid, due); assert.equal(r.short, 0); assert.equal(Math.floor(s.res.silver), 5); assert.equal(s.res.stone, 1000);
+  assert.equal(s.publicaniDue, null, 'следующая сумма — новая');
+  // монет нет: недоимку — остальными запасами (кроме привозного папируса) по ценнику вдвое дешевле, одной долей
+  s.publicaniDue = 5000; s.res.silver = 1000;
+  for (const k of Object.keys(s.res)) if (k !== 'silver') s.res[k] = G.resVisible(k) ? 10000 : 0;
+  s.res.papyrus = 100;
+  const keys = Object.keys(s.res).filter(k => G.resVisible(k) && k !== 'silver' && k !== 'papyrus');
+  const half = keys.reduce((t, k) => t + s.res[k] * W[k] * 0.5, 0) / W.silver;   // всё хозяйство по полцены, в монетах
+  const before = { ...s.res };
+  r = G.raid(true);
+  assert.equal(r.paid, 1000); assert.equal(r.short, 4000);
+  assert.ok(Math.abs(r.pct - 4000 / half) < 1e-9, 'доля = недоимка / всё по полцены');
+  for (const k of keys) assert.equal(s.res[k], before[k] - Math.floor(before[k] * r.pct), k);
+  assert.equal(s.res.papyrus, 100, 'папирус не трогают');
+  // Эдикт Цицерона: всегда 2500
+  s.techs.push('cicero'); G.tick(0.001); s.publicaniDue = 9990;
+  assert.equal(G.tributeDue(), 2500); assert.equal(T.cicero.effect.publicani, 2500);
+  // «через силу» у Эдикта — 80% папируса по ценнику и без монет; у остальных — 40% папирус, 30% монеты, 30% остальное
+  const val = c => Object.entries(c).reduce((t, [k, n]) => t + n * W[k], 0), share = (c, k) => (c[k] || 0) * W[k] / val(c);
+  assert.ok(!T.cicero.labor.silver && Math.abs(share(T.cicero.labor, 'papyrus') - 0.8) < 0.03, 'папирус ' + share(T.cicero.labor, 'papyrus'));
+  for (const id of ['apollonius', 'pax', 'genetrix']) {
+    const c = T[id].labor;
+    assert.ok(Math.abs(share(c, 'papyrus') - 0.4) < 0.02 && Math.abs(share(c, 'silver') - 0.3) < 0.02, id + ' ' + share(c, 'papyrus') + ' ' + share(c, 'silver'));
+  }
+  // офлайн: срок вышел — побор один раз, в конце
+  s.timers.raid = 10; s.lastSave = C.clock.now - 600e3; s.res.silver = 3000;
+  const away = G.catchUp();
+  assert.ok(away.raid && away.raid.lord === 'rome' && away.raid.paid === 2500); assert.equal(s.timers.raid, 1200);
+});
+
+test('Римский Кипр: четыре знания, Меркуралии вместо «Обряда торговли» (×3, сразу корабль), Римский храм Афродиты', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, T = C.get('TECH_BY_ID'), R = C.get('RITUAL_BY_ID'), B = C.get('BUILDINGS');
+  s.techs = C.get('TECHS').filter(t => t.epoch < 4).map(t => t.id); s.epoch = 4; s.logos = 9000; G.tick(0.001);
+  const ids = ['cicero', 'apollonius', 'pax', 'genetrix'];
+  assert.deepEqual([...C.get('TECHS').filter(t => t.epoch === 4).map(t => t.id)], ids);
+  assert.deepEqual(ids.map(id => T[id].logos), [110, 120, 130, 140]);
+  assert.ok(!G.techStatus(T.cicero).locked, 'Эдикт Цицерона открыт сразу');
+  for (const id of ids.slice(1)) assert.ok(G.techStatus(T[id]).locked, id);
+  // цены — в складе
+  for (const id of ids) for (const mode of ['logos', 'labor']) for (const v of Object.values(G.techPrice(T[id], mode).cost)) assert.ok(v <= 20000, id + ' ' + mode + ' ' + v);
+  // обряды эпохи — по курсу (на десятую дешевле эллинских), «Сбор припасов» — 7 минут по 3.22 λ
+  assert.deepEqual(['ingot', 'bullmask', 'vintage', 'thalysia', 'chalkeia', 'aphrodisia'].map(id => G.ritualLogos(R[id])), [25, 14, 11, 16, 32, 125]);
+  assert.equal(G.ritualLogos(R.elders), Math.round(1.4 * 2.3 * 7));
+  // гавань и корабли
+  const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('port', t));
+  s.buildings.push({ id: 960, type: 'port', level: 9, x: t.x, y: t.y }, { id: 962, type: 'storehouse', level: 13, x: 7, y: 7 }); G.tick(0.001);
+  assert.ok(G.storageCap() >= 20000);
+  for (const k of Object.keys(s.res)) s.res[k] = 20000;
+  assert.ok(!G.ritualStatus(R.ingot).hidden); assert.ok(G.ritualStatus(R.mercuralia).hidden);
+  assert.ok(G.research('cicero')); assert.ok(G.research('pax'));
+  assert.ok(G.ritualStatus(R.ingot).hidden, '«Обряд торговли» ушёл');
+  const st = G.ritualStatus(R.mercuralia); assert.ok(st.ok && st.logos === 40);
+  s.ship = { pack: 'grain', want: { food: 1 }, give: { papyrus: 10 }, deals: 3 };
+  const res = G.perform('mercuralia');
+  assert.equal(res.minutes, 15); assert.ok(res.ship); assert.equal(s.ship.deals, 0, 'пришёл новый корабль — со всеми сделками');
+  assert.deepEqual({ ...R.mercuralia.buff.bmult }, { port: 2, workshop: 2 });
+  assert.equal(G.ritualStatus(R.mercuralia).reason.code, 'cooldown');
+  // «Скамья Гиппократа» — как врачи Идалиона
+  assert.deepEqual({ ...T.apollonius.effect }, { houseCap: 2, growth: 0.5 });
+  // римский храм — улучшение Святилища Афродиты, после «Милости Августа»; прежнее Афродиты + монеты
+  const aph = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('sp_aphrodite', t));
+  s.buildings.push({ id: 961, type: 'sp_aphrodite', level: 1, x: aph.x, y: aph.y });
+  assert.ok(G.buildStatus('sp_paphia').locked);
+  assert.ok(G.research('genetrix'));
+  for (const k of Object.keys(s.res)) s.res[k] = 20000;
+  assert.ok(G.buildStatus('sp_paphia').ok, JSON.stringify(G.buildStatus('sp_paphia')));
+  const before = G.effects();
+  assert.ok(G.upgradeWonder('sp_paphia'));
+  assert.ok(s.buildings.some(b => b.type === 'sp_paphia') && !s.buildings.some(b => b.type === 'sp_aphrodite'));
+  const after = G.effects();
+  assert.ok(Math.abs(after.bonus.silver - before.bonus.silver - 0.2) < 1e-9 && after.bonus.food === before.bonus.food && after.logos === before.logos);
+  assert.ok(G.hasWonder('sp_aphrodite'), 'Утренняя звезда остаётся'); assert.ok(!G.ritualStatus(R.morningstar).hidden);
+  assert.equal(B.sp_paphia.logos, 600);
 });
 
 test('обряды: «Всей семьёй» не дорожает с эпохами и длится 30/35/40/45 минут; «Сбор припасов» — 3/4/5/6 минут выпуска', () => {

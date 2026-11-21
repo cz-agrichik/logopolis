@@ -14,7 +14,9 @@ const APPETITES = {
   normal: { intervals: [HOUR, DAY, 14 * DAY, 90 * DAY] },
   often:  { intervals: [10 * MIN, HOUR, DAY, 4 * DAY, 14 * DAY, 60 * DAY] },
 };
-const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', newPerRound: 5, roundSize: 8 };
+// roundSize — заданий в раунде (знакомство с новым словом — тоже задание); learnPool — сколько слов заучивается одновременно:
+// новые слова приходят, пока в заучивании меньше learnPool, — раунды ровные, а не «8 новых и 8 проверок» за один раз.
+const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', learnPool: 8, roundSize: 8 };
 // Срок повтора выученного — не ровно ступень лестницы, а ступень × случайный множитель от 10% до 190% (в среднем — ровно ступень).
 // Слова, выученные в один день, возвращаются не одной волной через месяц, а вразбивку — «долг» отрабатывается с первых дней.
 const DUE_SPREAD = [0.1, 1.9];
@@ -22,6 +24,13 @@ const DUE_SPREAD = [0.1, 1.9];
 Object.assign(Decks, {
   // ---------- настройки и состояние карточки ----------
   settings(state) { return Object.assign({}, DEFAULT_SETTINGS, state.settings || {}); },
+  /** Настройки из старого сохранения или копии: «новых за раунд» (newPerRound) → «заучивается одновременно» (learnPool). */
+  fixSettings(settings) {
+    const s = Object.assign({}, settings || {});
+    if (s.newPerRound != null && s.learnPool == null) s.learnPool = s.newPerRound;
+    delete s.newPerRound;
+    return Object.assign({}, DEFAULT_SETTINGS, s);
+  },
   intervals(state) { return (APPETITES[this.settings(state).appetite] || APPETITES.normal).intervals; },
   /** Интервал со случайным разбросом (DUE_SPREAD). */
   spread(ms) { return Math.round(ms * (DUE_SPREAD[0] + Math.random() * (DUE_SPREAD[1] - DUE_SPREAD[0]))); },
@@ -96,10 +105,10 @@ Object.assign(Decks, {
     return { due, fresh };
   },
 
-  /** Что будет в следующем раунде: сколько пора повторить и сколько новых добавится. */
+  /** Что будет в следующем раунде: сколько пора повторить, сколько новых добавится и сколько слов уже заучивается. */
   roundPreview(state) {
-    const p = this.pending(state);
-    return { due: p.due, fresh: p.fresh, newNow: Math.min(p.fresh, this.settings(state).newPerRound) };
+    const p = this.pending(state), plan = this.roundPlan(state);
+    return { due: p.due, fresh: p.fresh, newNow: plan.newCount, inRotation: plan.inRotation, pool: plan.pool };
   },
   /** Сводка по включённым колодам: всего, новых, учатся, выучено, пора повторить. */
   totals(state, now = Date.now()) {
@@ -113,25 +122,40 @@ Object.assign(Decks, {
     return t;
   },
 
-  /** Карточки на раунд: сначала заучиваемые, потом пора повторить, потом новые, потом досрочные. */
-  selectRound(state) {
-    const now = Date.now(), set = this.settings(state);
-    const n = set.roundSize, maxNew = set.newPerRound;
+  /** Состав раунда без случайности (его же показывает подсказка «Учиться»).
+   *  Раунд — roundSize заданий; новое слово стоит двух (знакомство и проверка в конце раунда).
+   *  1) заучиваемые слова, у которых подошёл срок; 2) новые — пока в заучивании меньше learnPool слов, не больше половины
+   *  оставшихся заданий, и половина остатка (сколько нужно) — повторению выученного; 3) выученные, которым пора;
+   *  4) досрочные — если место ещё есть. */
+  roundPlan(state, now = Date.now(), size = null) {
+    const set = this.settings(state), n = size || set.roundSize;
     const learning = [], due = [], fresh = [], early = [];
+    let inRotation = 0;
     for (const c of this.activeCards(state)) {
       const p = this.prog(state, c);
-      if (!p) fresh.push(c);
-      else if (p.due <= now) (this.isLearned(p) ? due : learning).push(c);
+      if (!p) { fresh.push(c); continue; }
+      if (!this.isLearned(p)) inRotation++;
+      if (p.due <= now) (this.isLearned(p) ? due : learning).push(c);
       else early.push(c);
     }
     const byDue = (a, b) => this.prog(state, a).due - this.prog(state, b).due;
     learning.sort(byDue); due.sort(byDue); early.sort(byDue);
-    const picks = [];
+    const learnNow = learning.slice(0, n), left = n - learnNow.length;
+    const reserve = Math.min(due.length, Math.ceil(left / 2));
+    const newCount = Math.max(0, Math.min(set.learnPool - inRotation, fresh.length, Math.floor((left - reserve) / 2)));
+    const dueNow = due.slice(0, left - 2 * newCount);
+    const earlyNow = early.slice(0, Math.max(0, left - 2 * newCount - dueNow.length));
+    return { learning: learnNow, due: dueNow, fresh, newCount, early: earlyNow, inRotation, pool: set.learnPool };
+  },
+
+  /** Карточки на раунд (roundPlan): заучиваемые, новые (какие — случайно), пора повторить, досрочные. */
+  selectRound(state, size = null) {
+    const plan = this.roundPlan(state, Date.now(), size), picks = [];
     const add = (c, kind) => picks.push({ card: c, kind, lvl: this.level(this.prog(state, c)) });
-    for (const c of learning) { if (picks.length >= n) break; add(c, 'due'); }
-    for (const c of due) { if (picks.length >= n) break; add(c, 'due'); }
-    for (const c of shuffle(fresh).slice(0, maxNew)) { if (picks.length >= n) break; add(c, 'new'); }
-    for (const c of early) { if (picks.length >= n) break; add(c, 'early'); }
+    for (const c of plan.learning) add(c, 'due');
+    for (const c of plan.newCount ? shuffle(plan.fresh).slice(0, plan.newCount) : []) add(c, 'new');
+    for (const c of plan.due) add(c, 'due');
+    for (const c of plan.early) add(c, 'early');
     return picks;
   },
 

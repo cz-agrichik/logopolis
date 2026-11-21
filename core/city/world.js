@@ -66,16 +66,29 @@ Object.assign(Game, {
     return { x: pos.x, y: pos.y, gains, roll, kind: maenad ? 'maenad' : 'goat' };
   },
 
-  /** Грозят ли набеги или дань: с бронзового века и пока не изучена «Поддержка Александра» (effect.noTribute). */
-  raidsOn(fx = this.fx || this.effects()) { const s = this.state; return s.epoch >= 1 && !s.finished && !fx.noTribute; },
-  /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery). */
-  nextRaidIn() { const [a, b] = BALANCE.raidEvery; return rand(a, b); },
-  /** Что грозит: 'sea' — набеги «народов моря» (бронзовый век), 'tribute' — дань империям (железный век). */
-  raidKind() { return this.state.epoch >= 2 ? 'tribute' : 'sea'; },
-  /** Кто берёт дань: 'assyria' — грабит, 'egypt' — серебро с каждого жителя, 'persia' — твёрдая сумма; null — не железный век. */
+  /** Грозят ли набеги или дань: с бронзового века; дань — пока не изучена «Поддержка Александра» (effect.noTribute),
+   *  откупщики Римского Кипра приходят всегда. */
+  raidsOn(fx = this.fx || this.effects()) { const s = this.state; return s.epoch >= 1 && !s.finished && (this.raidKind() === 'publicani' || !fx.noTribute); },
+  /** Через сколько секунд следующий набег (случайно, BALANCE.raidEvery); откупщики — ровно через BALANCE.publicani.every. */
+  nextRaidIn() { if (this.raidKind() === 'publicani') return BALANCE.publicani.every; const [a, b] = BALANCE.raidEvery; return rand(a, b); },
+  /** Что грозит: 'sea' — набеги «народов моря» (бронзовый век), 'tribute' — дань империям (железный век),
+   *  'publicani' — откупщики и ростовщики (Римский Кипр). */
+  raidKind() { const e = this.state.epoch; return e >= 4 ? 'publicani' : e >= 2 ? 'tribute' : 'sea'; },
+  /** Кто берёт дань: 'assyria' — грабит, 'egypt' — серебро с каждого жителя, 'persia' — твёрдая сумма, 'rome' — откупщики;
+   *  null — бронзовый век. */
   overlord() {
-    if (this.raidKind() !== 'tribute') return null;
+    const kind = this.raidKind();
+    if (kind === 'publicani') return 'rome';
+    if (kind !== 'tribute') return null;
     return this.hasTech('gifts') ? 'persia' : this.hasTech('pharaoh') ? 'egypt' : 'assyria';
+  },
+  /** Сколько монет потребуют откупщики: после «Эдикта Цицерона» — твёрдо (effect.publicani), иначе — случайная сумма
+   *  (BALANCE.publicani.due), которая выпадает заранее и видна на плашке (state.publicaniDue; после побора — новая). */
+  publicaniDue(fx = this.fx || this.effects()) {
+    if (fx.publicani) return fx.publicani;
+    const s = this.state, [a, b] = BALANCE.publicani.due;
+    if (s.publicaniDue == null) s.publicaniDue = Math.round(rand(a, b) / 10) * 10;
+    return s.publicaniDue;
   },
   /** Дань серебром без скидок флота.
    *  Египет: столько, сколько в среднем унесли бы ассирийцы — середина BALANCE.raidLoot (стены — вдвое) от ценности
@@ -90,22 +103,25 @@ Object.assign(Game, {
   /** Сколько серебра потребуют: Египет — как средний ассирийский грабёж, Персия — сумма с присяги; «Флот царей» −25%. null — Ассирия: она грабит. */
   tributeDue(fx = this.fx || this.effects()) {
     const lord = this.overlord();
+    if (lord === 'rome') return this.publicaniDue(fx);   // у откупщиков свой счёт: «Флот царей» не поможет
     if (lord !== 'egypt' && lord !== 'persia') return null;
     const base = lord === 'persia' ? (this.state.tributeFixed || this.tributeBase('persia', fx)) : this.tributeBase('egypt', fx);
     return Math.ceil(base * (1 - Math.min(0.9, fx.tributeCut || 0)));
   },
-  /** Сколько секунд до набега или дани — срок виден заранее; null — угрозы нет (медно-каменный век, после «Поддержки Александра» или игра окончена). */
+  /** Сколько секунд до набега, дани или откупщиков — срок виден заранее; null — угрозы нет (медно-каменный век, после «Поддержки Александра»
+   *  до Римского Кипра или игра окончена). */
   raidIn() {
     const s = this.state;
     return this.raidsOn() && s.timers.raid != null ? Math.max(0, s.timers.raid) : null;
   },
-  /** Набег (бронзовый век) или дань (железный век).
+  /** Набег (бронзовый век), дань (железный век) или откупщики (Римский Кипр).
    *  «Народы моря» и Ассирия уносят случайную долю (BALANCE.raidLoot) всех запасов: стены от «народов моря» защищают полностью,
-   *  от Ассирии — вдвое. Египет и Персия берут серебро (tributeDue); не хватает — Египет добирает недостающую долю грабежом
-   *  (стены — вдвое), Персия — ровно по ценнику (BALANCE.worth) из остальных запасов.
+   *  от Ассирии — вдвое. Египет, Персия и откупщики берут серебро (tributeDue); не хватает — Египет добирает недостающую долю грабежом
+   *  (стены — вдвое), Персия — ровно по ценнику (BALANCE.worth) из остальных запасов, кроме привозных, откупщики — оттуда же,
+   *  но по ценнику вдвое дешевле (BALANCE.publicani.rate): одной и той же долей из каждого.
    *  quiet — случилось, пока игрока не было: расскажет окно «С возвращением!», а не всплывашка. */
   raid(quiet = false) {
-    const s = this.state, fx = this.fx || this.effects(), tribute = this.raidKind() === 'tribute', lord = this.overlord();
+    const s = this.state, fx = this.fx || this.effects(), tribute = this.raidKind() !== 'sea', lord = this.overlord();
     if (fx.raidShield && !tribute) {
       this.log('raidShield');
       if (!quiet) Bus.emit('raid', { shielded: true });
@@ -129,12 +145,15 @@ Object.assign(Game, {
       const short = due - paid;
       let pct = 0, halved = false;
       if (short > 0 && lord === 'egypt') { halved = !!fx.raidShield; pct = grab(short / due); }
-      else if (short > 0) {   // Персия: недоимку — ровно по ценнику, одной и той же долей из всех запасов
-        const W = BALANCE.worth, need = short * W.silver, keys = RES_KEYS.filter(k => this.resVisible(k) && !RES[k].imported);   // привозное (папирус) не трогают
-        const total = keys.reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1), 0);
+      else if (short > 0) {   // Персия и откупщики: недоимку — по ценнику, одной и той же долей из всех запасов
+        // привозное (папирус) не трогают; Персия считает ровно по ценнику, откупщики — по полцены
+        const rate = lord === 'rome' ? BALANCE.publicani.rate : 1;
+        const W = BALANCE.worth, need = short * W.silver, keys = RES_KEYS.filter(k => this.resVisible(k) && !RES[k].imported);
+        const total = keys.reduce((t, k) => t + (s.res[k] || 0) * (W[k] || 1) * rate, 0);
         pct = total > 0 ? Math.min(1, need / total) : 0;
         for (const k of keys) take(k, s.res[k] * pct);
       }
+      if (lord === 'rome') s.publicaniDue = null;   // следующий раз — новая сумма
       out = { shielded: false, lost, pct, tribute, halved, lord, due, paid, short };
     }
     this.log(tribute ? 'tribute' : 'raid', { lost, pct: out.pct, halved: out.halved, lord, due: out.due, paid: out.paid, short: out.short });

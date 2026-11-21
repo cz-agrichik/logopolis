@@ -38,6 +38,8 @@ const Msg = {
   /** Дань железного века одной строкой: итог Game.raid или запись летописи. list = false — без списка потерь (его покажут фишками). */
   tributeLine(p, list = true) {
     const L = Lex.lords[p.lord || 'assyria'], tail = list && p.lost && p.lost.length ? ': ' + this.resList(p.lost, '−') : '';
+    if (p.lord === 'rome') return !p.short ? `${L.icon} Откупщики и ростовщики взяли ${Lex.res.silver.icon} −${p.paid}`
+      : `${L.icon} Откупщикам не хватило ${p.short} ${this.silverOf(p.short)} (взяли ${p.paid} из ${p.due}) — недоимку взяли запасами по полцены, ${Math.round(p.pct * 1000) / 10}% каждого${tail}`;
     if (p.due == null) return `${L.icon} Сборщики дани ${L.of} забрали ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены уменьшили дань вдвое)' : ''}${tail}`;
     if (!p.short) return `${L.icon} Дань ${L.to} уплачена: ${Lex.res.silver.icon} −${p.paid}`;
     if (p.lord === 'egypt') return `${L.icon} Дань ${L.to}: ${this.silverOf(5)} не хватило (${p.paid} из ${p.due}) — недостающее добрали грабежом, ${Math.round(p.pct * 100)}% запасов${p.halved ? ' (стены — вдвое)' : ''}${tail}`;

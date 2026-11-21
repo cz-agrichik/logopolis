@@ -926,6 +926,17 @@ const Art = (() => {
       <path d="M18 46 A14 15 0 0 1 46 46Z" fill="${STU}" ${st(1.2)}/><circle cx="32" cy="41" r="1.8" fill="${CALC}" ${st(.9)}/>
       <rect x="10" y="46" width="44" height="9" fill="${STU}" ${st(1.4)}/><rect x="9" y="44.5" width="46" height="2.4" fill="${STUD}" ${st(1)}/>
       <rect x="18" y="48.5" width="4" height="6.5" fill="${C.dark}"/><rect x="30" y="48" width="4.4" height="7" fill="${C.dark}"/><rect x="42" y="48.5" width="4" height="6.5" fill="${C.dark}"/>`,
+    // Римский храм Афродиты Пафосской — как на монетах провинции: высокая середина с коническим камнем, крылья с колоннами
+    //   под черепицей, голуби на крышах, над фронтоном — звезда и полумесяц
+    sp_paphia: shadow(30) + `<rect x="4" y="48" width="56" height="7" fill="${C.stone}" ${st(1.5)}/><rect x="6" y="45.6" width="52" height="3" fill="${CALC}" ${st(1.1)}/>
+      <rect x="7" y="30" width="15" height="15.6" fill="${STU}" ${st(1.3)}/><rect x="42" y="30" width="15" height="15.6" fill="${STU}" ${st(1.3)}/>` +
+      [11, 18, 46, 53].map(x => ionic(x, 31.6, 17, .8)).join('') + tiles(5, 24, 30, 4, 3) + tiles(40, 59, 30, 4, 3) +
+      `<rect x="22" y="20" width="20" height="25.6" fill="${STU}" ${st(1.4)}/><path d="M25 45.6 L25 28 Q32 22 39 28 L39 45.6Z" fill="${C.dark}" opacity=".75"/>
+      <path d="M27 45.6 Q28.4 32 32 28 Q35.6 32 37 45.6Z" fill="#5d5a66" ${st(1.4)}/><path d="M30 37 Q31.4 32.6 33.6 33.4" stroke="#8f8b99" stroke-width="1.2" fill="none"/>
+      <path d="M20 20 L32 11.5 L44 20Z" fill="${TER}" ${st(1.5)}/><path d="M24.5 18.6 L32 13.6 L39.5 18.6" fill="none" stroke="${TERL}" stroke-width="1"/>
+      <path d="M9 25 q3 -3 6 0 q-3 1 -6 0Z M49 25 q3 -3 6 0 q-3 1 -6 0Z" fill="${C.white}" ${st(.9)}/>
+      <path d="M28.6 7.4 A3.6 3.6 0 0 0 35.4 7.4 A3 3 0 0 1 28.6 7.4Z" fill="${C.wheat}" ${st(.8)}/>
+      <path d="M32 1.2 L32.9 3.4 L35 4.2 L32.9 5 L32 7.2 L31.1 5 L29 4.2 L31.1 3.4Z" fill="#ffe69a" ${st(.6)}/>`,
     // Палеопафос: двор с колоннами, конический камень богини, голуби
     sp_aphrodite: shadow(28) + `
       <rect x="6" y="46" width="52" height="9" fill="${C.stone}" ${st()}/>
@@ -1293,6 +1304,46 @@ const Art = (() => {
       <path d="M46 40 L46 16" stroke="${C.dark}" stroke-width="1.6"/><path d="M42 18 L50 18" stroke="${C.dark}" stroke-width="1.6"/>
       <rect x="42.6" y="18.6" width="6.8" height="8" fill="${C.red}" ${st(1)}/><path d="M42.6 26.6 l1.2 2 M45.2 26.6 l.8 2 M47.6 26.6 l.4 2" stroke="${C.wheatD}" stroke-width="1"/>
       <circle cx="46" cy="14.6" r="1.8" fill="${C.wheat}" ${st(.9)}/>`,
+    // Эдикт Цицерона: ровные весы — на одной чаше монеты, на другой свиток эдикта (не больше 12% в год)
+    t_cicero: tdisc + `<path d="M32 17 L32 50" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M24 54 L40 54 L37 49 L27 49Z" fill="${C.woodD}" ${st(1.3)}/>
+      <path d="M13 20 L51 20" stroke="${C.bronzeD}" stroke-width="2.4" stroke-linecap="round"/><circle cx="32" cy="17" r="2.6" fill="${C.bronze}" ${st(1.1)}/>
+      <path d="M14 20 L8.5 36 M14 20 L19.5 36 M50 20 L44.5 36 M50 20 L55.5 36" stroke="${O}" stroke-width="1"/>
+      <path d="M7 36 Q14 43 21 36Z M43 36 Q50 43 57 36Z" fill="${C.bronze}" ${st(1.2)}/>` + coinStack(14, 35, 3) + scroll(50, 33.4, .6, false),
+    // Скамья Гиппократа (Аполлоний Китийский): раскрытый свиток Гиппократа «О суставах» и кость поверх
+    t_apollonius: tdisc + scroll(32, 33, 2.1) + `<g transform="rotate(-38 32 32)">
+      <path d="M21 32 L43 32" stroke="${O}" stroke-width="7.6" stroke-linecap="round"/>
+      ${[[19.4, 29.4], [19.4, 34.6], [44.6, 29.4], [44.6, 34.6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.9" fill="${O}"/>`).join('')}
+      ${[[19.4, 29.4], [19.4, 34.6], [44.6, 29.4], [44.6, 34.6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="2.6" fill="${C.white}"/>`).join('')}
+      <path d="M21 32 L43 32" stroke="${C.white}" stroke-width="5" stroke-linecap="round"/><path d="M24 33.4 L40 33.4" stroke="${STUD}" stroke-width="1"/></g>`,
+    // Pax Romana: золотой орёл легиона над лавровым венком и спокойное море
+    t_pax: tdisc + `<path d="M9 49 q5.75 -3 11.5 0 t11.5 0 t11.5 0 t11.5 0" fill="none" stroke="${C.water}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M14 54.4 q4.5 -2.4 9 0 t9 0 t9 0 t9 0" fill="none" stroke="${C.water}" stroke-width="1.8" stroke-linecap="round" opacity=".7"/>
+      <path d="M32 26 L32 47" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="32" cy="37" r="7" fill="none" stroke="${C.greenD}" stroke-width="1.5"/>
+      ${Array.from({ length: 10 }, (_, i) => { const a = i * Math.PI / 5 + .3, x = 32 + Math.cos(a) * 7, y = 37 + Math.sin(a) * 7; return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="2.4" ry="1.1" transform="rotate(${(a * 180 / Math.PI + 90).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="#b3bf86" stroke="#2a2a1c" stroke-width=".7"/>`; }).join('')}
+      <path d="M27 27 L37 27" stroke="${C.bronzeD}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M31 21 Q22 21 13 11 Q19 12.4 23 15 Q21 11 22 8 Q27 14 31 17Z M33 21 Q42 21 51 11 Q45 12.4 41 15 Q43 11 42 8 Q37 14 33 17Z" fill="${C.wheat}" ${st(1.3)}/>
+      <path d="M28.4 18 Q32 14 35.6 18 L34.8 26 L29.2 26Z" fill="${C.wheat}" ${st(1.3)}/><circle cx="32" cy="14" r="3" fill="${C.wheat}" ${st(1.2)}/>
+      <path d="M34.6 13.4 L37.4 14.6 L34.6 15.8Z" fill="${C.bronze}" ${st(.7)}/><circle cx="32.8" cy="13.4" r=".7" fill="${O}"/>`,
+    // Милость Августа: раковина Венеры, прародительницы Юлиев, рождённой из моря, и Утренняя звезда — звезда Венеры
+    t_genetrix: tdisc + (() => {
+      const P = (a, r = 1) => [32 + Math.cos(a) * 19 * r, 33 + Math.sin(a) * 20 * r], f = ([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`;
+      let d = `M${f(P(Math.PI))}`;
+      for (let i = 1; i <= 7; i++) d += ` Q${f(P(Math.PI + (i - .5) * Math.PI / 7, 1.16))} ${f(P(Math.PI + i * Math.PI / 7))}`;
+      const ribs = Array.from({ length: 6 }, (_, i) => `M32 51 L${f(P(Math.PI + (i + 1) * Math.PI / 7, .96))}`).join(' ');
+      return `<path d="${d} L32 51Z" fill="#f4cdd3" ${st(1.7)}/><path d="${ribs}" stroke="#d98a9a" stroke-width="1.3" fill="none"/>
+        <path d="M25 49 L32 51 L39 49 L37 55 L27 55Z" fill="#f4cdd3" ${st(1.4)}/><circle cx="32" cy="45" r="2.2" fill="${C.white}" ${st(.9)}/>
+        <path d="M48 7 L49.2 10.4 L52.6 11.6 L49.2 12.8 L48 16.2 L46.8 12.8 L43.4 11.6 L46.8 10.4Z" fill="#ffe69a" ${st(.8)}/>`;
+    })(),
+    // Стадион Куриона (знание пока спрятано — ждёт бонуса и названия): беговая дорожка с одним скруглённым концом, ряды скамей и оливковая ветвь — масло атлетов и наград
+    t_kourion: tdisc + `<path d="M9 22 L36 22 A12 12 0 0 1 36 46 L9 46Z" fill="${CALC}" ${st(1.6)}/>
+      <path d="M9 25 L36 25 A9 9 0 0 1 36 43 L9 43" fill="none" stroke="${CALCD}" stroke-width="1"/>
+      <path d="M9 28 L36 28 A6 6 0 0 1 36 40 L9 40Z" fill="#e8cf98" ${st(1.2)}/>
+      <path d="M11 34 L37 34" stroke="${C.white}" stroke-width="1" stroke-dasharray="2 1.6"/><path d="M13.6 28.6 L13.6 39.4" stroke="${C.white}" stroke-width="1.6"/>
+      <path d="M16 18 Q32 8 48 14" fill="none" stroke="${C.greenD}" stroke-width="1.6"/>
+      ${[[20, 15.4, -35], [25.6, 12.4, -25], [31, 10.8, -12], [36.6, 10.6, 5], [42.4, 11.8, 18]].map(([x, y, r]) => `<ellipse cx="${x}" cy="${y}" rx="3.2" ry="1.3" transform="rotate(${r} ${x} ${y})" fill="#9aa866" stroke="#3c4a2a" stroke-width=".7"/>`).join('')}
+      <circle cx="28.6" cy="15" r="1.7" fill="#3c4a2a"/><circle cx="40" cy="14.6" r="1.7" fill="#3c4a2a"/>
+      <circle cx="51" cy="34" r="4.2" fill="${C.wheat}" ${st(1.2)}/><path d="M51 30.4 L51 37.6 M47.6 34 L54.4 34" stroke="${C.wheatD}" stroke-width="1"/>`,
     t_writing: tdisc + tablet(28, 33, 1) + `<rect x="40" y="18" width="9" height="18" rx="4" fill="${C.stone}" ${st(1.4)}/>
       <path d="M42 22 l5 0 M42 27 l5 0 M42 32 l5 0" stroke="${C.stoneD}" stroke-width="1.2"/><path d="M40 44 L54 48" stroke="${C.woodD}" stroke-width="2.4" stroke-linecap="round"/>`,
 
@@ -1358,6 +1409,12 @@ const Art = (() => {
       ${[26, 32, 38].map(x => `<circle cx="${x}" cy="${x === 32 ? 42.5 : 40.5}" r="1.6" fill="#ffe69a"/>`).join('')}
       <path d="M10 22 q4 -5 9 -2 q-2 3 -5 3 l-4 2Z M45 16 q4 -5 9 -2 q-2 3 -5 3 l-4 2Z" fill="${C.white}" ${st(1.1)}/>
       <path d="M8 54 Q32 48 56 54" fill="none" stroke="#c9b48a" stroke-width="2.2" stroke-dasharray="3 3"/>`,
+    // Меркуралии: жезл Меркурия с крыльями и двумя змеями и капли из его источника — ими кропят товары
+    r_mercuralia: rdisc + `<path d="M32 15 L32 54" stroke="${C.wheat}" stroke-width="2.6" stroke-linecap="round"/><circle cx="32" cy="13.4" r="2.6" fill="${C.wheat}" ${st(1)}/>
+      <path d="M30 17.6 Q22 12 15 15.6 Q21 17 23.4 19 Q19.4 20 17.4 23.4 Q25 22.4 30 20.6Z M34 17.6 Q42 12 49 15.6 Q43 17 40.6 19 Q44.6 20 46.6 23.4 Q39 22.4 34 20.6Z" fill="${C.white}" ${st(1.1)}/>
+      <path d="M32 51 C24 47 24 43 32 39 C40 35 40 31 32 27 C27 24.4 27.4 22.4 30 21.8 M32 51 C40 47 40 43 32 39 C24 35 24 31 32 27 C37 24.4 36.6 22.4 34 21.8" fill="none" stroke="${C.green}" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="29.6" cy="22" r="1.5" fill="${C.green}"/><circle cx="34.4" cy="22" r="1.5" fill="${C.green}"/>
+      ${[[14, 34], [50, 37], [18, 46], [46.6, 48]].map(([x, y]) => `<path d="M${x} ${y} q-2.6 4.4 0 6.2 q2.6 -1.8 0 -6.2Z" fill="${C.sky}" ${st(.6)}/>`).join('')}`,
   };
 
   const ALL = Object.assign({}, B, S, T, M);
