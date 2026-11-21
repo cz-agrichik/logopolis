@@ -55,6 +55,7 @@ DATA_VERSION = 3   # 3: + обороты (phrases)
 PROMPT_VERSION = "2"  # меняется при правке промптов -> кеш не смешивается
 LEMMA_PROMPT_VERSION = "3"  # отдельно: правка словаря не сбрасывает дорогой контекстный перевод
 PHRASE_PROMPT_VERSION = "1"  # обороты — свой проход и свой кеш: старые ответы остаются в силе
+FORM_PROMPT_VERSION = "1"    # грамматика форм (аорист, род. п. мн. ч.…), перевод формы и её уровень
 LEVEL_PROMPT_VERSION = "1"   # уровни (CEFR) лемм и оборотов — тоже свой проход и свой кеш
 LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]   # в греческой сертификации — Α1, Α2, Β1, Β2, Γ1, Γ2
 BOOK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -125,8 +126,13 @@ def bare_lemma(head: str) -> str:
     return stripped or head
 
 
+def canon_lemma(lemma: str) -> str:
+    """Варианты одного глагола — одна лексема: ξυπνάω = ξυπνώ, μιλάω = μιλώ (ключ — на -ώ)."""
+    return lemma[:-2] + "ώ" if lemma.endswith("άω") and len(lemma) > 3 else lemma
+
+
 def lemma_key(head: str) -> str:
-    return bare_lemma(head).lower()
+    return canon_lemma(bare_lemma(head).lower())
 
 
 def as_int(value):
@@ -905,6 +911,108 @@ def run_phrases(text: str, sentences: list[dict], words: list[dict], config: dic
     return complete, phrases
 
 
+# ─────────────────────────── 2c'. Формы ───────────────────────────
+# Слово в тексте — не лемма: ξύπνησαν — аорист от ξυπνάω, «проснулись», и уровень у формы свой (аорист
+# неправильного глагола — позже, чем у правильного). Каждая изменённая форма (не совпадающая с леммой) один раз
+# уходит модели: грамматика по-русски, перевод именно этой формы, уровень формы. Табличкой это не описать.
+
+FORM_SYSTEM = """You are a Modern Greek grammar teacher for Russian-speaking learners (CEFR; Greek certificate Α1–Γ2).
+
+Input: numbered inflected Modern Greek word forms. Each line: the form, its dictionary form (after ←), the
+automatic tagger's guess in brackets (part of speech; features — they may be wrong, trust the form itself)
+and, in «», how the form was translated in the text.
+
+For each form return:
+- grammar: a short Russian description of THIS form for a learner, e.g. "аорист, 3 л. мн. ч.",
+  "имперфект, 1 л. ед. ч.", "сослаг. наклонение, аорист, 3 л. ед. ч. (после να/θα)", "пассивный аорист, 3 л. ед. ч.",
+  "повелит. наклонение, 2 л. ед. ч.", "род. п. мн. ч.", "вин. п. ед. ч., ж. р.", "сравн. степень",
+  "причастие страд. залога, ж. р.", "слабая форма местоимения, вин. п.". Mark irregular stems: "неправильный аорист".
+- translation: the Russian translation of THIS exact form, in a matching Russian form, 1–3 words
+  ("проснулись", "проснётся", "окон", "его").
+- level: the CEFR level at which a learner normally recognises and uses THIS form (not just the word):
+  regular forms of common words early; irregular stems, passive, rare or learned (katharevousa) forms later.
+  One level "A2", two adjacent levels "A2-B1", or "?" if you cannot judge.
+
+Return ONLY one JSON object, no markdown:
+{"forms": [[number, "grammar", "translation", "level"], ...]}
+Include EVERY number exactly once. Never mix alphabets: Russian text in Cyrillic only.
+"""
+
+FORM_BATCH = 50
+
+
+def form_key(form: str, key: str) -> str:
+    """Ключ формы в книге и в словаре: «ξύπνησαν|ξυπνώ» (форма — как fold(), лемма — как lemma_key)."""
+    return f"{fold(form).strip(chr(39))}|{key}"
+
+
+def is_dictionary_form(form: str, head: str) -> bool:
+    return fold(form).strip("'") in (fold(bare_lemma(head)), fold(canon_lemma(bare_lemma(head).lower())))
+
+
+def run_forms(chapters: list[dict], lemma_info: dict, config: dict, cache: Cache, client: LLMClient) -> tuple[bool, dict]:
+    """Грамматика, перевод и уровень каждой изменённой формы книги: {form_key: [грамматика, перевод, уровень]}.
+    Кеш — по каждой форме («form1») и пачками («form»). Возвращает (всё ли получено, формы)."""
+    items: dict[str, tuple] = {}
+    for chapter in chapters:
+        for w in chapter["words"]:
+            if "PROPN" in w.get("upos", "") or not has_greek(w["form"]):
+                continue
+            key = lemma_key(w.get("head") or w["lemma"])
+            head = dictionary_head(w, lemma_info)
+            if not pure_greek(head) or is_dictionary_form(w["form"], head):
+                continue
+            fk = form_key(w["form"], key)
+            if fk not in items:
+                items[fk] = (fk, w["form"].lower(), head, w.get("upos", ""), w.get("feats", ""), w.get("ru", ""))
+    one = lambda it: digest("form1", FORM_PROMPT_VERSION, config["model"], it[1], it[2], it[3], it[4])
+    forms, rest = {}, []
+    for it in items.values():
+        hit = cache.get(one(it))
+        if isinstance(hit, list) and len(hit) == 3:
+            forms[it[0]] = hit
+        else:
+            rest.append(it)
+    prompt_of = lambda chunk: "\n".join(
+        f"{n}. {form} ← {head} ({upos or '?'}; {feats or '—'})" + (f" «{hint}»" if hint else "")
+        for n, (_, form, head, upos, feats, hint) in enumerate(chunk, start=1))
+    batches = [rest[i:i + FORM_BATCH] for i in range(0, len(rest), FORM_BATCH)]
+    asked = sum(1 for c in batches if cache.get(digest("form", FORM_PROMPT_VERSION, config["model"], prompt_of(c))) is None)
+    progress = Progress(f"Формы · {len(items)}: из кеша {len(items) - len(rest)} · к модели ~{asked} запросов",
+                        len(rest), "форм")
+    complete = True
+    for chunk in batches:
+        prompt = prompt_of(chunk)
+        began = time.monotonic()
+        reply, from_cache = ask(client, cache, digest("form", FORM_PROMPT_VERSION, config["model"], prompt),
+                                FORM_SYSTEM, prompt, f"формы: {len(chunk)} пропущено")
+        if reply is None:
+            complete = False
+            reply = {}
+        fresh = {}
+        for item in reply.get("forms", []) if isinstance(reply, dict) else []:
+            n = as_int(item[0]) if isinstance(item, list) and len(item) >= 4 else None
+            if n is None or not 1 <= n <= len(chunk):
+                continue
+            gram, ru = " ".join(str(item[1]).split()), " ".join(str(item[2]).split())
+            gram = gram if CYRILLIC_RE.search(gram) else ""
+            ru = ru if CYRILLIC_RE.search(ru) and not has_greek(ru) else ""
+            if not gram and not ru:
+                continue
+            value = [gram, ru, normalize_level(item[3]) or ""]
+            forms[chunk[n - 1][0]] = value
+            fresh[one(chunk[n - 1])] = value
+        cache.put_many(fresh)
+        sample = "" if from_cache else " · ".join(
+            f"{it[1]} — {forms[it[0]][1] or forms[it[0]][0]}" for it in chunk[:3] if it[0] in forms)
+        progress.step(len(chunk), from_cache, time.monotonic() - began, sample)
+    if batches:
+        progress.finish()
+    else:
+        log("   всё из кеша")
+    return complete, forms
+
+
 # ─────────────────────────── 2d. Уровни (CEFR) ───────────────────────────
 # Мнение об уровне леммы или оборота — одно из четырёх:
 #   "B1"     — уровень определён;
@@ -951,8 +1059,8 @@ def normalize_level(raw) -> str | None:
 
 
 def level_key(head: str) -> str:
-    """Ключ для сравнения с колодами: без артикля, NFC, строчные, ς → σ, ’ → '."""
-    return fold(bare_lemma(head)).strip()
+    """Ключ для сравнения с колодами: без артикля, NFC, строчные, -άω → -ώ, ς → σ, ’ → '."""
+    return fold(canon_lemma(bare_lemma(head).lower())).strip()
 
 
 def deck_levels() -> dict[str, str]:
@@ -1087,7 +1195,7 @@ def run_argos(text: str, sentences: list[dict], words: list[dict]) -> dict:
 CHAPTER_SEPARATOR = "\n\n\n"
 
 
-def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict) -> dict:
+def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict, forms: dict | None = None) -> dict:
     """Склеивает главы в одну книгу: общий текст, сквозные позиции, разметка глав."""
     text_parts: list[str] = []
     out_sentences: list[list] = []
@@ -1126,6 +1234,8 @@ def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict) -
         offset += len(chapter["text"])
 
     used = {w["key"] for w in out_words}
+    full_text = "".join(text_parts)
+    used_forms = {form_key(full_text[w["start"]:w["end"]], w["key"]) for w in out_words}
     return {
         "version": DATA_VERSION,
         "title": title,
@@ -1135,6 +1245,8 @@ def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict) -
         "lemmas": {k: v for k, v in lemma_info.items() if k in used},
         "words": out_words,
         "phrases": out_phrases,
+        # изменённые формы: «форма|лемма» → [грамматика, перевод формы, уровень формы]
+        "forms": {k: v for k, v in sorted((forms or {}).items()) if k in used_forms},
         "meta": meta,
     }
 
@@ -1282,6 +1394,7 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
     имена собственные не берём."""
     analyses: dict[str, dict[tuple, int]] = {}
     glosses: dict[tuple, dict[str, int]] = {}
+    grammar: dict[tuple, list] = {}      # (форма, лемма) → [грамматика, перевод формы, уровень формы]
     lemmas: dict[str, dict] = {}
     phrases: dict[str, dict] = {}
     for _, data in books:
@@ -1295,6 +1408,9 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
                 continue
             key = clean_key(w["key"], form)
             sig = (key, w.get("upos", ""), w.get("feats", ""))
+            g = (data.get("forms") or {}).get(form_key(text[w["start"]:w["end"]], w["key"]))
+            if g and (form, key) not in grammar:
+                grammar[(form, key)] = g
             bucket = analyses.setdefault(form, {})
             bucket[sig] = bucket.get(sig, 0) + 1
             if w.get("ru"):
@@ -1338,7 +1454,9 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
         g = glosses.get((form, sig[0]), {})
         # как форму переводили в книгах: до трёх вариантов, частые первыми (при равенстве — как встретились)
         seen = sorted(g.items(), key=lambda kv: -kv[1])[:3]
-        forms[form] = [sig[0], sig[1], sig[2], "; ".join(v for v, _ in seen)]
+        gram, form_ru, form_level = grammar.get((form, sig[0])) or ["", "", ""]
+        forms[form] = [sig[0], sig[1], sig[2], "; ".join(v for v, _ in seen)] + (
+            [gram, form_ru, form_level] if gram or form_ru else [])
     return {
         "version": 1,
         "forms": forms,
@@ -1408,6 +1526,7 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="ничего не запрашивать у модели, собрать из кеша")
     parser.add_argument("--no-phrases", dest="no_phrases", action="store_true", help="без прохода оборотов")
     parser.add_argument("--no-levels", dest="no_levels", action="store_true", help="без прохода уровней (CEFR)")
+    parser.add_argument("--no-forms", dest="no_forms", action="store_true", help="без прохода форм (грамматика, перевод и уровень формы)")
     parser.add_argument("--html", action="store_true", help="ещё и один самодостаточный файл out/<id>.html")
     parser.add_argument("--translator", "--provider", dest="provider", help="gemini | groq | openrouter | ollama | custom | argos | none")
     parser.add_argument("--model", help="имя модели у провайдера")
@@ -1463,6 +1582,9 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         chapters.append({"title": chapter_title, "text": text, "sentences": sentences,
                          "words": words, "phrases": phrases})
 
+    forms, forms_done = {}, True
+    if client and not args.no_forms:
+        forms_done, forms = run_forms(chapters, lemma_info, config, cache, client)
     levels_done = True
     if client and not args.no_levels:
         levels_done = run_levels(lemma_info, [p for ch in chapters for p in ch["phrases"]], config, cache, client, deck_levels())
@@ -1474,8 +1596,9 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         "complete": complete,
         "phrases": bool(client) and not args.no_phrases and phrases_done,
         "levels": bool(client) and not args.no_levels and levels_done,
+        "forms": bool(client) and not args.no_forms and forms_done,
     }
-    data = build_book(chapters, title, lemma_info, meta)
+    data = build_book(chapters, title, lemma_info, meta, forms)
     out = book_output(book)
     save_book_data(data, out)
     log(f"\nГотово: «{title}» — {chapters_word(len(chapters))}, {len(data['words'])} слов, "

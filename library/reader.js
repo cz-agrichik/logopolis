@@ -68,6 +68,17 @@
   // Оборот — своя лексическая единица: ключ карточки «phrase:<словарная форма>» (NFC, строчные, ς → σ).
   const phraseKey = head => "phrase:" + String(head || "").normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/\s+/g, " ").trim();
   const isPhraseKey = key => String(key).startsWith("phrase:");
+  // Форма слова и лемма: ключ формы «ξύπνησαν|ξυπνώ» — как form_key() в bookconverter.py
+  const foldForm = value => String(value || "").normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/\u2019/g, "'").replace(/^'+|'+$/g, "");
+  const bareHead = head => String(head || "").replace(/^(?:ο|η|το|οι|τα|ένας|μία|μια|ένα)\s+/i, "");
+  // форма отличается от словарной (лемма ξυπνάω/ξυπνώ — словарная, ξύπνησαν — нет)
+  const isInflected = (form, head) => {
+    const f = foldForm(form), h = foldForm(bareHead(head));
+    return Boolean(f && h) && f !== h && f !== h.replace(/άω$/, "ώ") && f !== h.replace(/ώ$/, "άω");
+  };
+  // перевод личной формы глагола в инфинитиве («ξυπνούσε — просыпаться») — это перевод леммы, а не формы
+  const looksInfinitive = (gloss, feats) => /VerbForm=Fin/.test(feats || "")
+    && /(ть|ться|ти|тись|чь|чься)$/.test(String(gloss || "").split(/[;,(]/)[0].trim());
   const squash = value => String(value || "").replace(/\s+/g, " ").trim();
 
   function normalizeData(input) {
@@ -102,6 +113,9 @@
         ru: item.ru || "",
         en: item.en || "",
         seen: item.seen || "",          // свой текст: как форму переводили в книгах
+        gram: item.gram || "",          // свой текст: грамматика формы («аорист, 3 л. мн. ч.»)
+        formRu: item.formRu || "",      // свой текст: перевод именно этой формы
+        formLevel: item.formLevel || "",
         unknown: Boolean(item.unknown), // свой текст: слова нет в словаре сайта
         guess: Boolean(item.guess),     // свой текст: нашлось без учёта ударений
       });
@@ -143,6 +157,7 @@
       lemmas: (v2 && input.lemmas) || {},
       phrases,
       phrasesOfWord,
+      forms: (input.forms && typeof input.forms === "object") ? input.forms : {},   // «форма|лемма» → [грамматика, перевод, уровень]
       meta: input.meta || {},
     };
   }
@@ -360,26 +375,43 @@
     return { text: squash(data.slice(start, end)), ru: "" };
   }
 
+  // Три слоя слова: лемма (ξυπνάω — «просыпаться», уровень слова), форма (ξύπνησαν — аорист, 3 л. мн. ч.,
+  // «проснулись», уровень формы) и место в тексте (перевод в этом предложении). Форма — в паре только
+  // с переводом формы, лемма — со словарным переводом.
   function wordInfo(word) {
     const lemma = data.lemmas[word.key] || {};
+    const head = lemma.head || word.lemma || word.form;
+    const f = data.forms[`${foldForm(word.form)}|${word.key}`] || [];
+    const gram = word.gram || f[0] || "";
+    const formRu = word.formRu || f[1] || "";
+    const inflected = !word.unknown && (Boolean(gram) || isInflected(word.form, head));
+    const gloss = word.ru && !looksInfinitive(word.ru, word.feats) ? word.ru : "";
+    // свой текст: как эту самую форму переводили в книгах — тоже перевод формы
+    const seen = (word.seen || "").split(";")[0].trim();
+    const seenGloss = seen && !seen.startsWith("(") && !looksInfinitive(seen, word.feats) ? seen : "";
     return {
-      head: lemma.head || word.lemma || word.form,
+      head,
       pos: lemma.pos || uposLabel(word.upos),
       meaning: lemma.ru || "",
       meaningEn: lemma.en || word.en || "",
-      gloss: word.ru || "",
+      gloss: gloss || formRu || seenGloss || (inflected ? "" : lemma.ru || ""),   // перевод ЭТОЙ формы (или словарный, если форма и есть лемма)
       seen: word.seen || "",
       level: lemma.level || "",
+      inflected,
+      gram,
+      formRu,
+      formLevel: word.formLevel || f[2] || "",
     };
   }
 
   // Уровень (CEFR; в греческой сертификации Α1–Γ2): "B1", "A2–B1" — на границе, "?" — не ясен, "" — нет данных.
   const LEVEL_TIP = "Уровень по шкале CEFR (в Греции — Α1…Γ2). «A2–B1» — на границе двух уровней, «?» — уровень не ясен. "
     + "Слова из колод игры — уровень учебника, остальные — оценка языковой модели.";
-  function showLevel(chip, level) {
+  function showLevel(chip, level, prefix = "") {
     chip.hidden = !level;
-    chip.textContent = level === "?" ? "уровень ?" : level;
-    chip.title = LEVEL_TIP;
+    chip.textContent = (prefix ? prefix + " " : "") + (level === "?" ? (prefix ? "?" : "уровень ?") : level);
+    chip.title = (prefix === "форма" ? "Уровень этой формы (аорист неправильного глагола — позже, чем правильного). "
+      : prefix === "слово" ? "Уровень самого слова (леммы). " : "") + LEVEL_TIP;
   }
 
   const wiktionary = value => `https://en.wiktionary.org/wiki/${encodeURIComponent(String(value).toLocaleLowerCase("el"))}#Greek`;
@@ -390,7 +422,7 @@
   // они берутся из book_content.js в момент показа и экспорта (см. cardView).
   // Поле saved — копия последнего известного перевода, только на случай, когда
   // слово открыто в другой книге и взять перевод больше неоткуда.
-  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu", "level"];
+  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu", "level", "formGram", "formRu", "formLevel"];
 
   function cardFromPhrase(phrase) {
     const first = data.words[phrase.w[0]];
@@ -468,6 +500,9 @@
       gloss: sameSentence ? info.gloss : "",
       exampleRu: sameSentence ? data.sentences[s].ru : (card.example ? "" : sentenceOf(word).ru),
       level: info.level,
+      formGram: info.inflected ? info.gram : "",
+      formRu: info.inflected ? (sameSentence ? info.gloss : info.formRu) : "",
+      formLevel: info.inflected ? info.formLevel : "",
     };
   }
 
@@ -653,17 +688,24 @@
     let bottom = -Infinity;
     for (const item of items) {
       const word = data.words[item.index];
+      // оборот — словарная форма со словарным переводом («ρίχνω μια ματιά — взглянуть»);
+      // слово — форма с переводом формы, а у изменённой формы ниже мелко: «аорист от ξυπνάω»
       let label = word.form;
       let gloss;
+      let below = "";
       if (item.unit) {
-        label = phraseText(item.unit);
+        label = item.unit.head;
         gloss = item.unit.ru;
       } else {
         const info = wordInfo(word);
-        gloss = info.gloss || info.meaning;
+        gloss = info.gloss;
+        if (info.inflected) {
+          const what = (info.gram.split(",")[0] || "форма").trim();
+          below = `${what} от ${bareHead(info.head)}` + (gloss ? "" : info.meaning ? ` (${info.meaning.split(";")[0]})` : "");
+        }
       }
       // Служебные слова («(артикль)», «(частица)») на полях — только шум.
-      if (!gloss || gloss.startsWith("(")) continue;
+      if ((!gloss && !below) || (gloss && gloss.startsWith("("))) continue;
       const note = document.createElement("button");
       note.type = "button";
       note.className = item.unit ? "margin-note margin-note--phrase" : "margin-note";
@@ -671,7 +713,11 @@
       const greek = el("span", "margin-note__gr", note);
       greek.lang = "el";
       greek.textContent = label;
-      note.append(` — ${gloss}`);
+      if (gloss) note.append(` — ${gloss}`);
+      if (below) {
+        const small = el("span", "margin-note__gram", note);
+        small.textContent = below;
+      }
       margin.appendChild(note);
       // Заметки не наезжают друг на друга: следующая сдвигается ниже.
       const top = Math.max(item.top, bottom + 6);
@@ -716,9 +762,9 @@
   const pTop = el("div", "popover__top", popover);
   const pForm = el("span", "popover__form", pTop);
   const pPos = el("span", "chip popover__pos", pTop);
-  const pLevel = el("span", "chip chip--level", pTop);
   const pGloss = el("div", "popover__gloss", popover);
   const pEn = el("div", "popover__en", popover);
+  const pGram = el("div", "popover__gram", popover);             // грамматика формы + уровень формы
   const pLemma = el("div", "popover__lemma", popover);
   const pSeen = el("div", "popover__seen", popover);
   const pGrammar = el("div", "popover__grammar", popover);
@@ -841,21 +887,28 @@
     pForm.textContent = word.form;
     pPos.textContent = info.pos;
     pPos.hidden = !info.pos;
-    showLevel(pLevel, info.level);
 
-    // в книге главное — перевод формы в этом предложении; в своём тексте — словарное значение леммы
-    const main = info.gloss || info.meaning;
-    pGloss.textContent = main || (word.unknown ? "нет в словаре сайта" : "нет перевода");
-    pGloss.classList.toggle("popover__gloss--empty", !main);
-    pEn.textContent = info.meaningEn ? `en: ${info.meaningEn}` : "";
+    // сверху — перевод ЭТОЙ формы (в книге — в этом предложении); словарный перевод — только у леммы ниже
+    pGloss.textContent = info.gloss || (word.unknown ? "нет в словаре сайта" : info.inflected ? "перевод этой формы неизвестен" : "нет перевода");
+    pGloss.classList.toggle("popover__gloss--empty", !info.gloss);
+    pEn.textContent = info.meaningEn && !info.inflected ? `en: ${info.meaningEn}` : "";
     pEn.hidden = !pEn.textContent;
+
+    pGram.replaceChildren();
+    pGram.hidden = !(info.inflected && info.gram);
+    if (!pGram.hidden) {
+      pGram.append(info.gram);
+      if (info.formLevel) { const chip = el("span", "chip chip--level", pGram); showLevel(chip, info.formLevel, "форма"); }
+    }
 
     pLemma.replaceChildren();
     pLemma.hidden = word.unknown;
+    if (info.inflected) pLemma.append("от ");
     const head = el("b", "", pLemma);
     head.textContent = info.head;
     head.lang = "el";
-    if (info.meaning && info.gloss) pLemma.append(` — ${info.meaning}`);
+    if (info.meaning && (info.inflected || info.meaning !== info.gloss)) pLemma.append(` — ${info.meaning}`);
+    if (info.level) { const chip = el("span", "chip chip--level", pLemma); showLevel(chip, info.level, info.inflected ? "слово" : ""); }
     pSeen.replaceChildren();
     if (info.seen && !info.seen.startsWith("(")) pSeen.append(`в книгах переводили: ${info.seen}`);
     if (word.unknown || data.meta.source === "own") {
@@ -868,13 +921,14 @@
     }
     pSeen.hidden = !pSeen.childNodes.length;
 
+    // признаки разборщика — только если модель не описала форму
     const { labels, unknown } = parseFeats(word.feats);
     pGrammar.replaceChildren(...labels.map(label => {
       const chip = el("span", "chip");
       chip.textContent = label;
       return chip;
     }));
-    pGrammar.hidden = labels.length === 0;
+    pGrammar.hidden = labels.length === 0 || !pGram.hidden;
     pRaw.textContent = [...unknown, ...(word.guess ? ["найдено без учёта ударений"] : [])].join(" · ");
     pRaw.hidden = !pRaw.textContent;
 
@@ -1054,6 +1108,15 @@
       }
       const meaning = el("div", "card__meaning", item);
       meaning.textContent = card.meaning || card.gloss || card.meaningEn || "—";
+      // слово встретилось в изменённой форме — она тоже в карточке, но вторым планом
+      if (!isPhraseKey(card.key) && card.form && isInflected(card.form, card.head)) {
+        const form = el("div", "card__form", item);
+        const gr = el("i", "", form);
+        gr.lang = "el";
+        gr.textContent = card.form;
+        form.append([card.formRu && ` — ${card.formRu}`, card.formGram && ` · ${card.formGram}`].filter(Boolean).join(""));
+        if (card.formLevel) { const chip = el("span", "chip chip--level", form); showLevel(chip, card.formLevel, "форма"); }
+      }
 
       if (card.example) {
         item.appendChild(highlightExample(card.example, card.form));
@@ -1111,15 +1174,30 @@
       .sort((a, b) => String(a.addedAt).localeCompare(String(b.addedAt)));
   }
 
+  const cardInflected = card => !isPhraseKey(card.key) && card.form && isInflected(card.form, card.head);
+  // лицевая сторона: слово (лемма), а встреченная форма — рядом, вторым планом
+  const frontText = card => cardInflected(card) ? `${card.head || card.key} (${card.form})` : (card.head || card.key);
+  const formText = card => [card.form, card.formRu && `— ${card.formRu}`, card.formGram && `(${card.formGram})`].filter(Boolean).join(" ");
+
   function backText(card) {
     const meaning = card.meaning || card.gloss || card.meaningEn || "";
-    return card.pos ? `${meaning} (${card.pos})` : meaning;
+    const base = card.pos ? `${meaning} (${card.pos})` : meaning;
+    return cardInflected(card) ? `${base}; в тексте: ${formText(card)}` : base;
+  }
+
+  function ankiFront(card) {
+    const head = `<b>${escapeHtml(card.head || card.key)}</b>`;
+    return cardInflected(card) ? `${head}<br><span style="font-size:.7em;color:#8a7a66">${escapeHtml(card.form)}</span>` : head;
   }
 
   function ankiBack(card) {
     const parts = [`<b>${escapeHtml(card.meaning || card.gloss || card.meaningEn)}</b>`];
     if (card.pos || card.level) parts.push(`<small>${escapeHtml([card.pos, card.level && card.level !== "?" ? card.level : ""].filter(Boolean).join(", "))}</small>`);
     if (card.meaningEn) parts.push(`<small>en: ${escapeHtml(card.meaningEn)}</small>`);
+    if (cardInflected(card)) {
+      parts.push(`<br><i>${escapeHtml(card.form)}</i>${card.formRu ? ` — ${escapeHtml(card.formRu)}` : ""}`
+        + (card.formGram || card.formLevel ? ` <small>(${escapeHtml([card.formGram, card.formLevel && card.formLevel !== "?" ? "форма " + card.formLevel : ""].filter(Boolean).join("; "))})</small>` : ""));
+    }
     if (card.example) {
       const example = escapeHtml(card.example);
       const form = escapeHtml(card.form);
@@ -1139,7 +1217,7 @@
         "#deck:Греческий из книг",
         "#tags column:3",
         ...list.map(card => [
-          oneLine(escapeHtml(card.head || card.key)),
+          oneLine(ankiFront(card)),
           oneLine(ankiBack(card)),
           "greek-reader",
         ].join("\t")),
@@ -1149,12 +1227,12 @@
     quizlet: {
       filename: "greek-cards-quizlet.txt",
       copy: true,
-      build: list => list.map(card => `${oneLine(card.head || card.key)}\t${oneLine(backText(card))}`).join("\n"),
+      build: list => list.map(card => `${oneLine(frontText(card))}\t${oneLine(backText(card))}`).join("\n"),
       hint: "<b>Quizlet:</b> текст уже скопирован (и скачан файлом).<ol><li>Создать → Учебный модуль → «Импорт».</li><li>Вставь текст (Ctrl+V).</li><li>Между термином и определением — <b>Tab</b>, между карточками — <b>новая строка</b>.</li></ol>",
     },
     brainscape: {
       filename: "greek-cards-brainscape.csv",
-      build: list => list.map(card => csvRow([card.head || card.key, backText(card)])).join("\r\n") + "\r\n",
+      build: list => list.map(card => csvRow([frontText(card), backText(card)])).join("\r\n") + "\r\n",
       hint: "<b>Brainscape:</b> в колоде (deck) → Add cards → Import → загрузи скачанный CSV. Первый столбец — вопрос, второй — ответ.",
     },
     csv: {
@@ -1162,9 +1240,10 @@
       bom: true,
       build: list => [
         csvRow(["greek", "word_form", "part_of_speech", "level", "russian", "english", "meaning_in_text",
-          "example", "example_ru", "book", "added", "status"]),
+          "form_grammar", "form_translation", "form_level", "example", "example_ru", "book", "added", "status"]),
         ...list.map(card => csvRow([
           card.head || card.key, card.form, card.pos, card.level, card.meaning, card.meaningEn, card.gloss,
+          card.formGram, card.formRu, card.formLevel,
           card.example, card.exampleRu, card.book, (card.addedAt || "").slice(0, 10),
           card.status === "learned" ? "learned" : "learning",
         ])),

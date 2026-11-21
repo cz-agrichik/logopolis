@@ -1014,3 +1014,11 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
 .card__top .chip--level { margin-left: 4px; }
 .topbar .own-again { color: var(--head-ink); }
 .topbar .own-again:hover { color: #fff; }
+
+/* форма и лемма: грамматика формы, «от ξυπνάω» */
+.popover__gram { margin-top: 6px; color: var(--muted); font-size: 13.5px; }
+.popover__gram .chip--level, .popover__lemma .chip--level { margin-left: 8px; vertical-align: 1px; }
+.margin-note__gram { display: block; margin-top: 1px; font-family: var(--font-ui); font-size: 12.5px; font-style: italic; opacity: 0.75; }
+.card__form { margin-top: 3px; color: var(--muted); font-size: 13.5px; }
+.card__form i { color: var(--ink); }
+.card__form .chip--level { margin-left: 6px; }

@@ -138,10 +138,11 @@
       const hit = lookup(dict, form);
       const word = { start, end, s: inside ? s : -1 };
       if (hit) {
-        const [key, upos, feats, seen] = hit.a;
+        const [key, upos, feats, seen, gram, formRu, formLevel] = hit.a;
         const entry = dict.lemmas[key];
         if (entry) lemmas[key] = entry;
-        Object.assign(word, { lemma: (entry && entry.head) || key, key, upos, feats, seen, guess: hit.guess });
+        Object.assign(word, { lemma: (entry && entry.head) || key, key, upos, feats, seen, guess: hit.guess,
+          gram: gram || "", formRu: formRu || "", formLevel: formLevel || "" });
         known += 1;
         if (hit.guess) guessed += 1;
       } else {

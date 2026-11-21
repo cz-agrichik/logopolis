@@ -39,6 +39,7 @@ class FakeClient:
     offline = False
     calls = 0
     level_prompts = []
+    form_prompts = []
     lemma_prompts = []
 
     def chat_json(self, system, user):
@@ -55,6 +56,11 @@ class FakeClient:
             if find("νίκος"):
                 out.append([[find("ο")[0], find("νίκος")[0]], "ο Νίκος", "Никос"])              # имя — не берём
             return {"phrases": out}
+        if system is bc.FORM_SYSTEM:
+            FakeClient.form_prompts.append(user)
+            known = {"έριξε": ["неправильный аорист, 3 л. ед. ч.", "бросил", "Α2"], "πίνει": ["наст. вр., 3 л. ед. ч.", "пьёт", "A1"]}
+            items = re.findall(r"^(\d+)\. (\S+) ← ", user, re.M)
+            return {"forms": [[n, *known.get(f, ["форма", "βλα", "?"])] for n, f in items]}   # «βλα» — перевод не по-русски
         if system is bc.LEVEL_SYSTEM:
             FakeClient.level_prompts.append(user)
             answer = {"ματιά": "Β1", "καμιά φορά": "Α2-Β1", "ρίχνω μια ματιά": "?", "πίνω": "A1-B2"}
@@ -111,6 +117,12 @@ def main():
         plv = {p[1]: p[3] for p in book["phrases"]}
         assert plv == {"ρίχνω μια ματιά": "?", "καμιά φορά": "A2–B1"}, plv
         assert book["meta"]["levels"] is True
+        # формы: изменённые — с грамматикой, переводом формы и уровнем; словарные (ματιά = ματιά) — не спрашиваются
+        assert book["forms"]["έριξε|ρίχνω"] == ["неправильный аорист, 3 л. ед. ч.", "бросил", "A2"], book["forms"]
+        assert book["forms"]["πίνει|πίνω"] == ["наст. вр., 3 л. ед. ч.", "пьёт", "A1"]
+        assert not any("ματιά ←" in p for p in FakeClient.form_prompts), "словарная форма ушла модели"
+        assert all(v[1] != "βλα" for v in book["forms"].values()), "перевод формы греческими буквами"
+        assert book["meta"]["forms"] is True
         assert (bc.LIB_DIR / "local" / "books" / "secret.js").is_file()
 
         cat = json.loads((bc.LIB_DIR / "catalog.js").read_text(encoding="utf-8").split(" = ", 1)[1].rstrip(";\n"))
@@ -125,6 +137,8 @@ def main():
         assert ["ρίχνω", "ένας", "ματιά"] in [p[0] for p in d["phrases"]]   # μια есть в словарной форме — ключ остаётся
         assert {p[1]: p[3] for p in d["phrases"]} == {"καμιά φορά": "A2–B1", "ρίχνω μια ματιά": "?"}
         assert d["lemmas"]["καφές"]["level"] == "A1" and "level" not in d["lemmas"]["πίνω"]
+        assert d["forms"]["έριξε"][4:] == ["неправильный аорист, 3 л. ед. ч.", "бросил", "A2"], d["forms"]["έριξε"]
+        assert len(d["forms"]["ματιά"]) == 4, "у словарной формы нет грамматики"
         flat = json.dumps(d, ensure_ascii=False)
         assert "перевод 1" not in flat and "Ο Νίκος έριξε" not in flat, "в словаре сайта — предложения"
         assert cat["dict"] == {"forms": len(d["forms"]), "lemmas": len(d["lemmas"]), "phrases": 2}
@@ -144,6 +158,7 @@ def main():
         assert bc.check_phrase("για κάτι", "о чём-то", m(("γι", "για", "ADP"), ("αυτό", "αυτός", "PRON"))) is None, "одни служебные"
         assert bc.check_phrase("χαμηλώνω το κεφάλι", "склонить голову", m(("Ο", "ο", "DET"), ("κεφάλι", "το κεφάλι", "NOUN"))) is None
         assert bc.check_phrase("καθόλου", "совсем", m(("Δεν", "δεν", "PART"), ("καθόλου", "καθόλου", "ADV"))) is None
+        assert bc.lemma_key("ξυπνάω") == bc.lemma_key("ξυπνώ") == "ξυπνώ" and bc.lemma_key("το αγόρι") == "αγόρι"
         assert not bc.pure_greek("τίποта") and not bc.pure_greek("то μυστήριο") and bc.pure_greek("σε + ο")
         assert [bc.normalize_level(x) for x in ("B1", "Β1", "a2-b1", "Γ1", "?", "A1-B2", "C3", "")] == \
             ["B1", "B1", "A2–B1", "C1", "?", None, None, None]
