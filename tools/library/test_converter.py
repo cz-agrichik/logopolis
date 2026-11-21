@@ -39,6 +39,7 @@ class FakeClient:
     offline = False
     calls = 0
     level_prompts = []
+    bad = 0
     form_prompts = []
     lemma_prompts = []
 
@@ -71,6 +72,9 @@ class FakeClient:
             items = re.findall(r"^(\d+)\. (\S+)", user, re.M)
             return {"lemmas": [[n, h, "рус:" + h, "en:" + h, "имя собств." if h == "Νίκος" else "сл."] for n, h in items]}
         sents = re.findall(r"^S(\d+):", user, re.M)
+        if len(sents) > 1:   # пачку из нескольких предложений модель «не может» разобрать — как на 2-й главе «Поттера»
+            FakeClient.bad += 1
+            raise bc.BadReply("не удалось разобрать ответ: тест")
         return {"sentences": [[int(s), "перевод " + s] for s in sents],
                 "words": [[n, LEMMA.get(w.lower(), (w.lower(),))[0], "≈" + w] for n, w in nums.items()]}
 
@@ -163,6 +167,8 @@ def main():
         assert [bc.normalize_level(x) for x in ("B1", "Β1", "a2-b1", "Γ1", "?", "A1-B2", "C3", "")] == \
             ["B1", "B1", "A2–B1", "C1", "?", None, None, None]
 
+        assert FakeClient.bad == 1, "негодная пачка — один раз"
+        assert book["sentences"][1][2] == "перевод 1", "после негодной пачки — по одному предложению"
         # второй запуск — всё из кеша
         before = FakeClient.calls
         bc.main(["story", *args], nlp=FakeNLP(), client=FakeClient())

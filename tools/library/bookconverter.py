@@ -329,6 +329,8 @@ class LLMClient:
         self.extra = dict(config.get("extra") or {})
         self.json_mode = True
         self.last_call = 0.0
+        self.last_bad = ""          # сырой ответ, который не разобрался (пишем в cache/bad_replies.txt)
+        self.retry_bad = bool(config.get("retry_bad"))
         # offline: лимит исчерпан или запуск с --offline — берём только из кеша.
         self.offline = bool(config.get("offline"))
         if not self.base_url or not self.model:
@@ -412,6 +414,7 @@ class LLMClient:
                     continue
                 raise RuntimeError(f"Нет связи с {self.base_url}: {exc}") from exc
             except (ValueError, KeyError, IndexError, TypeError) as exc:
+                self.last_bad = (locals().get("content") or "")[:4000]
                 if attempt <= 2:
                     log("   модель вернула не-JSON, повторяю…")
                     continue
@@ -436,12 +439,18 @@ def retry_delay(exc: urllib.error.HTTPError, body: str) -> float | None:
 
 
 def parse_json_reply(content: str) -> dict:
+    """JSON из ответа модели — терпимо: без ```, без рассуждений <think>, с переводами строк внутри строк
+    (strict=False) и с лишней запятой перед ] или } — так модели ошибаются чаще всего."""
     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
     content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content).strip()
     start, end = content.find("{"), content.rfind("}")
     if start < 0 or end <= start:
-        raise ValueError("в ответе нет JSON-объекта")
-    return json.loads(content[start:end + 1])
+        raise ValueError("в ответе нет JSON-объекта" + (" (ответ оборван?)" if start >= 0 else ""))
+    body = content[start:end + 1]
+    try:
+        return json.loads(body, strict=False)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r",(\s*[\]}])", r"\1", body), strict=False)
 
 
 
@@ -592,8 +601,15 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
         what: str) -> tuple[dict | None, bool]:
     """Ответ из кеша или от модели.
     Возвращает (ответ, из_кеша). None — ответа нет и сейчас не будет (лимит или --offline);
-    {} — модель не дала годного ответа на этот кусок."""
+    {} — модель не дала годного ответа на этот кусок.
+    Негодный ответ тоже запоминается ({"_bad": …}): на нём модель спотыкается каждый раз, и раньше каждый запуск
+    тратил на него три запроса. Теперь он сразу идёт дальше (у перевода — по одному предложению, они кешируются);
+    спросить такие куски заново — --retry-bad."""
     reply = cache.get(key)
+    if isinstance(reply, dict) and "_bad" in reply:
+        if not getattr(client, "retry_bad", False) or client.offline:
+            return {}, True
+        reply = None
     if reply is not None:
         return reply, True
     if client.offline:
@@ -607,7 +623,12 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
             f"   Ответ сервера: {str(exc)[:300]}\n")
         return None, False
     except BadReply as exc:
-        log(f"   ! {what}: {exc}")
+        log(f"   ! {what}: {exc} — запомнил, в следующий раз не спрашиваю (заново: --retry-bad)")
+        cache.put(key, {"_bad": str(exc)[:300], "when": datetime.now(timezone.utc).strftime("%Y-%m-%d")})
+        raw = getattr(client, "last_bad", "")
+        if raw:
+            with open(CACHE_DIR / "bad_replies.txt", "a", encoding="utf-8") as fh:
+                fh.write(f"\n===== {datetime.now(timezone.utc):%Y-%m-%d %H:%M} · {what} · {exc}\n--- запрос:\n{prompt[:3000]}\n--- ответ:\n{raw}\n")
         return {}, False
     cache.put(key, reply)
     return reply, False
@@ -1524,6 +1545,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--dict", action="store_true", help="только пересобрать каталоги и словарь сайта")
     parser.add_argument("--offline", action="store_true",
                         help="ничего не запрашивать у модели, собрать из кеша")
+    parser.add_argument("--retry-bad", dest="retry_bad", action="store_true",
+                        help="спросить заново куски, на которых модель раньше давала негодный ответ")
     parser.add_argument("--no-phrases", dest="no_phrases", action="store_true", help="без прохода оборотов")
     parser.add_argument("--no-levels", dest="no_levels", action="store_true", help="без прохода уровней (CEFR)")
     parser.add_argument("--no-forms", dest="no_forms", action="store_true", help="без прохода форм (грамматика, перевод и уровень формы)")
@@ -1636,6 +1659,7 @@ def main(argv=None, nlp=None, client=None) -> None:
     args = parse_args(argv)
     config = load_config(args)
     config["offline"] = args.offline
+    config["retry_bad"] = args.retry_bad
     provider = config["provider"]
 
     if args.list_models:
