@@ -56,7 +56,6 @@ kbd { font-family: inherit; font-size: .75em; border: 1px solid currentColor; bo
 .brand { display: flex; align-items: center; gap: 12px; min-width: 230px; }
 .logo { font-size: 26px; font-weight: 700; letter-spacing: .02em; color: var(--gold-l); }
 .epoch-name { font-weight: 700; font-size: 16px; }
-.epoch-sub { font-size: 12px; opacity: .8; }
 .resources { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
 .res {
   display: flex; align-items: baseline; gap: 4px;
@@ -350,6 +349,16 @@ label.btn { display: inline-block; }
   background: rgba(255,255,255,.15); color: #fff;
 }
 .pedia-btn:hover { background: rgba(255,255,255,.28); }
+/* кнопки шапки: 📖 библиотека (ссылка), 📚 обучение, ? Кипропедия */
+.pedia-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; text-decoration: none; }
+.top-tools { display: flex; gap: 5px; flex: none; }
+.top-tools .pedia-btn { width: 36px; height: 36px; font-size: 17px; }
+.top-tools .pedia-q { font-size: 21px; }
+.pedia-q, .rail-q, .pedia-q-ic { font-family: 'Noto Serif', Georgia, serif; font-weight: 700; font-style: normal; color: var(--gold-l); }
+.pedia-q { font-size: 22px; }
+.pedia-q-ic { display: inline-flex; width: 1.3em; height: 1.3em; align-items: center; justify-content: center; border-radius: 50%;
+  background: rgba(255,255,255,.15); font-size: .95em; margin-right: 2px; }
+.brand { cursor: help; }
 .item.sp { background: linear-gradient(135deg, #fff9e8, #fff4d6); border-color: #ecd9a6; }
 .item-title small { color: var(--ink-2); font-weight: 400; }
 .item-effect { font-size: 12px; color: #34511c; margin-top: 4px; }
@@ -560,7 +569,7 @@ details.fold[open] > summary::before { content: '▾ '; }
 .bf .ico.inl { width: 24px; height: 24px; vertical-align: middle; }
 .bf small { font-variant-numeric: tabular-nums; color: #7a5200; font-weight: 700; }
 #map { width: min(100%, calc((100vh - 170px) * 18 / 11)); }
-@media (max-width: 1250px) { .brand .epoch-sub, .popbox .wide-only { display: none; } }
+@media (max-width: 1250px) { .popbox .wide-only { display: none; } #topbar { gap: 9px; } .brand { gap: 8px; } .logo { font-size: 21px; } .epoch-name { font-size: 14px; } }
 /* ресурсы не помещаются в шапку — плотнее (UI.fitRes): 1 — мельче, 2 — значок над числом, 3 — ещё мельче; прирост виден всегда */
 .resbar[data-fit="1"] .rs { gap: 3px; padding: 3px 5px 6px; }
 .resbar[data-fit="1"] .rs-ic, .resbar[data-fit="1"] .rs-ic .ico { width: 20px; height: 20px; }

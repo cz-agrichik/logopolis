@@ -15,11 +15,12 @@ const Phone = {
   init() {
     this.bindTips();
     this.bindFullscreen();
-    // полоса справа: режим улучшения, справка, учёба
+    // полоса справа: режим улучшения, библиотека, учёба, справка
     $('#rail').addEventListener('click', e => {
       const b = e.target.closest('button');
       if (!b) return;
       if (b.hasAttribute('data-up-mode')) return this.upMode(!UI.upMode);
+      if (b.dataset.open === 'library') { Session.saveAll(); location.href = 'library/index.html'; return; }
       if (b.dataset.open) { UI.drawer(false); this.upMode(false); return b.dataset.open === 'pedia' ? Pedia.open() : School.open(); }
       if (b.dataset.tab) this.upMode(false);   // открыли вкладку — режим улучшения выключаем
     });

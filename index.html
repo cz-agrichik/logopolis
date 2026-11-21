@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <!-- Версия файлов для сброса кэша браузера: после любого изменения кода поднимите ОДНО число — ASSET_V ниже.
        Скрипты и стили подключаются с ?v=ASSET_V; список скриптов — ASSETS в конце страницы (порядок важен). -->
-  <script>var ASSET_V = 124;</script>
+  <script>var ASSET_V = 125;</script>
   <script>
     document.write('<link rel="stylesheet" href="ui/desktop/styles.css?v=' + ASSET_V + '">');
     document.write('<link rel="stylesheet" href="ui/desktop/phone.css?v=' + ASSET_V + '">');   // телефон — поверх компьютерной раскладки
@@ -41,18 +41,18 @@
 <body data-epoch="0">
   <noscript><div><img src="https://mc.yandex.ru/watch/114153547" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
   <header id="topbar">
-    <div class="brand">
+    <div class="brand" id="brand">
       <div class="logo">Λόγος</div>
-      <div>
-        <div class="epoch-name" id="epochName"></div>
-        <div class="epoch-sub" id="epochSub"></div>
-      </div>
+      <div class="epoch-name" id="epochName"></div>
     </div>
     <div class="logos-medal" id="logosMedal" title="Логос — главный ресурс: его дают только карточки"></div>
     <div class="resbar" id="resources"></div>
     <div class="popbox" id="popbox"></div>
-    <button id="pediaBtn" class="pedia-btn" title="Кипропедия — справочник по игре и учёбе (F1)">📖</button>
-    <button id="schoolBtn" class="pedia-btn" title="Обучение: прогресс по словам, колоды, темп, экспорт">📚</button>
+    <nav class="top-tools" aria-label="Библиотека, обучение, справка">
+      <a id="libBtn" class="pedia-btn" href="library/index.html" title="Библиотека: читать греческие тексты — слово по нажатию, с переводом и в карточки">📖</a>
+      <button id="schoolBtn" class="pedia-btn" title="Обучение: прогресс по словам, колоды, темп, экспорт">📚</button>
+      <button id="pediaBtn" class="pedia-btn pedia-q" title="Кипропедия — справочник по игре и учёбе (F1)">?</button>
+    </nav>
     <button id="studyBtn" class="study-btn"><span class="sb-main">📜<span class="sb-word"> Учиться</span></span></button>
   </header>
 
@@ -81,8 +81,9 @@
       <button data-tab="rites"><i>🏛️</i><span>Обряды</span></button>
       <button data-tab="epoch"><i>⏳</i><span>Эпоха</span></button>
       <button data-up-mode title="Режим улучшения: каждое касание здания — +1 уровень (как Shift+клик на компьютере)"><i>⏫</i><span>Улучшать</span></button>
-      <button data-open="pedia" class="rail-low" title="Кипропедия — справочник по игре и учёбе"><i>📖</i><span>Справка</span></button>
+      <button data-open="library" class="rail-low" title="Библиотека: читать греческие тексты"><i>📖</i><span>Книги</span></button>
       <button data-open="school" title="Обучение: прогресс по словам, колоды, темп"><i>📚</i><span>Учёба</span></button>
+      <button data-open="pedia" title="Кипропедия — справочник по игре и учёбе"><i class="rail-q">?</i><span>Справка</span></button>
     </nav>
   </main>
 
@@ -95,7 +96,7 @@
 
   <div id="pedia" class="pedia hidden">
     <div class="pedia-box">
-      <div class="pedia-top"><button class="pn-toggle" data-nav-toggle title="Оглавление">☰</button><div class="pedia-title">📖 Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
+      <div class="pedia-top"><button class="pn-toggle" data-nav-toggle title="Оглавление">☰</button><div class="pedia-title"><span class="pedia-q-ic">?</span> Кипропедия <small>Κυπροπαίδεια</small></div><button class="st-close" data-pedia-close title="Закрыть (Esc)">✕</button></div>
       <div class="pedia-main"><nav id="pediaNav" class="pedia-nav"></nav><article id="pediaBody" class="pedia-body"></article></div>
     </div>
   </div>

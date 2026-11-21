@@ -89,8 +89,8 @@ const School = {
     const top = $('#schoolBody').scrollTop;
     $('#schoolNav').innerHTML = `<div class="pn-group">${SCHOOL_SECTIONS.map(s =>
       `<a href="#" class="pn-item ${s.id === this.sec ? 'active' : ''}" data-sec="${s.id}"><span>${s.icon}</span>${esc(s.title)}</a>`).join('')}</div>
-      <div class="pn-foot"><button class="link" data-pedia="a:study">📖 Как устроена учёба</button>
-        <a class="link lib-link" href="library/index.html" target="_blank" rel="noopener" title="Греческие тексты с переводом слов и оборотов — в новой вкладке">📚 Библиотека: читать тексты ↗</a></div>`;
+      <div class="pn-foot"><button class="link" data-pedia="a:study">? Как устроена учёба</button>
+        <a class="link lib-link" href="library/index.html" target="_blank" rel="noopener" title="Греческие тексты с переводом слов и оборотов — в новой вкладке">📖 Библиотека: читать тексты ↗</a></div>`;
     $('#schoolBody').innerHTML = this['s_' + this.sec]();
     if (this.sec === 'words') this.renderWords();
     $('#schoolBody').scrollTop = keepScroll ? top : 0;

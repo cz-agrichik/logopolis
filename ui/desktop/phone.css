@@ -20,7 +20,7 @@
   /* шапка */
   #topbar { gap: 6px; padding: 4px 8px; flex-wrap: nowrap; }
   #topbar::after { bottom: -5px; height: 5px; background-size: 10px 5px; }
-  .brand .logo, .brand .epoch-sub { display: none; }
+  .brand .logo { display: none; }
   .brand .epoch-name { font-size: 12px; line-height: 1.1; max-width: 88px; }
   .logos-medal { padding: 2px 8px 2px 3px; gap: 4px; }
   .lm-sign { width: 24px; height: 24px; font-size: 15px; }
@@ -100,6 +100,7 @@
   .rail button { width: 52px; padding: 6px 0 4px; border: 0; border-radius: 12px; background: var(--parch-2); color: var(--ink);
     box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit; cursor: pointer; }
   .rail button i { font-style: normal; font-size: 20px; line-height: 1; }
+  .rail button i.rail-q { color: var(--accent); font-size: 21px; }
   .rail button span { font-size: 9.5px; line-height: 1.1; }
   body.drawer-open .rail button.active { background: var(--accent); color: #fff; }
   /* панель выезжает поверх карты */
@@ -177,7 +178,7 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .fs-gate .link { color: #fbf3e2; opacity: .65; font-size: 12px; }
 
   /* шапка: Кипропедия и «Обучение» уехали в полосу справа; ресурсы — значок над числом */
-  #pediaBtn, #schoolBtn { display: none; }
+  #pediaBtn, #schoolBtn, #libBtn { display: none; }
   .wide-only { display: none; }
   /* ресурсы тянутся на свободное место (ячейка — не шире 110), но соседей не давят: не помещаются — ячейки плотнее (UI.fitRes) */
   .rs { gap: 3px; padding: 2px 5px 5px; max-width: 110px; }

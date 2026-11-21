@@ -95,7 +95,7 @@ const UI = {
     const s = Game.state, E = Cat.epochs[s.epoch];
     document.body.dataset.epoch = s.epoch;
     $('#epochName').textContent = E.name;
-    $('#epochSub').textContent = E.sub;
+    $('#brand').title = `${E.name} · ${E.sub} — подробнее во вкладке «Эпоха»`;   // годы — в подсказке: шапка нужна ресурсам
 
     // λ — на почётном месте, сразу после названия эпохи
     const lm = Math.round((Game.logosMult() - 1) * 100);
@@ -792,7 +792,7 @@ const UI = {
       в новую эпоху — требует <b>λ Логоса</b>. Его не добыть ни киркой, ни торговлей: только решая карточки в «📜 Учиться».
       Логос можно тратить с первых минут: во вкладке «Обряды» <b>Сбор припасов</b> за ${RITUAL_BY_ID.elders.logos} λ сразу даёт ресурсы,
       а благословения удваивают производство. Можно и не спешить — поиграть без карточек, пока не упрётесь в λ.
-      Подробности — в <b>📖 Кипропедии</b>.</p>`;
+      Подробности — в <b>Кипропедии</b> (кнопка «?» вверху).</p>`;
     const retired = first ? [] : (s.log || []).filter(e => e.k === 'retired' && e.p.epoch === s.epoch);
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
     if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Здания с 5-го уровня сменили облик на бронзовый, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
@@ -804,7 +804,7 @@ const UI = {
       Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:epochs">как это устроено</a>'}).
       «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до Рима. Спасибо!</p>`;
-    h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">📖 Кипропедия</button>` : ''}
+    h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">? Кипропедия</button>` : ''}
       <button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'Дальше →' : 'Дальше'}</button></div></div>`;
     this.showModal(h);
   },

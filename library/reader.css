@@ -1041,3 +1041,23 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
 .popover__game--learned { font-weight: 700; }
 .margin-note--known { color: #4f7a2e; }
 .margin-note--known::before { background: #4f7a2e; }
+
+/* кнопка «В игру» — золотая, как «Учиться» в игре */
+.game-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 7px 14px;
+  border-radius: 22px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+  color: #3a2700;
+  background: linear-gradient(180deg, #ffe39a, #e2ae3c);
+  box-shadow: 0 2px 0 #9b6e12;
+}
+.game-link:hover { filter: brightness(1.05); }
+@media (max-width: 760px) { .game-link span { display: none; } .game-link { padding: 7px 10px; } }
