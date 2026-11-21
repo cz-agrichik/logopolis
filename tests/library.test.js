@@ -52,6 +52,10 @@ test('библиотека: каталог и словарь сайта на м�
     assert.ok(!/PROPN/.test(a[1]), 'имя собственное в словаре: ' + f);
   }
   assert.ok(dict.phrases.every(p => p[0].length >= 2 && p[0].length <= 5));
+  // уровни: «B1», «A2–B1» (соседние), «?» или нет поля
+  const LEVEL = /^(\?|(A1|A2|B1|B2|C1|C2)|A1–A2|A2–B1|B1–B2|B2–C1|C1–C2)$/;
+  for (const [k, e] of Object.entries(dict.lemmas)) if (e.level != null) assert.match(e.level, LEVEL, 'уровень леммы ' + k);
+  for (const p of dict.phrases) if (p[3] != null && p[3] !== '') assert.match(p[3], LEVEL, 'уровень оборота ' + p[1]);
   assert.ok(!('sentences' in dict) && !('text' in dict));
 });
 

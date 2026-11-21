@@ -84,7 +84,7 @@
     for (const list of bySentence) {
       for (let a = 0; a < list.length; a += 1) {
         for (const p of dict._byFirst.get(words[list[a]].key) || []) {
-          const [keys, head, ru] = dict.phrases[p];
+          const [keys, head, ru, level] = dict.phrases[p];
           const got = [a];
           for (let k = 1; k < keys.length; k += 1) {
             const from = got[got.length - 1];
@@ -98,7 +98,7 @@
           if (got.length !== keys.length) continue;
           const w = got.map(b => list[b]);
           const id = `${p}:${w[0]}`;
-          if (!seen.has(id)) { seen.add(id); found.push([w, head, ru]); }
+          if (!seen.has(id)) { seen.add(id); found.push([w, head, ru, level || ""]); }
         }
       }
     }

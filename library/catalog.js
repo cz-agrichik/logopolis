@@ -1,2 +1,2 @@
 // Каталог библиотеки. Создаётся tools/library/bookconverter.py.
-window.GREEK_LIBRARY = {"books":[{"id":"demo","title":"Ένα ήσυχο πρωί","author":"пример читалки","level":"A1","about":"Короткий пример: утро Марии у моря — на нём видно, как работает читалка.","license":"свой текст","chapters":1,"words":47,"lemmas":36,"phrases":0,"complete":true,"updated":"2026-11-21"}],"dict":{"forms":1430,"lemmas":1101,"phrases":61}};
+window.GREEK_LIBRARY = {"books":[{"id":"demo","title":"Ένα ήσυχο πρωί","author":"пример читалки","level":"A1","about":"Короткий пример: утро Марии у моря — на нём видно, как работает читалка.","license":"свой текст","chapters":1,"words":47,"lemmas":36,"phrases":0,"complete":true,"updated":"2026-11-21"}],"dict":{"forms":1428,"lemmas":1093,"phrases":63}};

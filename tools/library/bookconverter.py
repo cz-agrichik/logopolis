@@ -55,6 +55,8 @@ DATA_VERSION = 3   # 3: + обороты (phrases)
 PROMPT_VERSION = "2"  # меняется при правке промптов -> кеш не смешивается
 LEMMA_PROMPT_VERSION = "3"  # отдельно: правка словаря не сбрасывает дорогой контекстный перевод
 PHRASE_PROMPT_VERSION = "1"  # обороты — свой проход и свой кеш: старые ответы остаются в силе
+LEVEL_PROMPT_VERSION = "1"   # уровни (CEFR) лемм и оборотов — тоже свой проход и свой кеш
+LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]   # в греческой сертификации — Α1, Α2, Β1, Β2, Γ1, Γ2
 BOOK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 # Бесплатные провайдеры с OpenAI-совместимым API.
@@ -125,6 +127,17 @@ def bare_lemma(head: str) -> str:
 
 def lemma_key(head: str) -> str:
     return bare_lemma(head).lower()
+
+
+def as_int(value):
+    """Номер из ответа модели: она пишет и 3, и "3" (Gemini — иногда строкой). Не номер — None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
 
 
 def has_letters(text: str) -> bool:
@@ -282,7 +295,13 @@ class Cache:
         return self.data.get(key)
 
     def put(self, key: str, value) -> None:
-        self.data[key] = value
+        self.put_many({key: value})
+
+    def put_many(self, items: dict) -> None:
+        """Записать несколько ответов разом (файл кеша переписывается один раз)."""
+        if not items:
+            return
+        self.data.update(items)
         self.path.parent.mkdir(exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")
@@ -598,16 +617,18 @@ def run_llm(text: str, sentences: list[dict], words: list[dict], config: dict,
     batches = make_batches(sentences, words, int(config["batch_words"]))
     complete = True
     total_words = sum(len(by_sentence[s]) for batch in batches for s in batch)
-    progress = Progress(f"Перевод в контексте · {config['model']} · ~{len(batches)} запросов",
-                        total_words, "слов")
+    asked = sum(1 for b in batches if cache.get(digest("ctx", PROMPT_VERSION, config["model"],
+                                                       context_prompt(text, sentences, by_sentence, b)[0])) is None)
+    progress = Progress(f"Перевод в контексте · {config['model']} · пачек {len(batches)}, из кеша {len(batches) - asked}"
+                        f" · к модели ~{asked} запросов", total_words, "слов")
 
     def apply(batch: list[int], reply: dict, s_map: dict, w_map: dict) -> set[int]:
         for item in reply.get("sentences", []):
-            if isinstance(item, list) and len(item) >= 2 and item[0] in s_map:
-                sentences[s_map[item[0]]]["ru"] = str(item[1]).strip()
+            if isinstance(item, list) and len(item) >= 2 and as_int(item[0]) in s_map:
+                sentences[s_map[as_int(item[0])]]["ru"] = str(item[1]).strip()
         for item in reply.get("words", []):
-            if isinstance(item, list) and len(item) >= 3 and item[0] in w_map:
-                word = w_map[item[0]]
+            if isinstance(item, list) and len(item) >= 3 and as_int(item[0]) in w_map:
+                word = w_map[as_int(item[0])]
                 head = unicodedata.normalize("NFC", str(item[1]).strip())
                 if head and pure_greek(head):
                     word["head"] = head
@@ -659,8 +680,9 @@ def lemma_entries(words: list[dict]) -> list[tuple[str, str, str]]:
 LEMMA_BATCH = 60
 
 
-def lemma_batches(words: list[dict], known: dict | None = None):
-    entries = [e for e in lemma_entries(words) if not known or e[0] not in known]
+def lemma_batches(words: list[dict], known: dict | None = None, entries: list | None = None):
+    if entries is None:
+        entries = [e for e in lemma_entries(words) if not known or e[0] not in known]
     for i in range(0, len(entries), LEMMA_BATCH):
         chunk = entries[i:i + LEMMA_BATCH]
         prompt = "\n".join(
@@ -672,10 +694,10 @@ def lemma_batches(words: list[dict], known: dict | None = None):
 
 def apply_lemma_reply(chunk, reply: dict, info: dict) -> None:
     for item in reply.get("lemmas", []):
-        if not (isinstance(item, list) and item and isinstance(item[0], int)
-                and 1 <= item[0] <= len(chunk)):
+        n = as_int(item[0]) if isinstance(item, list) and item else None
+        if n is None or not 1 <= n <= len(chunk):
             continue
-        key, head, _ = chunk[item[0] - 1]
+        key, head, _ = chunk[n - 1]
         if len(item) >= 5:      # [n, исправленная форма, ru, en, pos]
             fixed = unicodedata.normalize("NFC", str(item[1]).strip())
             head = fixed if pure_greek(fixed) else head
@@ -690,14 +712,27 @@ def apply_lemma_reply(chunk, reply: dict, info: dict) -> None:
 def run_lemmas(words: list[dict], client: LLMClient, config: dict, cache: Cache,
                info: dict) -> bool:
     """Дописывает в info словарные значения новых лемм (уже известные по прошлым главам
-    не запрашиваются). Возвращает True, если все получены."""
-    batches = list(lemma_batches(words, info))
-    if not batches:
+    не запрашиваются). Возвращает True, если все получены.
+    Кеш — по каждой лемме отдельно («lemma1»: форма + подсказка): пачки по 60 зависят от того, какие леммы
+    стоят до них, и одна изменившаяся лемма раньше сдвигала все следующие пачки — их приходилось спрашивать заново.
+    Старые ответы пачками («lemma») тоже работают: то, чего нет по одной, сначала собирается в те же пачки."""
+    entries = [e for e in lemma_entries(words) if e[0] not in info]
+    if not entries:
         log("\nСловарные значения: все леммы уже известны по прошлым главам")
         return True
+    one = lambda head, hint: digest("lemma1", LEMMA_PROMPT_VERSION, config["model"], head, hint)
+    rest = []
+    for key, head, hint in entries:
+        hit = cache.get(one(head, hint))
+        if isinstance(hit, dict) and hit.get("head"):
+            info[key] = dict(hit)
+        else:
+            rest.append((key, head, hint))
+    batches = list(lemma_batches(words, entries=rest))
+    asked = sum(1 for _, prompt in batches if cache.get(digest("lemma", LEMMA_PROMPT_VERSION, config["model"], prompt)) is None)
+    progress = Progress(f"Словарные значения · лемм {len(entries)}: из кеша {len(entries) - len(rest)} по одной"
+                        f" и {len(batches) - asked} пачками · к модели ~{asked} запросов", len(rest), "лемм")
     complete = True
-    progress = Progress(f"Словарные значения · ~{len(batches)} запросов",
-                        sum(len(c) for c, _ in batches), "лемм")
     for chunk, prompt in batches:
         key = digest("lemma", LEMMA_PROMPT_VERSION, config["model"], prompt)
         began = time.monotonic()
@@ -707,12 +742,16 @@ def run_lemmas(words: list[dict], client: LLMClient, config: dict, cache: Cache,
             complete = False
             reply = {}
         apply_lemma_reply(chunk, reply, info)
+        cache.put_many({one(head, hint): dict(info[k]) for k, head, hint in chunk if k in info})
         sample = ""
         if reply and not from_cache:
             shown = [info[k] for k, _, _ in chunk if k in info and len(k) > 4][:2]
             sample = " · ".join(f"{e['head']} — {e['ru']}" for e in shown)
         progress.step(len(chunk), from_cache, time.monotonic() - began, sample)
-    progress.finish()
+    if batches:
+        progress.finish()
+    else:
+        log("   всё из кеша")
     return complete
 
 
@@ -816,7 +855,7 @@ def apply_phrase_reply(reply: dict, w_map: dict, index_of: dict, found: dict, le
     for item in reply.get("phrases", []) if isinstance(reply, dict) else []:
         if not (isinstance(item, list) and len(item) >= 3 and isinstance(item[0], list)):
             continue
-        numbers = sorted({n for n in item[0] if isinstance(n, int) and n in w_map})
+        numbers = sorted({as_int(n) for n in item[0] if as_int(n) in w_map})
         if not 2 <= len(numbers) <= PHRASE_MAX_WORDS:
             continue
         members = [w_map[n] for n in numbers]
@@ -842,8 +881,10 @@ def run_phrases(text: str, sentences: list[dict], words: list[dict], config: dic
     index_of = {id(w): i for i, w in enumerate(words)}
     # ответ короткий — пачки вдвое крупнее, чем для перевода
     batches = make_batches(sentences, words, max(120, 2 * int(config["batch_words"])))
-    progress = Progress(f"Обороты · {config['model']} · ~{len(batches)} запросов",
-                        sum(len(by_sentence[s]) for b in batches for s in b), "слов")
+    asked = sum(1 for b in batches if cache.get(digest("phr", PHRASE_PROMPT_VERSION, config["model"],
+                                                       context_prompt(text, sentences, by_sentence, b)[0])) is None)
+    progress = Progress(f"Обороты · {config['model']} · пачек {len(batches)}, из кеша {len(batches) - asked}"
+                        f" · к модели ~{asked} запросов", sum(len(by_sentence[s]) for b in batches for s in b), "слов")
     complete, found = True, {}
     for number, batch in enumerate(batches, start=1):
         prompt, _, w_map = context_prompt(text, sentences, by_sentence, batch)
@@ -864,7 +905,152 @@ def run_phrases(text: str, sentences: list[dict], words: list[dict], config: dic
     return complete, phrases
 
 
-# ─────────────────────────── 2d. Argos (офлайн) ───────────────────────────
+# ─────────────────────────── 2d. Уровни (CEFR) ───────────────────────────
+# Мнение об уровне леммы или оборота — одно из четырёх:
+#   "B1"     — уровень определён;
+#   "A2–B1"  — на границе двух соседних уровней;
+#   "?"      — модель не берётся судить (редкое, книжное, узкое, опечатка);
+#   нет поля — ответа нет (лимит, пропуск, ответ не по правилам).
+# Слова и обороты из встроенных колод игры (content/ru/words.js: a1-*, a2-*, b1-* — по учебнику) берут уровень
+# колоды и модели не отправляются.
+
+LEVEL_SYSTEM = """You are an experienced teacher of Modern Greek as a foreign language and an examiner for the
+Greek language certificate (Πιστοποίηση Ελληνομάθειας: Α1, Α2, Β1, Β2, Γ1, Γ2 = CEFR A1–C2).
+
+Input: numbered Modern Greek headwords — single words or set expressions — each with a Russian gloss.
+For each, give the CEFR level at which a learner of Modern Greek normally meets and learns it
+(core vocabulary of that level), in Latin letters: A1, A2, B1, B2, C1, C2.
+
+Return ONLY one JSON object, no markdown:
+{"levels": [[number, "B1"], ...]}
+
+Rules:
+1. Include EVERY number exactly once.
+2. One level when you are confident: "A2".
+3. Two ADJACENT levels when it is borderline: "A2-B1".
+4. "?" when you cannot judge: rare, archaic, dialectal or highly specialised words, typos, not a real word.
+5. Basic function words (articles, common prepositions, personal pronouns, να, θα, δεν, και) are A1.
+"""
+
+LEVEL_BATCH = 80
+LEVEL_LETTERS = str.maketrans({"Α": "A", "Β": "B", "Γ": "C", "α": "A", "β": "B", "γ": "C"})
+
+
+def normalize_level(raw) -> str | None:
+    """Ответ модели → "B1" / "A2–B1" / "?"; не по правилам (нет такого уровня, уровни не соседние) — None."""
+    value = re.sub(r"\s+", "", str(raw or "")).translate(LEVEL_LETTERS).upper()
+    if value == "?":
+        return "?"
+    parts = [x for x in re.split(r"[-–—/]", value) if x]
+    if not parts or any(x not in LEVELS for x in parts) or len(parts) > 2:
+        return None
+    a, b = sorted({LEVELS.index(x) for x in parts}) + [None] * (2 - len(set(parts)))
+    if b is None:
+        return LEVELS[a]
+    return f"{LEVELS[a]}–{LEVELS[b]}" if b == a + 1 else None
+
+
+def level_key(head: str) -> str:
+    """Ключ для сравнения с колодами: без артикля, NFC, строчные, ς → σ, ’ → '."""
+    return fold(bare_lemma(head)).strip()
+
+
+def deck_levels() -> dict[str, str]:
+    """Уровни из встроенных колод игры: слово (и выражение) → самый ранний уровень, где оно есть."""
+    path = REPO_DIR / "content" / "ru" / "words.js"
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    start = text.find("const WORD_DECKS = [")
+    if start < 0:
+        return {}
+    start = text.index("[", start)
+    end = text.index("\n];", start) + 2
+    try:
+        decks = json.loads(re.sub(r",(\s*[\]}])", r"\1", text[start:end]))   # в JS допустима запятая перед ]
+    except json.JSONDecodeError:
+        log("⚠ content/ru/words.js: не разобрал колоды — уровни из колод не беру")
+        return {}
+    out: dict[str, str] = {}
+    for deck in decks:
+        level = str(deck.get("id", "")).split("-")[0].upper()
+        if level not in LEVELS:
+            continue
+        for card in deck.get("cards", []):
+            for variant in re.split(r"\s*[/,]\s*", str(card[0])):
+                key = level_key(variant)
+                if key and (key not in out or LEVELS.index(level) < LEVELS.index(out[key])):
+                    out[key] = level
+    return out
+
+
+def run_levels(lemma_info: dict, phrases: list[dict], config: dict, cache: Cache, client: LLMClient,
+               decks: dict[str, str]) -> bool:
+    """Проставляет "level" леммам (lemma_info) и оборотам (phrases). Возвращает True, если ответы получены все."""
+    asks: dict[str, tuple[str, str, list[dict]]] = {}   # словарная форма → (форма, перевод, кому проставить)
+    from_decks = 0
+    targets = [(e, e.get("head", key), e.get("ru", "")) for key, e in lemma_info.items()]
+    targets += [(p, p["head"], p.get("ru", "")) for p in phrases]
+    for target, head, ru in targets:
+        if not head or not pure_greek(head):
+            continue
+        known = decks.get(level_key(head))
+        if known:
+            target["level"] = known
+            from_decks += 1
+            continue
+        asks.setdefault(fold(head), (head, ru, []))[2].append(target)
+    # кеш — и по каждому слову («level1»), и пачками («level»): см. run_lemmas
+    one = lambda head, ru: digest("level1", LEVEL_PROMPT_VERSION, config["model"], head, ru)
+    items, from_one = [], 0
+    for head, ru, targets in asks.values():
+        hit = cache.get(one(head, ru))
+        if isinstance(hit, str) and normalize_level(hit):
+            for target in targets:
+                target["level"] = hit
+            from_one += 1
+        else:
+            items.append((head, ru, targets))
+    prompt_of = lambda chunk: "\n".join(f"{n}. {head} — {ru}" if ru else f"{n}. {head}"
+                                        for n, (head, ru, _) in enumerate(chunk, start=1))
+    batches = [items[i:i + LEVEL_BATCH] for i in range(0, len(items), LEVEL_BATCH)]
+    asked = sum(1 for chunk in batches
+                if cache.get(digest("level", LEVEL_PROMPT_VERSION, config["model"], prompt_of(chunk))) is None)
+    progress = Progress(f"Уровни · из колод игры {from_decks} · из кеша {from_one} · к модели ~{asked} запросов",
+                        len(items), "слов и оборотов")
+    complete = True
+    for chunk in batches:
+        prompt = prompt_of(chunk)
+        key = digest("level", LEVEL_PROMPT_VERSION, config["model"], prompt)
+        began = time.monotonic()
+        reply, from_cache = ask(client, cache, key, LEVEL_SYSTEM, prompt, f"уровни: {len(chunk)} пропущено")
+        if reply is None:
+            complete = False
+            reply = {}
+        got, fresh = 0, {}
+        for item in reply.get("levels", []) if isinstance(reply, dict) else []:
+            n = as_int(item[0]) if isinstance(item, list) and len(item) >= 2 else None
+            if n is None or not 1 <= n <= len(chunk):
+                continue
+            level = normalize_level(item[1])
+            if level:
+                got += 1
+                head, ru, targets = chunk[n - 1]
+                fresh[one(head, ru)] = level
+                for target in targets:
+                    target["level"] = level
+        cache.put_many(fresh)   # ответа нет — по одной не кешируем: спросим снова в следующий раз
+        sample = "" if from_cache else " · ".join(
+            f"{h} — {t[0].get('level', 'нет ответа')}" for h, _, t in chunk[:3])
+        progress.step(len(chunk), from_cache, time.monotonic() - began, sample)
+    if batches:
+        progress.finish()
+    else:
+        log("   всё из кеша")
+    return complete
+
+
+# ─────────────────────────── 2e. Argos (офлайн) ───────────────────────────
 
 def run_argos(text: str, sentences: list[dict], words: list[dict]) -> dict:
     import argostranslate.translate
@@ -922,7 +1108,7 @@ def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict) -
                                   sentence.get("ru", "")])
         w_offset = len(out_words)
         for phrase in chapter.get("phrases", []):
-            out_phrases.append([[i + w_offset for i in phrase["w"]], phrase["head"], phrase["ru"]])
+            out_phrases.append([[i + w_offset for i in phrase["w"]], phrase["head"], phrase["ru"], phrase.get("level")])
         for word in chapter["words"]:
             head = word.get("head") or word["lemma"]
             item = {
@@ -1118,9 +1304,12 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
             head = next((h for h in (entry.get("head"), w.get("lemma")) if h and pure_greek(h)), key)
             old = lemmas.get(key)
             if old is None or (not old.get("ru") and entry.get("ru")):
-                lemmas[key] = {"head": head, **{k: entry[k] for k in ("ru", "en", "pos") if entry.get(k)}}
+                lemmas[key] = {"head": head, **{k: entry[k] for k in ("ru", "en", "pos", "level") if entry.get(k)}}
+            elif entry.get("level") and not lemmas[key].get("level"):
+                lemmas[key]["level"] = entry["level"]
         for item in data.get("phrases", []):
             idx, head, ru = item[0], item[1], item[2]
+            level = item[3] if len(item) > 3 else None
             members = [words[i] for i in idx if 0 <= i < len(words)]
             if len(members) != len(idx) or not 2 <= len(members) <= PHRASE_MAX_WORDS:
                 continue
@@ -1140,7 +1329,8 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
                     if plain(text[w["start"]:w["end"]]) in in_head or plain(bare_lemma(lemma_of(w))) in in_head]
             if len(keys) < 2:
                 continue
-            p = phrases.setdefault(fold(head), {"keys": keys, "head": head, "ru": ru, "n": 0})
+            p = phrases.setdefault(fold(head), {"keys": keys, "head": head, "ru": ru, "n": 0, "level": level})
+            p["level"] = p["level"] or level
             p["n"] += 1
     forms = {}
     for form in sorted(analyses):
@@ -1153,7 +1343,7 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
         "version": 1,
         "forms": forms,
         "lemmas": {k: lemmas[k] for k in sorted(lemmas)},
-        "phrases": [[p["keys"], p["head"], p["ru"]] for _, p in sorted(phrases.items())],
+        "phrases": [[p["keys"], p["head"], p["ru"]] + ([p["level"]] if p["level"] else []) for _, p in sorted(phrases.items())],
     }
 
 
@@ -1217,6 +1407,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--offline", action="store_true",
                         help="ничего не запрашивать у модели, собрать из кеша")
     parser.add_argument("--no-phrases", dest="no_phrases", action="store_true", help="без прохода оборотов")
+    parser.add_argument("--no-levels", dest="no_levels", action="store_true", help="без прохода уровней (CEFR)")
     parser.add_argument("--html", action="store_true", help="ещё и один самодостаточный файл out/<id>.html")
     parser.add_argument("--translator", "--provider", dest="provider", help="gemini | groq | openrouter | ollama | custom | argos | none")
     parser.add_argument("--model", help="имя модели у провайдера")
@@ -1272,6 +1463,9 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         chapters.append({"title": chapter_title, "text": text, "sentences": sentences,
                          "words": words, "phrases": phrases})
 
+    levels_done = True
+    if client and not args.no_levels:
+        levels_done = run_levels(lemma_info, [p for ch in chapters for p in ch["phrases"]], config, cache, client, deck_levels())
     title = book.get("title") or (chapters[0]["title"] if len(chapters) == 1 else book["id"])
     meta = {
         "provider": provider,
@@ -1279,6 +1473,7 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         "created": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "complete": complete,
         "phrases": bool(client) and not args.no_phrases and phrases_done,
+        "levels": bool(client) and not args.no_levels and levels_done,
     }
     data = build_book(chapters, title, lemma_info, meta)
     out = book_output(book)
@@ -1295,6 +1490,8 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         log("Перевод неполный — запусти ещё раз, когда лимит обновится.")
     elif meta["phrases"] is False and client and not args.no_phrases:
         log("Обороты получены не все — запусти ещё раз, когда лимит обновится.")
+    elif meta["levels"] is False and client and not args.no_levels:
+        log("Уровни получены не все — запусти ещё раз, когда лимит обновится.")
 
 
 def print_books(books: list[dict]) -> None:

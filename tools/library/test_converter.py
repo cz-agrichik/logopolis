@@ -38,6 +38,8 @@ class FakeNLP:
 class FakeClient:
     offline = False
     calls = 0
+    level_prompts = []
+    lemma_prompts = []
 
     def chat_json(self, system, user):
         FakeClient.calls += 1
@@ -53,9 +55,15 @@ class FakeClient:
             if find("νίκος"):
                 out.append([[find("ο")[0], find("νίκος")[0]], "ο Νίκος", "Никос"])              # имя — не берём
             return {"phrases": out}
+        if system is bc.LEVEL_SYSTEM:
+            FakeClient.level_prompts.append(user)
+            answer = {"ματιά": "Β1", "καμιά φορά": "Α2-Β1", "ρίχνω μια ματιά": "?", "πίνω": "A1-B2"}
+            items = re.findall(r"^(\d+)\. (.+?)(?: — .*)?$", user, re.M)
+            return {"levels": [[n, answer.get(h, "A2")] for n, h in items]}   # номера строкой — как иногда отвечает Gemini
         if system is bc.LEMMA_SYSTEM:
+            FakeClient.lemma_prompts.append(user)
             items = re.findall(r"^(\d+)\. (\S+)", user, re.M)
-            return {"lemmas": [[int(n), h, "рус:" + h, "en:" + h, "имя собств." if h == "Νίκος" else "сл."] for n, h in items]}
+            return {"lemmas": [[n, h, "рус:" + h, "en:" + h, "имя собств." if h == "Νίκος" else "сл."] for n, h in items]}
         sents = re.findall(r"^S(\d+):", user, re.M)
         return {"sentences": [[int(s), "перевод " + s] for s in sents],
                 "words": [[n, LEMMA.get(w.lower(), (w.lower(),))[0], "≈" + w] for n, w in nums.items()]}
@@ -75,6 +83,10 @@ def main():
         (pub / "book.json").write_text('// комментарий\n{"title": "Ιστορία", "level": "A2"}', encoding="utf-8")
         (priv / "glava1.txt").write_text("Καμιά φορά πίνει καφέ.", encoding="utf-8")
         (priv / "book.json").write_text('{"title": "Тайная"}', encoding="utf-8")
+        # колоды игры: «καφές» — A1 по учебнику, модель о нём не спрашиваем
+        (tmp / "content" / "ru").mkdir(parents=True)
+        (tmp / "content" / "ru" / "words.js").write_text(
+            'const WORD_DECKS = [\n{"id": "a1-food", "cards": [["καφές", "кофе", "ο καφές"]]},\n];\n', encoding="utf-8")
         args = ["--translator", "gemini", "--api-key", "x"]
 
         # публичная книга без license — отказ
@@ -92,6 +104,13 @@ def main():
         heads = {p[1]: forms(p[0]) for p in book["phrases"]}
         assert heads == {"ρίχνω μια ματιά": ["έριξε", "μια", "ματιά"], "καμιά φορά": ["Καμιά", "φορά"]}, heads
         assert book["meta"]["phrases"] is True and book["sentences"][0][2] == "перевод 1"
+        # уровни: из колоды, точный, на границе, «?», ответ не по правилам — нет поля
+        lv = {k: v.get("level") for k, v in book["lemmas"].items()}
+        assert lv["καφές"] == "A1" and lv["ματιά"] == "B1" and lv["πίνω"] is None and lv["ρίχνω"] == "A2", lv
+        assert not any("καφές" in p for p in FakeClient.level_prompts), "слово из колоды ушло модели"
+        plv = {p[1]: p[3] for p in book["phrases"]}
+        assert plv == {"ρίχνω μια ματιά": "?", "καμιά φορά": "A2–B1"}, plv
+        assert book["meta"]["levels"] is True
         assert (bc.LIB_DIR / "local" / "books" / "secret.js").is_file()
 
         cat = json.loads((bc.LIB_DIR / "catalog.js").read_text(encoding="utf-8").split(" = ", 1)[1].rstrip(";\n"))
@@ -103,7 +122,9 @@ def main():
         assert "νίκοσ" not in d["forms"] and "νίκος" not in d["forms"], "имя собственное попало в словарь"
         assert d["forms"]["έριξε"][0] == "ρίχνω" and d["forms"]["καμιά"][0] == "καμιά"
         assert sorted(p[1] for p in d["phrases"]) == ["καμιά φορά", "ρίχνω μια ματιά"], d["phrases"]
-        assert ["ρίχνω", "ένας", "ματιά"] in [p[0] for p in d["phrases"]]
+        assert ["ρίχνω", "ένας", "ματιά"] in [p[0] for p in d["phrases"]]   # μια есть в словарной форме — ключ остаётся
+        assert {p[1]: p[3] for p in d["phrases"]} == {"καμιά φορά": "A2–B1", "ρίχνω μια ματιά": "?"}
+        assert d["lemmas"]["καφές"]["level"] == "A1" and "level" not in d["lemmas"]["πίνω"]
         flat = json.dumps(d, ensure_ascii=False)
         assert "перевод 1" not in flat and "Ο Νίκος έριξε" not in flat, "в словаре сайта — предложения"
         assert cat["dict"] == {"forms": len(d["forms"]), "lemmas": len(d["lemmas"]), "phrases": 2}
@@ -124,11 +145,20 @@ def main():
         assert bc.check_phrase("χαμηλώνω το κεφάλι", "склонить голову", m(("Ο", "ο", "DET"), ("κεφάλι", "το κεφάλι", "NOUN"))) is None
         assert bc.check_phrase("καθόλου", "совсем", m(("Δεν", "δεν", "PART"), ("καθόλου", "καθόλου", "ADV"))) is None
         assert not bc.pure_greek("τίποта") and not bc.pure_greek("то μυστήριο") and bc.pure_greek("σε + ο")
+        assert [bc.normalize_level(x) for x in ("B1", "Β1", "a2-b1", "Γ1", "?", "A1-B2", "C3", "")] == \
+            ["B1", "B1", "A2–B1", "C1", "?", None, None, None]
 
         # второй запуск — всё из кеша
         before = FakeClient.calls
         bc.main(["story", *args], nlp=FakeNLP(), client=FakeClient())
         assert FakeClient.calls == before, "повторная сборка снова спрашивала модель"
+
+        # новое слово в начале главы сдвигает все пачки лемм — но кеш по одной лемме: спрашивается только новое
+        (pub / "01.txt").write_text("Ο Νίκος σήμερα έριξε μια γρήγορη ματιά. Καμιά φορά πίνει καφέ.", encoding="utf-8")
+        FakeClient.lemma_prompts.clear()
+        bc.main(["story", *args], nlp=FakeNLP(), client=FakeClient())
+        assert len(FakeClient.lemma_prompts) == 1 and FakeClient.lemma_prompts[0].count("\n") == 0 \
+            and "σήμερα" in FakeClient.lemma_prompts[0], FakeClient.lemma_prompts
         print("tools/library: конвертер — всё в порядке")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

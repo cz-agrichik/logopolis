@@ -115,7 +115,7 @@
       const w = item[0].filter(i => Number.isInteger(i) && i >= 0 && i < words.length);
       if (w.length < 2) continue;
       const head = String(item[1] || "");
-      const index = phrases.push({ w, head, ru: String(item[2] || ""), key: phraseKey(head) }) - 1;
+      const index = phrases.push({ w, head, ru: String(item[2] || ""), level: item[3] || "", key: phraseKey(head) }) - 1;
       for (const i of w) {
         if (!phrasesOfWord.has(i)) phrasesOfWord.set(i, []);
         phrasesOfWord.get(i).push(index);
@@ -369,7 +369,17 @@
       meaningEn: lemma.en || word.en || "",
       gloss: word.ru || "",
       seen: word.seen || "",
+      level: lemma.level || "",
     };
+  }
+
+  // Уровень (CEFR; в греческой сертификации Α1–Γ2): "B1", "A2–B1" — на границе, "?" — не ясен, "" — нет данных.
+  const LEVEL_TIP = "Уровень по шкале CEFR (в Греции — Α1…Γ2). «A2–B1» — на границе двух уровней, «?» — уровень не ясен. "
+    + "Слова из колод игры — уровень учебника, остальные — оценка языковой модели.";
+  function showLevel(chip, level) {
+    chip.hidden = !level;
+    chip.textContent = level === "?" ? "уровень ?" : level;
+    chip.title = LEVEL_TIP;
   }
 
   const wiktionary = value => `https://en.wiktionary.org/wiki/${encodeURIComponent(String(value).toLocaleLowerCase("el"))}#Greek`;
@@ -380,7 +390,7 @@
   // они берутся из book_content.js в момент показа и экспорта (см. cardView).
   // Поле saved — копия последнего известного перевода, только на случай, когда
   // слово открыто в другой книге и взять перевод больше неоткуда.
-  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu"];
+  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu", "level"];
 
   function cardFromPhrase(phrase) {
     const first = data.words[phrase.w[0]];
@@ -435,7 +445,7 @@
       const sentence = data.sentences[data.words[phrase.w[0]].s];
       return {
         head: phrase.head, pos: "оборот", meaning: phrase.ru, meaningEn: "", gloss: "",
-        exampleRu: (same || !card.example) && sentence ? sentence.ru : "",
+        exampleRu: (same || !card.example) && sentence ? sentence.ru : "", level: phrase.level,
       };
     }
     const elements = elementsByKey.get(card.key);
@@ -457,6 +467,7 @@
       meaningEn: info.meaningEn,
       gloss: sameSentence ? info.gloss : "",
       exampleRu: sameSentence ? data.sentences[s].ru : (card.example ? "" : sentenceOf(word).ru),
+      level: info.level,
     };
   }
 
@@ -561,7 +572,10 @@
       parts.push(`${n} ${word}`);
     }
     parts.push(`${data.words.length.toLocaleString("ru")} слов`, `${elementsByKey.size.toLocaleString("ru")} лемм`);
-    if (phrasesByKey.size) parts.push(`${phrasesByKey.size.toLocaleString("ru")} оборотов`);
+    if (phrasesByKey.size) {
+      const n = phrasesByKey.size, a = n % 100, b = n % 10;
+      parts.push(`${n.toLocaleString("ru")} ${a > 10 && a < 20 ? "оборотов" : b === 1 ? "оборот" : b >= 2 && b <= 4 ? "оборота" : "оборотов"}`);
+    }
     if (known) parts.push(`в колоде ${known}`);
     $("#book-meta").textContent = parts.join(" · ");
   }
@@ -695,12 +709,14 @@
   pPhraseHead.lang = "el";
   const pPhraseChip = el("span", "chip popover__pos popover__phrase-chip", pPhraseTop);
   pPhraseChip.textContent = "оборот";
+  const pPhraseLevel = el("span", "chip chip--level", pPhraseTop);
   const pPhraseRu = el("div", "popover__gloss", pPhrase);
   const pWordLabel = el("div", "popover__label", popover);
   pWordLabel.textContent = "Слово в обороте";
   const pTop = el("div", "popover__top", popover);
   const pForm = el("span", "popover__form", pTop);
   const pPos = el("span", "chip popover__pos", pTop);
+  const pLevel = el("span", "chip chip--level", pTop);
   const pGloss = el("div", "popover__gloss", popover);
   const pEn = el("div", "popover__en", popover);
   const pLemma = el("div", "popover__lemma", popover);
@@ -819,11 +835,13 @@
     if (phrase) {
       pPhraseHead.textContent = phrase.head;
       pPhraseRu.textContent = phrase.ru;
+      showLevel(pPhraseLevel, phrase.level);
     }
 
     pForm.textContent = word.form;
     pPos.textContent = info.pos;
     pPos.hidden = !info.pos;
+    showLevel(pLevel, info.level);
 
     // в книге главное — перевод формы в этом предложении; в своём тексте — словарное значение леммы
     const main = info.gloss || info.meaning;
@@ -1030,6 +1048,10 @@
         const pos = el("span", "chip card__pos", top);
         pos.textContent = card.pos;
       }
+      if (card.level) {
+        const level = el("span", "chip chip--level", top);
+        showLevel(level, card.level);
+      }
       const meaning = el("div", "card__meaning", item);
       meaning.textContent = card.meaning || card.gloss || card.meaningEn || "—";
 
@@ -1096,7 +1118,7 @@
 
   function ankiBack(card) {
     const parts = [`<b>${escapeHtml(card.meaning || card.gloss || card.meaningEn)}</b>`];
-    if (card.pos) parts.push(`<small>${escapeHtml(card.pos)}</small>`);
+    if (card.pos || card.level) parts.push(`<small>${escapeHtml([card.pos, card.level && card.level !== "?" ? card.level : ""].filter(Boolean).join(", "))}</small>`);
     if (card.meaningEn) parts.push(`<small>en: ${escapeHtml(card.meaningEn)}</small>`);
     if (card.example) {
       const example = escapeHtml(card.example);
@@ -1139,10 +1161,10 @@
       filename: "greek-cards.csv",
       bom: true,
       build: list => [
-        csvRow(["greek", "word_form", "part_of_speech", "russian", "english", "meaning_in_text",
+        csvRow(["greek", "word_form", "part_of_speech", "level", "russian", "english", "meaning_in_text",
           "example", "example_ru", "book", "added", "status"]),
         ...list.map(card => csvRow([
-          card.head || card.key, card.form, card.pos, card.meaning, card.meaningEn, card.gloss,
+          card.head || card.key, card.form, card.pos, card.level, card.meaning, card.meaningEn, card.gloss,
           card.example, card.exampleRu, card.book, (card.addedAt || "").slice(0, 10),
           card.status === "learned" ? "learned" : "learning",
         ])),

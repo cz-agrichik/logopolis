@@ -1006,3 +1006,11 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
 .own__title { font-family: var(--font-ui); font-weight: 700; }
 .own__text, .own__name { background: var(--surface); border-color: var(--line); font-family: var(--font-book); }
 @media (max-width: 600px) { .logo:has(+ .back-link) { display: none; } }   /* в читалке на телефоне место — названию */
+
+/* уровень слова или оборота (CEFR) */
+.chip--level { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-variant-numeric: tabular-nums; cursor: help; }
+.popover__top .chip--level { margin-left: 6px; }
+.popover__phrase-chip + .chip--level { margin-left: 6px; }
+.card__top .chip--level { margin-left: 4px; }
+.topbar .own-again { color: var(--head-ink); }
+.topbar .own-again:hover { color: #fff; }
