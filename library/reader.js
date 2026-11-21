@@ -65,6 +65,9 @@
   // ───────────────────── Данные книги (v1 и v2) ─────────────────────
 
   const legacyKey = value => String(value || "").trim().normalize("NFC").toLocaleLowerCase("el");
+  // Оборот — своя лексическая единица: ключ карточки «phrase:<словарная форма>» (NFC, строчные, ς → σ).
+  const phraseKey = head => "phrase:" + String(head || "").normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/\s+/g, " ").trim();
+  const isPhraseKey = key => String(key).startsWith("phrase:");
   const squash = value => String(value || "").replace(/\s+/g, " ").trim();
 
   function normalizeData(input) {
@@ -111,7 +114,8 @@
       if (!Array.isArray(item) || !Array.isArray(item[0])) continue;
       const w = item[0].filter(i => Number.isInteger(i) && i >= 0 && i < words.length);
       if (w.length < 2) continue;
-      const index = phrases.push({ w, head: String(item[1] || ""), ru: String(item[2] || "") }) - 1;
+      const head = String(item[1] || "");
+      const index = phrases.push({ w, head, ru: String(item[2] || ""), key: phraseKey(head) }) - 1;
       for (const i of w) {
         if (!phrasesOfWord.has(i)) phrasesOfWord.set(i, []);
         phrasesOfWord.get(i).push(index);
@@ -199,6 +203,15 @@
 
   let data = null;
   const elementsByKey = new Map();
+  const wordElements = [];                 // номер слова → его элемент
+  const phrasesByKey = new Map();          // ключ оборота → номера его вхождений в data.phrases
+  const phraseWords = i => data.phrases[i].w.map(w => wordElements[w]).filter(Boolean);
+  // слово как часть оборота: самый длинный оборот, куда оно входит (или null)
+  const phraseOfWord = index => (data.phrasesOfWord.get(index) || [])
+    .map(i => data.phrases[i]).sort((a, b) => b.w.length - a.w.length)[0] || null;
+  const phraseIndex = phrase => data.phrases.indexOf(phrase);
+  // текст вхождения оборота: от первого его слова до последнего («έριξε μια γρήγορη ματιά»)
+  const phraseText = phrase => squash(data.slice(data.words[phrase.w[0]].start, data.words[phrase.w[phrase.w.length - 1]].end));
   const sentenceElements = [];
 
   function makeWordElement(word, index) {
@@ -212,10 +225,18 @@
     if (word.unknown) element.classList.add("word--unknown");
     if (!elementsByKey.has(word.key)) elementsByKey.set(word.key, []);
     elementsByKey.get(word.key).push(element);
+    wordElements[index] = element;
     return element;
   }
 
   const chapterSections = [];
+
+  function indexPhrases() {
+    data.phrases.forEach((phrase, i) => {
+      if (!phrasesByKey.has(phrase.key)) phrasesByKey.set(phrase.key, []);
+      phrasesByKey.get(phrase.key).push(i);
+    });
+  }
 
   function renderBook() {
     const fragment = document.createDocumentFragment();
@@ -361,6 +382,21 @@
   // слово открыто в другой книге и взять перевод больше неоткуда.
   const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu"];
 
+  function cardFromPhrase(phrase) {
+    const first = data.words[phrase.w[0]];
+    const card = {
+      key: phrase.key,
+      kind: "phrase",
+      form: phraseText(phrase),
+      example: sentenceOf(first).text,
+      book: data.title,
+      addedAt: new Date().toISOString(),
+      status: "learning",
+    };
+    card.saved = translationsFor(card) || {};
+    return card;
+  }
+
   function cardFromWord(word) {
     const sentence = sentenceOf(word);
     const card = {
@@ -390,6 +426,18 @@
 
   // Переводы для карточки из текущей книги или null, если слова в книге нет.
   function translationsFor(card) {
+    if (isPhraseKey(card.key)) {
+      const list = (phrasesByKey.get(card.key) || []).map(i => data.phrases[i]);
+      if (!list.length) return null;
+      const s = card.example ? findSentence(card.example) : -1;
+      const same = list.find(p => data.words[p.w[0]].s === s);
+      const phrase = same || list[0];
+      const sentence = data.sentences[data.words[phrase.w[0]].s];
+      return {
+        head: phrase.head, pos: "оборот", meaning: phrase.ru, meaningEn: "", gloss: "",
+        exampleRu: (same || !card.example) && sentence ? sentence.ru : "",
+      };
+    }
     const elements = elementsByKey.get(card.key);
     if (!elements) return null;
     // Предпочитаем то самое вхождение, из предложения карточки.
@@ -434,7 +482,7 @@
     // «απλά», а модель — «απλώς»), находим слово по сохранённому предложению и форме
     // и переносим карточку на новый ключ.
     for (const card of Object.values(next)) {
-      if (elementsByKey.has(card.key) || !card.example || !card.form) continue;
+      if (isPhraseKey(card.key) || elementsByKey.has(card.key) || !card.example || !card.form) continue;
       const s = findSentence(card.example);
       if (s < 0) continue;
       const word = data.words.find(w => w.s === s && w.form === card.form);
@@ -454,6 +502,11 @@
       }
       for (const field of TRANSLATION_FIELDS) {
         if (field in card) { delete card[field]; changed = true; }
+      }
+      if (isPhraseKey(card.key)) {
+        const fresh = translationsFor(card);
+        if (fresh && JSON.stringify(fresh) !== JSON.stringify(card.saved)) { card.saved = fresh; changed = true; }
+        continue;
       }
       const elements = elementsByKey.get(card.key);
       if (!elements) continue;
@@ -479,11 +532,13 @@
   const deckButton = $("#deck-button");
   const deckCount = $("#deck-count");
 
+  const learningCard = key => cards[key] && cards[key].status !== "learned";
+
   function refreshHighlights() {
-    for (const [key, elements] of elementsByKey) {
-      const learning = cards[key] && cards[key].status !== "learned";
-      for (const element of elements) element.classList.toggle("word--learning", Boolean(learning));
-    }
+    const lit = new Set();
+    for (const [key, elements] of elementsByKey) if (learningCard(key)) for (const element of elements) lit.add(element);
+    for (const [key, list] of phrasesByKey) if (learningCard(key)) for (const i of list) for (const element of phraseWords(i)) lit.add(element);
+    for (const element of wordElements) if (element) element.classList.toggle("word--learning", lit.has(element));
   }
 
   function refreshCounts() {
@@ -497,7 +552,7 @@
 
   function refreshMeta() {
     if (!data) return;
-    const known = [...elementsByKey.keys()].filter(key => cards[key]).length;
+    const known = [...elementsByKey.keys(), ...phrasesByKey.keys()].filter(key => cards[key]).length;
     const parts = [];
     const n = data.chapters.length;
     if (n > 1) {
@@ -506,6 +561,7 @@
       parts.push(`${n} ${word}`);
     }
     parts.push(`${data.words.length.toLocaleString("ru")} слов`, `${elementsByKey.size.toLocaleString("ru")} лемм`);
+    if (phrasesByKey.size) parts.push(`${phrasesByKey.size.toLocaleString("ru")} оборотов`);
     if (known) parts.push(`в колоде ${known}`);
     $("#book-meta").textContent = parts.join(" · ");
   }
@@ -551,42 +607,63 @@
     margin.replaceChildren();
     if (!marginEnabled || margin.offsetParent === null) return; // выключено или узкий экран
 
+    // Заметка — лексическая единица: слово или оборот. Запомненный оборот подписывается целиком;
+    // запомненное слово внутри оборота — тоже оборотом (в этом месте текста оно значит то, что весь оборот).
+    // В одном абзаце одна и та же единица подписывается один раз.
     const originTop = margin.getBoundingClientRect().top;
     const items = [];
+    const seen = new Set();
+    const add = (index, unit) => {
+      const id = unit ? `p${phraseIndex(unit)}` : `w${index}`;
+      const once = `${unit ? unit.key : data.words[index].key}|${paragraphOfWord[index]}`;
+      if (seen.has(id) || seen.has(once)) return;
+      seen.add(id);
+      seen.add(once);
+      const element = wordElements[index];
+      items.push({ element, index, unit, top: element.getBoundingClientRect().top - originTop });
+    };
     for (const [key, elements] of elementsByKey) {
-      const card = cards[key];
-      if (!card || card.status === "learned") continue;
-      let lastParagraph = -1;
+      if (!learningCard(key)) continue;
       for (const element of elements) {
         const index = Number(element.dataset.i);
-        if (paragraphOfWord[index] === lastParagraph) continue;
-        lastParagraph = paragraphOfWord[index];
-        items.push({ element, index, top: element.getBoundingClientRect().top - originTop });
+        const unit = phraseOfWord(index);
+        add(unit ? unit.w[0] : index, unit);
       }
+    }
+    for (const [key, list] of phrasesByKey) {
+      if (!learningCard(key)) continue;
+      for (const i of list) add(data.phrases[i].w[0], data.phrases[i]);
     }
     items.sort((a, b) => a.top - b.top);
 
     let bottom = -Infinity;
     for (const item of items) {
       const word = data.words[item.index];
-      const info = wordInfo(word);
-      const gloss = info.gloss || info.meaning;
+      let label = word.form;
+      let gloss;
+      if (item.unit) {
+        label = phraseText(item.unit);
+        gloss = item.unit.ru;
+      } else {
+        const info = wordInfo(word);
+        gloss = info.gloss || info.meaning;
+      }
       // Служебные слова («(артикль)», «(частица)») на полях — только шум.
       if (!gloss || gloss.startsWith("(")) continue;
       const note = document.createElement("button");
       note.type = "button";
-      note.className = "margin-note";
+      note.className = item.unit ? "margin-note margin-note--phrase" : "margin-note";
       note.dataset.i = String(item.index);
       const greek = el("span", "margin-note__gr", note);
       greek.lang = "el";
-      greek.textContent = word.form;
+      greek.textContent = label;
       note.append(` — ${gloss}`);
       margin.appendChild(note);
       // Заметки не наезжают друг на друга: следующая сдвигается ниже.
       const top = Math.max(item.top, bottom + 6);
       note.style.top = `${top}px`;
       bottom = top + note.offsetHeight;
-      item.element.classList.add("word--noted");
+      for (const element of item.unit ? phraseWords(phraseIndex(item.unit)) : [item.element]) element.classList.add("word--noted");
     }
   }
 
@@ -611,7 +688,16 @@
     return node;
   };
 
+  // Слово внутри оборота: главная единица — оборот (сверху, крупно), ниже — само слово, мельче.
   const pPhrase = el("div", "popover__phrase", popover);
+  const pPhraseTop = el("div", "popover__top", pPhrase);
+  const pPhraseHead = el("span", "popover__form", pPhraseTop);
+  pPhraseHead.lang = "el";
+  const pPhraseChip = el("span", "chip popover__pos popover__phrase-chip", pPhraseTop);
+  pPhraseChip.textContent = "оборот";
+  const pPhraseRu = el("div", "popover__gloss", pPhrase);
+  const pWordLabel = el("div", "popover__label", popover);
+  pWordLabel.textContent = "Слово в обороте";
   const pTop = el("div", "popover__top", popover);
   const pForm = el("span", "popover__form", pTop);
   const pPos = el("span", "chip popover__pos", pTop);
@@ -633,6 +719,7 @@
   popover.addEventListener("click", event => event.stopPropagation());
 
   let currentWord = null;
+  let currentPhrase = null;   // оборот, в который входит выбранное слово (лексическая единица — он)
   let currentElement = null;
   let showSentence = false;
   let phraseElements = [];
@@ -662,12 +749,15 @@
   }
 
   function renderPopoverActions() {
-    const card = cards[currentWord.key];
+    // Запоминается лексическая единица: оборот, если слово в него входит, иначе слово.
+    const unitKey = currentPhrase ? currentPhrase.key : currentWord.key;
+    const card = cards[unitKey];
+    const what = currentPhrase ? "Оборот" : "Слово";
     pActions.replaceChildren();
     if (!card) {
-      pActions.append(button("Запомнить", "button", () => {
+      pActions.append(button(currentPhrase ? "Запомнить оборот" : "Запомнить", "button", () => {
         const rect = currentElement.getBoundingClientRect();
-        const fresh = cardFromWord(currentWord);
+        const fresh = currentPhrase ? cardFromPhrase(currentPhrase) : cardFromWord(currentWord);
         if (updateCards(next => { next[fresh.key] = fresh; })) {
           flyToDeck(rect, cardView(fresh));
           lastAddedKey = fresh.key;
@@ -675,7 +765,7 @@
       }));
     } else if (card.status !== "learned") {
       const status = el("span", "popover__status");
-      status.textContent = "✓ В карточках";
+      status.textContent = `✓ ${what} в карточках`;
       pActions.append(
         status,
         button("Выучил", "button button--quiet", () => {
@@ -685,13 +775,23 @@
       );
     } else {
       const status = el("span", "popover__status");
-      status.textContent = "✓ Выучено";
+      status.textContent = `✓ ${what} выучен${currentPhrase ? "" : "о"}`;
       pActions.append(
         status,
         button("Снова учить", "button button--quiet", () => {
           updateCards(next => { next[card.key].status = "learning"; delete next[card.key].learnedAt; });
         }),
       );
+    }
+    // внутри оборота можно запомнить и само слово — отдельной карточкой
+    if (currentPhrase) {
+      const wordCard = cards[currentWord.key];
+      const extra = el("div", "popover__word-action", pActions);
+      if (wordCard) extra.textContent = `слово «${cardView(wordCard).head}» тоже в карточках`;
+      else extra.append(button(`или только слово «${wordInfo(currentWord).head}»`, "link-button", () => {
+        const fresh = cardFromWord(currentWord);
+        if (updateCards(next => { next[fresh.key] = fresh; })) lastAddedKey = fresh.key;
+      }));
     }
     pError.textContent = storageError;
     pError.hidden = !storageError;
@@ -708,20 +808,17 @@
     currentElement = element;
     element.classList.add("word--selected");
 
-    // оборот: самый длинный из тех, куда входит слово, — сверху карточки, все его слова подсвечены
+    // оборот: самый длинный из тех, куда входит слово, — главная единица карточки, все его слова подсвечены
     const index = Number(element.dataset.i);
-    const phrase = (data.phrasesOfWord.get(index) || []).map(i => data.phrases[i])
-      .sort((a, b) => b.w.length - a.w.length)[0];
-    pPhrase.replaceChildren();
+    const phrase = phraseOfWord(index);
+    currentPhrase = phrase;
+    popover.classList.toggle("popover--phrase", Boolean(phrase));
     pPhrase.hidden = !phrase;
-    markPhrase(phrase ? phrase.w.map(i => book.querySelector(`.word[data-i="${i}"]`)).filter(Boolean) : []);
+    pWordLabel.hidden = !phrase;
+    markPhrase(phrase ? phraseWords(phraseIndex(phrase)) : []);
     if (phrase) {
-      const chip = el("span", "chip popover__phrase-chip", pPhrase);
-      chip.textContent = "оборот";
-      const head = el("b", "", pPhrase);
-      head.lang = "el";
-      head.textContent = phrase.head;
-      if (phrase.ru) pPhrase.append(` — ${phrase.ru}`);
+      pPhraseHead.textContent = phrase.head;
+      pPhraseRu.textContent = phrase.ru;
     }
 
     pForm.textContent = word.form;
@@ -795,6 +892,7 @@
   function hidePopover() {
     popover.hidden = true;
     markPhrase([]);
+    currentPhrase = null;
     if (currentElement) currentElement.classList.remove("word--selected");
     setActiveSentence(-1);
     currentElement = null;
@@ -951,7 +1049,7 @@
         actions.append(button("Выучил ✓", "link-button", () =>
           updateCards(next => { next[card.key].status = "learned"; next[card.key].learnedAt = new Date().toISOString(); })));
       }
-      if (elementsByKey.has(card.key)) {
+      if (elementsByKey.has(card.key) || phrasesByKey.has(card.key)) {
         actions.append(button("Найти в тексте", "link-button", () => revealInText(card.key), false));
       }
       actions.append(button("Удалить", "link-button link-button--danger", () => {
@@ -969,7 +1067,7 @@
   }
 
   function revealInText(key) {
-    const element = (elementsByKey.get(key) || [])[0];
+    const element = isPhraseKey(key) ? wordElements[data.phrases[(phrasesByKey.get(key) || [])[0]]?.w[0]] : (elementsByKey.get(key) || [])[0];
     if (!element) return;
     closeDeck();
     element.scrollIntoView({ block: "center", behavior: reduceMotion() ? "auto" : "smooth" });
@@ -1177,6 +1275,7 @@
 
   loadDeck();
   renderBook();
+  indexPhrases();
   setupChapters();
   computeParagraphs();
   refreshCardsFromBook();

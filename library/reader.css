@@ -1,53 +1,35 @@
-/* Оформление читалки. Цвета — переменные; тёмная тема включается по настройке системы. */
+/* Оформление библиотеки — в стиле игры (ui/desktop/styles.css): пергамент, чернила, терракота, золото,
+   шрифт Noto Serif, тёмно-терракотовая шапка с меандром. Тёмной темы нет — как и в игре. */
 :root {
   --text-width: 720px;
   --margin-width: 230px;
   --page-width: calc(var(--text-width) + var(--margin-width) + 72px);
-  --paper: #faf7f0;
-  --surface: #fffdf8;
-  --ink: #23201b;
-  --muted: #6f695e;
-  --faint: #a49d8f;
-  --line: #e7e0d1;
-  --accent: #2e6b4c;
+  --paper: #f4ead3;          /* --parch игры */
+  --surface: #fbf5e6;        /* карточки и подсказки — светлее пергамента */
+  --ink: #2a2017;
+  --muted: #6b5a45;          /* --ink-2 */
+  --faint: #a8957a;
+  --line: #dccaa2;           /* --parch-3 */
+  --accent: #b5532c;         /* --terra */
   --accent-ink: #ffffff;
-  --accent-hover: #24573d;
-  --accent-soft: #e3f1e7;
-  --learning-bg: #d5efdc;
-  --learning-ink: #1d4d33;
-  --sentence-bg: #f1ead8;
-  --hover-line: #b8ae99;
-  --danger: #a33b2f;
-  --shadow: 0 10px 30px rgba(52, 42, 20, 0.14), 0 2px 6px rgba(52, 42, 20, 0.08);
-  --radius: 12px;
-  --font-book: "Literata", "Noto Serif", "Georgia", "Times New Roman", serif;
+  --accent-hover: #8e3d1d;   /* --terra-d */
+  --accent-soft: #f3dcc8;
+  --learning-bg: #f6e2a6;    /* запомненное — золотом, как λ в игре */
+  --learning-ink: #4a3200;
+  --sentence-bg: #eadcbc;    /* --parch-2 */
+  --hover-line: #c2a978;
+  --danger: #b23a2a;
+  --gold: #c08a1e;
+  --gold-l: #f0d48a;
+  --head-bg: linear-gradient(180deg, #8e3d1d, #6e2d14);
+  --head-ink: #fbf3e2;
+  --shadow: 0 10px 40px rgba(60, 35, 10, 0.25), 0 2px 6px rgba(60, 35, 10, 0.12);
+  --radius: 10px;
+  --font-book: "Noto Serif", Georgia, "Times New Roman", serif;
   --font-hand: "Caveat", "Segoe Print", "Comic Sans MS", cursive;
-  --pencil: #3d5a80;
-  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --pencil: #2c6e95;         /* эгейская синь игры — карандаш на полях */
+  --font-ui: "Noto Serif", Georgia, "Times New Roman", serif;
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #191815;
-    --surface: #23211d;
-    --ink: #ebe5d8;
-    --muted: #a8a193;
-    --faint: #7a7468;
-    --line: #36332c;
-    --accent: #6cbf93;
-    --accent-ink: #10231a;
-    --accent-hover: #86d2a9;
-    --accent-soft: #22362a;
-    --learning-bg: #284534;
-    --learning-ink: #c9f0d6;
-    --sentence-bg: #2c2a24;
-    --hover-line: #6f685a;
-    --danger: #e0897d;
-    --pencil: #9db8d9;
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
-    color-scheme: dark;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -56,6 +38,9 @@
 body {
   margin: 0;
   background: var(--paper);
+  background-image: radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.5), transparent 50%),
+                    radial-gradient(circle at 80% 90%, rgba(180, 140, 80, 0.15), transparent 50%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
@@ -871,3 +856,153 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
 .own__name:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .own__mine { margin-left: auto; text-decoration: none; }
 .book-card__actions .link-button--danger:hover { color: var(--danger); }
+
+/* ───────── Стиль игры: шапка, кнопки, значки ───────── */
+.topbar {
+  background: var(--head-bg);
+  color: var(--head-ink);
+  border-bottom: 0;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.topbar::after {   /* меандр под шапкой — как в игре */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 8px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='8'%3E%3Cpath d='M0 7h7V1h6v4H9' fill='none' stroke='%23b5532c' stroke-width='1.6' opacity='.55'/%3E%3C/svg%3E") repeat-x;
+  pointer-events: none;
+}
+.topbar__title { font-family: var(--font-ui); font-weight: 700; }
+.topbar__meta { color: rgba(251, 243, 226, 0.75); }
+.logo {
+  flex: none;
+  color: var(--gold-l);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+.logo:hover { color: #fff1c4; }
+.back-link, .own-again {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--head-ink);
+}
+.back-link:hover, .own-again:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.progress__bar { background: var(--gold-l); }
+
+/* кнопки шапки — как плашки ресурсов игры */
+.deck-button, .margin-toggle, .chapter-select {
+  border: 0;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--head-ink);
+}
+.deck-button:hover, .margin-toggle:hover, .chapter-select:hover { background-color: rgba(255, 255, 255, 0.2); }
+.deck-button__icon { fill: none; stroke: var(--gold-l); }
+.deck-button__count { background: var(--gold-l); color: #3a2700; font-weight: 700; }
+.margin-toggle[aria-pressed="true"] { color: var(--gold-l); background-color: rgba(255, 255, 255, 0.2); }
+.chapter-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23fbf3e2' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+.chapter-select option { color: var(--ink); background: var(--surface); }
+
+/* кнопки — как .btn игры: терракота, жирный шрифт, «ступенька» тени; главная — золотая */
+.button {
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+.button:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+.button--gold, .popover__actions > .button:first-child:not(.button--quiet), #own-go {
+  background: linear-gradient(180deg, #f3cf6d, #d39b25);
+  color: #3a2700;
+  box-shadow: 0 2px 0 #9b6e12;
+}
+.button--gold:hover:not(:disabled), .popover__actions > .button:first-child:not(.button--quiet):hover:not(:disabled), #own-go:hover:not(:disabled) {
+  background: linear-gradient(180deg, #f3cf6d, #d39b25);
+}
+.button--quiet {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+}
+.button--quiet:hover:not(:disabled) { background: rgba(255, 255, 255, 0.5); filter: none; }
+.link-button { color: var(--accent); }
+.link-button:hover { color: var(--accent-hover); }
+.chip { border-radius: 6px; padding: 1px 7px; background: var(--sentence-bg); color: var(--muted); }
+.chip--local { background: var(--learning-bg); color: var(--learning-ink); }
+
+/* подсказка, панель карточек, уведомления — пергамент игры */
+.popover { background: var(--surface); border-color: var(--line); border-radius: 14px; }
+.popover__gloss { color: var(--accent-hover); }
+.popover__lemma { border-top-color: var(--line); }
+.deck { background: var(--paper); }
+.deck__head { background: var(--head-bg); color: var(--head-ink); padding: 12px 14px 12px 20px; }
+.deck__title { font-family: var(--font-ui); font-weight: 700; font-size: 19px; }
+.deck__head .icon-button { color: var(--head-ink); }
+.deck__head .icon-button:hover { background: rgba(255, 255, 255, 0.15); }
+.deck__tabs { margin-top: 10px; }
+.card { background: var(--surface); }
+.card::before { background: var(--gold); }
+.card__example mark { background: var(--learning-bg); color: var(--learning-ink); }
+.notice { background: var(--surface); border-left: 3px solid var(--accent); color: #5a4632; font-style: italic; }
+.toast { background: #3b2a1c; color: var(--head-ink); }
+
+/* оборот — главная единица карточки */
+.popover__phrase { margin: 0 0 4px; padding: 0; background: none; }
+.popover__phrase .popover__gloss { margin-top: 4px; }
+.popover__phrase-chip { margin-left: auto; background: var(--learning-bg); color: var(--learning-ink); }
+.popover__label {
+  margin: 12px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.popover--phrase .popover__top + .popover__gloss,
+.popover--phrase > .popover__top .popover__form { font-size: 17px; }
+.popover--phrase > .popover__gloss { margin-top: 4px; font-size: 15px; color: var(--ink); font-weight: 600; }
+.popover__actions { flex-wrap: wrap; }
+.popover__word-action { flex-basis: 100%; color: var(--muted); font-size: 12.5px; }
+.popover__word-action .link-button { font-size: 12.5px; }
+.word--phrase-active { background: var(--accent-soft); }
+.word--phrase { text-decoration-color: rgba(181, 83, 44, 0.45); }
+.margin-note--phrase .margin-note__gr { font-style: normal; font-weight: 600; }
+
+/* полка — как статьи Кипропедии */
+.library__lead.story, .own__lead.story {
+  font-style: italic;
+  color: #5a4632;
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 12px;
+}
+.library__h {
+  margin: 26px 0 10px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.book-card { background: var(--surface); border-color: var(--line); box-shadow: 0 2px 0 rgba(60, 35, 10, 0.06); }
+.book-card:hover { border-color: var(--hover-line); box-shadow: 0 2px 10px rgba(60, 35, 10, 0.18); }
+.book-card__title { font-family: var(--font-ui); font-weight: 700; font-size: 18px; }
+.book-card--own { background: transparent; border: 2px dashed var(--line); box-shadow: none; }
+.book-card--own .book-card__title { color: var(--accent); }
+.own__title { font-family: var(--font-ui); font-weight: 700; }
+.own__text, .own__name { background: var(--surface); border-color: var(--line); font-family: var(--font-book); }
+@media (max-width: 600px) { .logo:has(+ .back-link) { display: none; } }   /* в читалке на телефоне место — названию */
