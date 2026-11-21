@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Λόγος · читалка</title>
+  <!-- Шрифт для текста книги. Без интернета просто подставится системный. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Caveat:wght@500;600&display=swap">
+  <link rel="stylesheet" href="reader.css">
+  <!-- Читалка библиотеки: ?book=<id> — книга из каталога, ?own — свой текст по словарю сайта -->
+  <script src="catalog.js"></script>
+  <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
+  <script src="reader.js" defer></script>
+  <script src="owntext.js" defer></script>
+  <script src="library.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="back-link" href="index.html" title="Все книги">←<span> Библиотека</span></a>
+      <div class="topbar__text">
+        <div class="topbar__title" id="book-title">Греческая читалка</div>
+        <div class="topbar__meta" id="book-meta"></div>
+      </div>
+      <a class="link-button own-again" id="own-again" href="read.html?own" hidden>Другой текст</a>
+      <select class="chapter-select" id="chapter-select" aria-label="Перейти к главе" hidden></select>
+      <button type="button" class="margin-toggle" id="margin-toggle" aria-pressed="true"
+              title="Показывать переводы запомненных слов на полях">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1 10.5-10.5a2.1 2.1 0 0 0-3-3L5 16l-1 4z"></path><path d="M14 7l3 3"></path></svg>
+        <span>Поля</span>
+      </button>
+      <button type="button" class="deck-button" id="deck-button" aria-haspopup="dialog" aria-controls="deck">
+        <svg class="deck-button__icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="6.5" y="3" width="13" height="16" rx="2.2" transform="rotate(8 13 11)"></rect>
+          <rect x="4" y="5" width="13" height="16" rx="2.2"></rect>
+          <path d="M7.5 10h6M7.5 13.5h4"></path>
+        </svg>
+        <span class="deck-button__label">Карточки</span>
+        <span class="deck-button__count" id="deck-count">0</span>
+      </button>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="progress__bar" id="progress-bar"></div></div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <section class="own" id="own" hidden>
+    <h1 class="own__title">Свой текст</h1>
+    <p class="own__lead">Вставьте любой греческий текст или откройте файл .txt. Каждое слово ищется в словаре сайта —
+      он собран из всех книг библиотеки: форма слова, лемма и грамматика, значения и <b>обороты</b>
+      (<span lang="el">ρίχνω μια ματιά</span> — «взглянуть»). Перевода предложений здесь нет.
+      Текст остаётся в вашем браузере и никуда не отправляется.</p>
+    <textarea class="own__text" id="own-text" lang="el" spellcheck="false" placeholder="Επικολλήστε εδώ ένα ελληνικό κείμενο…"></textarea>
+    <div class="own__actions">
+      <button type="button" class="button" id="own-go">Разобрать</button>
+      <label class="button button--quiet">Открыть .txt<input type="file" id="own-file" accept=".txt,text/plain" hidden></label>
+      <span class="own__status" id="own-status" role="status"></span>
+    </div>
+  </section>
+
+  <div class="page" id="page">
+    <main id="book" class="book" lang="el" aria-label="Текст книги"></main>
+    <aside class="margin" id="margin" aria-label="Заметки на полях"></aside>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="deck" id="deck" role="dialog" aria-modal="true" aria-labelledby="deck-title" hidden>
+    <div class="deck__head">
+      <h2 class="deck__title" id="deck-title">Мои карточки</h2>
+      <button type="button" class="icon-button" id="deck-close" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <div class="deck__tabs" role="tablist">
+      <button type="button" class="tab" role="tab" data-tab="learning" aria-selected="true">Учу <span id="tab-learning-count"></span></button>
+      <button type="button" class="tab" role="tab" data-tab="learned" aria-selected="false">Выучил <span id="tab-learned-count"></span></button>
+    </div>
+    <input type="search" class="deck__search" id="deck-search" placeholder="Поиск по-гречески или по-русски" autocomplete="off">
+    <div class="deck__list" id="deck-list"></div>
+
+    <div class="deck__export">
+      <div class="deck__export-title">Экспорт для повторения</div>
+      <label class="deck__scope"><input type="checkbox" id="export-learned"> включить выученные</label>
+      <div class="export-grid">
+        <button type="button" class="export-button" data-export="anki"><b>Anki</b><span>.txt для импорта</span></button>
+        <button type="button" class="export-button" data-export="quizlet"><b>Quizlet</b><span>копировать текст</span></button>
+        <button type="button" class="export-button" data-export="brainscape"><b>Brainscape</b><span>.csv</span></button>
+        <button type="button" class="export-button" data-export="csv"><b>Таблица</b><span>.csv со всеми полями</span></button>
+      </div>
+      <div class="export-hint" id="export-hint" hidden></div>
+      <div class="deck__backup">
+        <button type="button" class="link-button" id="backup-save">Сохранить резервную копию</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="link-button" id="backup-load">Загрузить</button>
+        <input type="file" id="backup-file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

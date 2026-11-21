@@ -4,3 +4,9 @@ golden-base/
 __pycache__/
 *.pyc
 phone-out/
+# Библиотека: ключ API, кеш ответов модели, личные книги и их сборки — только на своём компьютере
+tools/library/config.json
+tools/library/cache/
+tools/library/private/
+tools/library/out/
+library/local/

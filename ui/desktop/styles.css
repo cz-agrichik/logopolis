@@ -590,6 +590,7 @@ details.fold[open] > summary::before { content: '▾ '; }
 .end .link { margin-top: 6px; }
 
 .pn-foot { padding: 10px 10px 0; border-top: 1px solid var(--parch-3); margin-top: 6px; }
+.pn-foot .lib-link { display: block; margin-top: 8px; }
 .school h2 { margin: 0 0 8px; font-size: 22px; }
 .kpis { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .kpi { flex: 1 1 110px; background: #fff8; border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; cursor: default; }

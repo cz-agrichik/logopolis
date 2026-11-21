@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Λόγος · библиотека</title>
+  <!-- Библиотека: греческие тексты с переводом слов, оборотов и предложений + свой текст по словарю сайта.
+       Книги собирает tools/library/bookconverter.py (см. tools/library/README.md). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Caveat:wght@500;600&display=swap">
+  <link rel="stylesheet" href="reader.css">
+  <script src="catalog.js"></script>
+  <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
+  <script src="library.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="back-link" href="../index.html" title="Вернуться в игру">←<span> В игру</span></a>
+      <div class="topbar__text">
+        <div class="topbar__title">Βιβλιοθήκη · библиотека</div>
+        <div class="topbar__meta">Греческие тексты: нажмите на слово — перевод, грамматика, оборот</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="library">
+    <p class="library__lead">Читайте по-гречески и нажимайте на любое слово: появится его перевод в этом предложении,
+      словарная форма и грамматика, а если слово — часть <b>оборота</b> (<span lang="el">καμιά φορά</span> — «иногда»),
+      то и перевод всего оборота. Нужные слова — кнопкой «Запомнить» в свои карточки, а оттуда — в Anki, Quizlet или таблицу.</p>
+
+    <h2 class="library__h">Книги</h2>
+    <nav class="shelf" id="shelf" aria-label="Книги"></nav>
+
+    <h2 class="library__h">Свой текст</h2>
+    <a class="book-card book-card--own" href="read.html?own">
+      <span class="book-card__title">Вставить свой текст</span>
+      <span class="book-card__about">Любой греческий текст разбирается по словарю сайта — словам и оборотам из всех книг библиотеки.
+        Перевода предложений нет. Текст остаётся в вашем браузере.</span>
+      <span class="book-card__facts" id="dict-stats"></span>
+    </a>
+  </main>
+</body>
+</html>

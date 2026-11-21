@@ -3,7 +3,8 @@
   "private": true,
   "description": "Λόγος · Кипр сквозь эпохи — игра открывается прямо из index.html; npm нужен только для тестов",
   "scripts": {
-    "test": "node --test tests/core.test.js tests/boundary.test.js",
+    "test": "node --test tests/core.test.js tests/boundary.test.js tests/library.test.js",
+    "test:library": "python3 tools/library/test_converter.py",
     "golden": "node tests/golden.js golden-out",
     "compare": "python3 tests/compare.py golden-base golden-out",
     "audit:pedia": "node tools/pedia/audit.js",

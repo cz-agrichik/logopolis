@@ -1,0 +1,37 @@
+// Настройки переводчика конвертера библиотеки. Скопируй этот файл в config.json и впиши ключ.
+// config.json лежит только у тебя (он в .gitignore) — в репозиторий ключ не попадает.
+// Строки с // в начале — комментарии. Что переводить, задают папки книг: texts/<id>/ и private/<id>/.
+{
+  // ── Переводчик ────────────────────────────────────────
+  // Оставь ОДИН блок без //, остальные закомментируй.
+
+  //1) Gemini — лучшее бесплатное качество, нужен ключ: https://aistudio.google.com/apikey
+  "translator": "gemini",
+  //"model": "",
+  "api_key": "",
+
+  // 2) Groq — бесплатный ключ: https://console.groq.com/keys
+  // "translator": "groq",
+  // "model": "",
+  // "api_key": "",
+
+  // 3) Ollama — локально, без ключа и лимитов (сначала: ollama pull gemma3:12b)
+  // "translator": "ollama",
+  // "model": "gemma3:12b",
+
+  // 4) OpenRouter — бесплатный ключ, но всего ~50 запросов в день
+  // "translator": "openrouter",
+  // "model": "",
+  // "api_key": "",
+
+   //5) Argos — офлайн, без ключа, качество слабое
+   //"translator": "argos",
+
+  // 6) Без перевода — только грамматика (Stanza)
+  // "translator": "none",
+
+  // ── Тонкая настройка (обычно не трогать) ───────────────
+  // "model": "" — пусто = модель по умолчанию; список: python bookconverter.py --list-models
+  "base_url": "",
+  "batch_words": 0
+}
