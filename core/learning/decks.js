@@ -13,6 +13,8 @@ const LEARN_PLANS = {
   own:     { groups: ['own'] },
 };
 
+const CARD_KEYS = new WeakMap();   // карточка → [греческая сторона, ключ прогресса]
+
 const Decks = {
   hasGreek(s) { return GREEK_RE.test(s || ''); },
 
@@ -60,8 +62,8 @@ const Decks = {
     const m = deck.builtin && /^([ab][12])-/.exec(deck.id);
     return m ? m[1].toUpperCase() : '';
   },
-  /** Группа колоды: 'start' (стартовый набор), 'A1', 'A2', 'B1' или 'own' (свои). */
-  groupOf(deck) { return this.levelOf(deck) || (deck.builtin ? 'start' : 'own'); },
+  /** Группа колоды: 'start' (стартовый набор), 'A1', 'A2', 'B1', 'reading' (слова из чтения) или 'own' (свои). */
+  groupOf(deck) { return this.levelOf(deck) || (deck.reading ? 'reading' : deck.builtin ? 'start' : 'own'); },
 
   // ---------- «Что будем учить?»: подборки колод ----------
   /** Входит ли колода в подборку. */
@@ -76,52 +78,37 @@ const Decks = {
   /** Включить колоды подборки, остальные выключить. Прогресс не трогается. */
   applyPlan(state, id) {
     if (!LEARN_PLANS[id]) return false;
-    for (const d of state.decks) d.active = this.inPlan(id, d);
+    for (const d of state.decks) if (!d.reading) d.active = this.inPlan(id, d);   // слова из чтения — сами по себе
     return true;
   },
   /** Какая подборка сейчас включена или null — свой набор колод. */
   planOf(state) {
-    return this.plans(state).find(id => state.decks.every(d => d.active === this.inPlan(id, d))) || null;
+    return this.plans(state).find(id => state.decks.every(d => d.reading || d.active === this.inPlan(id, d))) || null;
   },
   /** Сколько слов в колодах плана и сколько из них уже выучено. */
   planStats(state, id) {
-    const out = { decks: 0, words: 0, learned: 0 };
-    for (const d of state.decks) {
-      if (!this.inPlan(id, d)) continue;
-      out.decks++; out.words += d.cards.length;
-      for (const c of d.cards) if (this.isLearned(this.prog(state, c.id))) out.learned++;
-    }
-    return out;
+    const decks = state.decks.filter(d => this.inPlan(id, d));
+    return Object.assign({ decks: decks.length }, this.wordStats(state, decks));
   },
 
-  /** Добавляет в сохранение встроенные колоды, которых там ещё нет, и обновляет устаревшие. */
+  /** Добавляет в сохранение встроенные колоды, которых там ещё нет, и обновляет устаревшие.
+   *  Прогресс привязан к слову, а не к колоде: слово переехало (из A1 в A2, в тематическую колоду) — прогресс на месте. */
   ensureBuiltins(state) {
     const fresh = this.builtinDecks();
-    // слово могло переехать в другую встроенную колоду (например, из A1 в A2) — ищем его по греческому написанию
-    const anywhere = new Map();
-    for (const d of fresh) if (d.id !== SAMPLE_DECK.id) for (const c of d.cards) if (!anywhere.has(c.front)) anywhere.set(c.front, c);
     for (const nd of fresh) {
       const old = state.decks.find(d => d.id === nd.id);
       if (!old || (old.ver || 1) >= (nd.ver || 1)) continue;
-      // обновлённая колода (новый перевод, слово переехало): прогресс идёт за греческим словом
-      const here = new Map(nd.cards.map(c => [c.front, c]));
-      for (const c of old.cards) {
-        const p = state.progress[c.id];
-        if (!p) continue;
-        const n = here.get(c.front) || anywhere.get(c.front);
-        if (n && n.id !== c.id && !state.progress[n.id]) { state.progress[n.id] = p; delete state.progress[c.id]; }
-      }
       old.cards = nd.cards; old.ver = nd.ver; old.name = nd.name;
     }
-    // встроенная колода, которой больше нет (например, «Фразы для письма»), уходит вместе со своим прогрессом;
-    // если её слово живёт теперь в другой встроенной колоде — прогресс идёт за ним
+    // встроенная колода, которой больше нет (например, «Фразы для письма»), уходит вместе с прогрессом слов,
+    // которых больше нет ни в одной колоде
     const ids = new Set(fresh.map(d => d.id));
-    for (const d of state.decks) if (d.builtin && !ids.has(d.id)) for (const c of d.cards) {
-      const n = anywhere.get(c.front), p = state.progress[c.id];
-      if (p && n && !state.progress[n.id]) state.progress[n.id] = p;
-      delete state.progress[c.id];
-    }
+    const gone = state.decks.filter(d => d.builtin && !ids.has(d.id));
     state.decks = state.decks.filter(d => !d.builtin || ids.has(d.id));
+    if (gone.length) {
+      const keep = this.wordSet(state.decks.concat(fresh));
+      for (const d of gone) for (const c of d.cards) if (!keep.has(this.pkey(c))) delete state.progress[this.pkey(c)];
+    }
     // новая колода уровня приходит в том же состоянии, что и колоды этого уровня у игрока: включил A2 — новые колоды A2 тоже
     // включены (иначе слова, переехавшие в новую тематическую колоду, выпали бы из раундов); выключил A1 — новые A1 тоже выключены
     let added = 0;
@@ -131,6 +118,64 @@ const Decks = {
       state.decks.push(nd); added++;
     }
     return added;
+  },
+
+  // ---------- слова из чтения (библиотека) ----------
+  READING_ID: 'reading',
+  /** Уровень ученика по включённым встроенным колодам: самый высокий из A1/A2/B1 (никакие не включены — A1). */
+  planLevel(state) {
+    const order = ['A1', 'A2', 'B1'];
+    let best = 0;
+    for (const d of state.decks) if (d.active) best = Math.max(best, order.indexOf(this.levelOf(d)));
+    return order[best];
+  },
+  /** Слово карточки — то, к чему привязан прогресс: одно слово во всех колодах — один прогресс
+   *  (выучили в A1 — выучено и в «Словах из чтения», и наоборот). Строчные, без артикля, -άω → -ώ (ξυπνάω = ξυπνώ);
+   *  ударение различает слова: πότε ≠ ποτέ, ώμος ≠ ωμός. */
+  wordKey(front) {
+    return String(front || '').normalize('NFC').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim()
+      .replace(/^(ο|η|το|οι|τα) /, '').replace(/άω$/, 'ώ');
+  },
+  /** Ключ прогресса карточки (= wordKey её греческой стороны; запоминается, чтобы не считать каждый раз). */
+  pkey(card) {
+    const e = CARD_KEYS.get(card);
+    if (e && e[0] === card.front) return e[1];
+    const k = this.wordKey(card.front);
+    CARD_KEYS.set(card, [card.front, k]);
+    return k;
+  },
+  /** Колода «слова из чтения»: cards — [{ key, front, back, hint }] от читалки (уже отобранные по уровню).
+   *  Слово может быть и в других колодах — прогресс у него один (pkey), а в раунд оно попадает один раз (activeCards).
+   *  Возвращает, изменилась ли колода. */
+  setReadingDeck(state, cards, name) {
+    const list = [], seen = new Set();
+    for (const c of cards) {
+      const w = this.wordKey(c.front);
+      if (!c.front || !c.back || seen.has(w)) continue;
+      seen.add(w);
+      list.push({ id: this.READING_ID + ':' + this.hash(String(c.key)), front: c.front, back: c.back, hint: c.hint || '' });
+    }
+    let deck = state.decks.find(d => d.id === this.READING_ID);
+    if (!deck && !list.length) return false;
+    if (!deck) { deck = { id: this.READING_ID, name, active: true, builtin: false, reading: true, cards: [] }; state.decks.push(deck); }
+    if (!list.length && !deck.cards.length) return false;
+    const before = JSON.stringify([deck.name, deck.cards]);
+    deck.name = name; deck.reading = true; deck.cards = list;
+    return JSON.stringify([deck.name, deck.cards]) !== before;
+  },
+
+  /** Все слова (ключи прогресса) колод. */
+  wordSet(decks) {
+    const out = new Set();
+    for (const d of decks) for (const c of d.cards) out.add(this.pkey(c));
+    return out;
+  },
+  /** Сколько разных слов в колодах и сколько из них выучено (слово из двух колод — одно). */
+  wordStats(state, decks) {
+    const words = this.wordSet(decks);
+    let learned = 0;
+    for (const k of words) if (this.isLearned(this.progAt(state, k))) learned++;
+    return { words: words.size, learned };
   },
 
   deckOfCard(state, cardId) {

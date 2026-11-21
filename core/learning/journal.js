@@ -9,7 +9,7 @@ Object.assign(Decks, {
   /** Сколько слов сейчас в статусе «выучено» (во всех колодах). */
   learnedCount(state) {
     let n = 0;
-    for (const id of Object.keys(state.progress)) { const p = this.prog(state, id); if (this.isLearned(p)) n++; }
+    for (const k of Object.keys(state.progress)) if (this.isLearned(this.progAt(state, k))) n++;
     return n;
   },
 
@@ -28,14 +28,14 @@ Object.assign(Decks, {
     const now = Date.now();
     let n = 0;
     for (const c of this.activeCards(state)) {
-      const p = this.prog(state, c.id);
+      const p = this.prog(state, c);
       if (p && p.due > now && p.due <= now + ms) n++;
     }
     return n;
   },
   nextDue(state) {
     let t = Infinity;
-    for (const c of this.activeCards(state)) { const p = this.prog(state, c.id); if (p && p.due < t) t = p.due; }
+    for (const c of this.activeCards(state)) { const p = this.prog(state, c); if (p && p.due < t) t = p.due; }
     return t;
   },
 
@@ -46,8 +46,36 @@ Object.assign(Decks, {
     state.learnLog = {};
     Object.assign(state.stats, { right: 0, wrong: 0, rounds: 0, learned: 0, bestStreak: 0 });
   },
+  /** Сбросить прогресс слов колоды (у слова прогресс общий — оно станет новым и в других колодах). */
   resetDeck(state, deck) {
-    for (const c of deck.cards) delete state.progress[c.id];
+    for (const c of deck.cards) delete state.progress[this.pkey(c)];
+  },
+  /** Удалить колоду. Прогресс её слов, которые есть в других колодах, остаётся. */
+  removeDeck(state, deck) {
+    state.decks = state.decks.filter(d => d !== deck);
+    const keep = this.wordSet(state.decks);
+    for (const c of deck.cards) if (!keep.has(this.pkey(c))) delete state.progress[this.pkey(c)];
+  },
+
+  // ---------- прогресс по слову ----------
+  /** Сохранения до v2: прогресс был у карточки («колода:хэш»), теперь — у слова (pkey).
+   *  Одно слово в нескольких колодах — берём самый продвинутый прогресс, ответы складываем; прогресс карточек,
+   *  которых уже нет ни в одной колоде, уходит. */
+  progressByWord(state) {
+    const out = {};
+    for (const d of state.decks || []) for (const c of d.cards || []) {
+      const p = this.progAt(state, c.id);
+      if (!p) continue;
+      const k = this.pkey(c), q = out[k];
+      if (!q) { out[k] = p; continue; }
+      if (q === p) continue;
+      const better = this.level(p) - this.level(q) || (p.last || 0) - (q.last || 0);
+      const [a, b] = better > 0 ? [p, q] : [q, p];
+      a.right = (a.right || 0) + (b.right || 0); a.wrong = (a.wrong || 0) + (b.wrong || 0);
+      if (b.built) a.built = true;
+      out[k] = a;
+    }
+    state.progress = out;
   },
 
   // ---------- экспорт ----------
@@ -65,7 +93,7 @@ Object.assign(Decks, {
   /** Полная копия обучения: колоды, прогресс, настройки, журнал. */
   backup(state) {
     return {
-      type: 'logos-learning', v: 1, exported: new Date().toISOString(),
+      type: 'logos-learning', v: 2, exported: new Date().toISOString(),
       decks: state.decks, progress: state.progress, settings: state.settings,
       learnLog: state.learnLog || {}, spread: state.spread || 0,
       stats: { right: state.stats.right, wrong: state.stats.wrong, rounds: state.stats.rounds, learned: state.stats.learned || 0 },
@@ -79,6 +107,8 @@ Object.assign(Decks, {
     state.progress = data.progress || {};
     state.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
     state.learnLog = data.learnLog || {};
+    if (!(data.v >= 2)) this.progressByWord(state);   // копия до v2 — прогресс по карточкам
+    state.v = 2;
     Object.assign(state.stats, { right: 0, wrong: 0, rounds: 0, learned: 0 }, data.stats || {});
     if (!data.spread) this.respread(state);   // копия из времён без разброса сроков — разбросать, как при загрузке
     state.spread = 1;

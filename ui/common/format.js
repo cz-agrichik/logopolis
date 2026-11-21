@@ -37,9 +37,9 @@ function morphKids(a, b) {
 }
 
 
-/** Короткое описание прогресса карточки для таблиц (HTML). */
-function progressHtml(state, id) {
-  const p = Decks.prog(state, id);
+/** Короткое описание прогресса карточки (её слова) для таблиц (HTML). */
+function progressHtml(state, card) {
+  const p = Decks.prog(state, card);
   if (!p) return '<span class="dim">новая</span>';
   if (Decks.isLearned(p)) {
     const left = p.due - Date.now();

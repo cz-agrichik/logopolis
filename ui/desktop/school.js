@@ -14,6 +14,43 @@ const SCHOOL_SECTIONS = [
   { id: 'reset', icon: '♻️', title: 'Сброс' },
 ];
 const ST_NAMES = { new: 'новое', learning: 'учится', learned: 'выучено' };
+
+// ---------- слова из чтения: карточки читалки библиотеки → колода «📖 Слова из чтения» ----------
+// Читалка (library/) хранит свои карточки в localStorage (READER_DECK_KEY), игра их только читает — у каждого
+// ключа один писатель, вкладки не затирают друг друга. Берутся карточки, которые в читалке ещё учатся, уровня
+// ученика и ниже (READER_LEVEL_KEY — выбирается в читалке; по умолчанию — по включённым колодам игры).
+const READER_DECK_KEY = 'greek-reader:deck:v2', READER_LEVEL_KEY = 'greek-reader:my-level';
+const READING_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+const readingLevel = () => {
+  const own = BrowserIO.load(READER_LEVEL_KEY);
+  return READING_LEVELS.includes(own) ? own : Decks.planLevel(Learn.state);
+};
+const Reading = {
+  /** Карточки читалки → колода игры. Возвращает, изменилась ли колода. */
+  sync() {
+    if (!Learn.state) return false;
+    let deck = null;
+    try { deck = JSON.parse(BrowserIO.load(READER_DECK_KEY) || 'null'); } catch (e) { deck = null; }
+    const all = deck && deck.cards && typeof deck.cards === 'object' ? Object.values(deck.cards) : [];
+    const top = l => { const p = String(l || '').split('–').filter(x => READING_LEVELS.includes(x)); return p.length ? READING_LEVELS.indexOf(p[p.length - 1]) : -1; };
+    const mine = READING_LEVELS.indexOf(readingLevel());
+    const bare = h => String(h || '').replace(/^(ο|η|το|οι|τα)\s+/, '');
+    const cards = [];
+    for (const c of all) {
+      const t = c && c.saved || {};
+      if (!c || c.status === 'learned' || top(t.level) < 0 || top(t.level) > mine) continue;
+      const key = String(c.key);
+      if (key.startsWith('form:')) {
+        cards.push({ key, front: t.head || c.form, back: t.meaning || '', hint: [t.formGram, t.lemmaHead && 'от ' + bare(t.lemmaHead)].filter(Boolean).join(', ') });
+      } else if (key.startsWith('phrase:')) {
+        cards.push({ key, front: t.head, back: t.meaning || '', hint: 'оборот' });
+      } else {
+        cards.push({ key, front: bare(t.head || key), back: t.meaning || t.gloss || '', hint: t.head && t.head !== bare(t.head) ? t.head : '' });
+      }
+    }
+    return Decks.setReadingDeck(Learn.state, cards, '📖 Слова из чтения');
+  },
+};
 const WORDS_LIMIT = 400;
 
 const School = {
@@ -131,21 +168,22 @@ const School = {
     const s = Learn.state, groups = [];
     const put = (key, d) => { let g = groups.find(x => x.key === key); if (!g) groups.push(g = { key, decks: [] }); g.decks.push(d); };
     for (const d of s.decks) put(Decks.groupOf(d), d);
-    const order = ['start', 'A1', 'A2', 'B1', 'own'];
+    const order = ['start', 'A1', 'A2', 'B1', 'reading', 'own'];
     return groups.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
   },
-  groupTitle: { start: 'Стартовый набор', A1: 'A1 · начальный уровень', A2: 'A2 · базовый уровень', B1: 'B1 · средний уровень', own: 'Свои колоды' },
+  groupTitle: { start: 'Стартовый набор', A1: 'A1 · начальный уровень', A2: 'A2 · базовый уровень', B1: 'B1 · средний уровень', reading: '📖 Слова из чтения', own: 'Свои колоды' },
 
   deckHtml(d) {
     const s = Learn.state, st = Decks.stats(s, d);
     return `<div class="deck ${d.active ? '' : 'off'}">
-        <label class="deck-head"><input type="checkbox" data-deck-toggle="${d.id}" ${d.active ? 'checked' : ''}> <b>${esc(d.name)}</b>${d.builtin ? '' : ' <span class="badge">своя</span>'}</label>
+        <label class="deck-head"><input type="checkbox" data-deck-toggle="${d.id}" ${d.active ? 'checked' : ''}> <b>${esc(d.name)}</b>${d.reading ? ' <span class="badge">из библиотеки</span>' : d.builtin ? '' : ' <span class="badge">своя</span>'}</label>
+        ${d.reading ? `<div class="deck-stats">Слова, которые вы запомнили в <a href="library/index.html" target="_blank" rel="noopener">библиотеке</a>, — вашего уровня (${esc(readingLevel())}) и ниже. Колода обновляется сама. Прогресс у слова общий: выучили его в другой колоде — здесь оно тоже выучено, и наоборот; в раунд слово попадает один раз.</div>` : ''}
         ${this.bar(st)}
         <div class="deck-stats">${st.total} ${plural(st.total, 'слово', 'слова', 'слов')} · выучено ${st.learned} · учатся ${st.learning} · новых ${st.fresh}${st.due ? ` · пора повторить ${st.due}` : ''}</div>
         <div class="deck-actions"><button class="link" data-deck-words="${d.id}">Слова</button>
           <button class="link" data-export-deck="${d.id}">Экспорт .tsv</button>
           <button class="link danger" data-deck-reset="${d.id}">Сбросить прогресс</button>
-          ${d.builtin ? '' : `<button class="link danger" data-deck-del="${d.id}">Удалить</button>`}</div>
+          ${d.builtin || d.reading ? '' : `<button class="link danger" data-deck-del="${d.id}">Удалить</button>`}</div>
       </div>`;
   },
 
@@ -156,12 +194,12 @@ const School = {
       Колоды A2 и B1 сначала выключены — включайте их, когда A1 станет лёгким.</p>
       <div class="bar-legend"><span><i class="learned"></i>выучено</span><span><i class="learning"></i>учатся</span><span><i class="fresh"></i>новые</span></div>`;
     for (const g of this.deckGroups()) {
-      const on = g.decks.filter(d => d.active).length, words = g.decks.reduce((n, d) => n + d.cards.length, 0);
+      const on = g.decks.filter(d => d.active).length, { words, learned } = Decks.wordStats(s, g.decks);
       const open = this.groupOpen[g.key] ?? (on > 0 || g.key === 'own');
       const many = g.decks.length > 1;
       h += `<details class="dgroup" data-dgroup="${g.key}" ${open ? 'open' : ''}>
         <summary><b>${esc(this.groupTitle[g.key])}</b>
-          <span class="dim small">${many ? `${g.decks.length} ${plural(g.decks.length, 'колода', 'колоды', 'колод')} · ` : ''}${words} ${plural(words, 'слово', 'слова', 'слов')} · ${many ? (on === g.decks.length ? 'включены все' : on ? `включено ${on} из ${g.decks.length}` : 'все выключены') : on ? 'включена' : 'выключена'}</span></summary>
+          <span class="dim small">${many ? `${g.decks.length} ${plural(g.decks.length, 'колода', 'колоды', 'колод')} · ` : ''}${words} ${plural(words, 'слово', 'слова', 'слов')} · выучено ${learned}${words ? ` (${Math.round(learned / words * 100)}%)` : ''} · ${many ? (on === g.decks.length ? 'включены все' : on ? `включено ${on} из ${g.decks.length}` : 'все выключены') : on ? 'включена' : 'выключена'}</span></summary>
         ${many ? `<div class="dgroup-actions">${on < g.decks.length ? `<button class="link" data-group-on="${g.key}">Включить все</button>` : ''}${on ? `<button class="link" data-group-off="${g.key}">Выключить все</button>` : ''}</div>` : ''}
         ${g.decks.map(d => this.deckHtml(d)).join('')}
       </details>`;
@@ -199,7 +237,8 @@ const School = {
       if (q && !stripAccents((c.front + ' ' + c.back + ' ' + c.hint).toLowerCase()).includes(q)) continue;
       out.push(c);
     }
-    if (f.st === 'hard') out.sort((a, b) => (s.progress[b.id].wrong - s.progress[b.id].right * 0.2) - (s.progress[a.id].wrong - s.progress[a.id].right * 0.2));
+    const hard = c => { const p = Decks.prog(s, c); return p.wrong - p.right * 0.2; };
+    if (f.st === 'hard') out.sort((a, b) => hard(b) - hard(a));
     return out;
   },
 
@@ -208,9 +247,9 @@ const School = {
     if (!el) return;
     const s = Learn.state, list = this.filtered();
     const rows = list.slice(0, WORDS_LIMIT).map(c => {
-      const p = Decks.prog(s, c.id);
+      const p = Decks.prog(s, c);
       return `<tr><td class="greek">${esc(c.front)}</td><td>${esc(c.back)}</td><td class="dim">${esc(c.hint)}</td>
-        <td class="box">${progressHtml(s, c.id)}</td><td class="num">${p ? `<span title="верно">${p.right}</span> / <span class="${p.wrong ? 'bad-n' : ''}" title="ошибок">${p.wrong}</span>` : ''}</td></tr>`;
+        <td class="box">${progressHtml(s, c)}</td><td class="num">${p ? `<span title="верно">${p.right}</span> / <span class="${p.wrong ? 'bad-n' : ''}" title="ошибок">${p.wrong}</span>` : ''}</td></tr>`;
     }).join('');
     el.innerHTML = `<div class="dim small">${list.length > WORDS_LIMIT ? `Показаны первые ${WORDS_LIMIT} из ${list.length} — уточните фильтр.` : `${list.length} ${plural(list.length, 'слово', 'слова', 'слов')}`}</div>
       ${list.length ? `<div class="deck-table"><table><tr><th>Греческий</th><th>Перевод</th><th>Подсказка</th><th>Прогресс</th><th title="верно / ошибок">✓ / ✗</th></tr>${rows}</table></div>` : '<p class="dim">Ничего не найдено.</p>'}`;
@@ -369,16 +408,15 @@ const School = {
     if ('exportBackup' in d) return this.download(`logos-обучение-${dayKey()}.json`, JSON.stringify(Decks.backup(s)), 'application/json');
     if (d.deckReset) {
       const deck = deckBy(d.deckReset);
-      if (deck) this.confirm(`Сбросить прогресс колоды «${esc(deck.name)}»? Все её слова снова станут новыми.`, 'Сбросить', () => {
+      if (deck) this.confirm(`Сбросить прогресс колоды «${esc(deck.name)}»? Все её слова снова станут новыми — и в других колодах, где они есть.`, 'Сбросить', () => {
         Decks.resetDeck(s, deck); Learn.save(); this.render(true); UI.renderTop(); UI.toast(`Прогресс колоды «${esc(deck.name)}» сброшен`);
       });
       return;
     }
     if (d.deckDel) {
       const deck = deckBy(d.deckDel);
-      if (deck) this.confirm(`Удалить колоду «${esc(deck.name)}» и её прогресс?`, 'Удалить', () => {
-        Decks.resetDeck(s, deck);
-        s.decks = s.decks.filter(x => x !== deck);
+      if (deck) this.confirm(`Удалить колоду «${esc(deck.name)}»? Прогресс её слов останется только у тех, что есть в других колодах.`, 'Удалить', () => {
+        Decks.removeDeck(s, deck);
         Learn.save(); this.render(true); UI.renderTop();
       });
       return;

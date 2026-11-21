@@ -13,6 +13,9 @@
   const saved = boot.cityLoaded;
   if (saved && boot.decksAdded) Game.state.log.unshift({ t: Date.now(), k: 'decksAdded', p: { n: boot.decksAdded } });
   Game.tick(0);
+  // слова, запомненные в читалке библиотеки, — в колоду «Слова из чтения»
+  const syncReading = () => { if (!Session.lost && Reading.sync()) { Learn.save(); if (School.isOpen()) School.render(true); } };
+  syncReading();
 
   const away = saved ? Game.catchUp() : null;
   Speech.init();
@@ -61,11 +64,15 @@
 
   window.addEventListener('beforeunload', () => Session.saveAll());
   // другая вкладка записала сохранение — сверяем штампы (событие приходит только в чужие вкладки)
-  window.addEventListener('storage', e => { if (!e.key || e.key.endsWith(Session.STAMP)) Session.check(); });
+  window.addEventListener('storage', e => {
+    if (!e.key || e.key.endsWith(Session.STAMP)) Session.check();
+    if (e.key === READER_DECK_KEY || e.key === READER_LEVEL_KEY) syncReading();   // в соседней вкладке читалки запомнили слово
+  });
   // во фоне игра «спит», а при возвращении досчитывает офлайн-прогресс по общим правилам
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { Session.saveAll(); Game.paused = true; return; }
     if (Session.check()) return;   // пока нас не было, в другой вкладке игра ушла вперёд
+    syncReading();
     const a = Game.catchUp();
     Game.paused = false; last = performance.now();
     if (a) { UI.renderMap(); UI.renderAll(); UI.showAway(a); }

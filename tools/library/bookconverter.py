@@ -55,7 +55,7 @@ DATA_VERSION = 3   # 3: + обороты (phrases)
 PROMPT_VERSION = "2"  # меняется при правке промптов -> кеш не смешивается
 LEMMA_PROMPT_VERSION = "3"  # отдельно: правка словаря не сбрасывает дорогой контекстный перевод
 PHRASE_PROMPT_VERSION = "1"  # обороты — свой проход и свой кеш: старые ответы остаются в силе
-FORM_PROMPT_VERSION = "1"    # грамматика форм (аорист, род. п. мн. ч.…), перевод формы и её уровень
+FORM_PROMPT_VERSION = "2"    # грамматика форм (аорист, род. п. мн. ч.…), перевод формы и уровень ГРАММАТИКИ формы
 LEVEL_PROMPT_VERSION = "1"   # уровни (CEFR) лемм и оборотов — тоже свой проход и свой кеш
 LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]   # в греческой сертификации — Α1, Α2, Β1, Β2, Γ1, Γ2
 BOOK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -119,9 +119,45 @@ def log(message: str = "") -> None:
     print(message, flush=True)
 
 
+def write_lf(path: Path, text: str) -> None:
+    """Текст с переводами строк \\n и на Windows: в git файлы не меняются целиком из-за \\r\\n."""
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+
+
+POLY_DROP = {"\u0313", "\u0314", "\u0345", "\u0304", "\u0306"}   # придыхания, подписная йота, долгота/краткость
+POLY_ACUTE = {"\u0300", "\u0342"}                                 # тяжёлое ударение и облечённое → тонос
+
+
+def monotonic(text: str) -> str:
+    """Политоника → монотоника: ἀλλάζω → αλλάζω, ἀποκτῶ → αποκτώ. Модель и Stanza иногда отвечают политоникой,
+    а в тексте и в колодах — монотоника; иначе одно слово получает два ключа."""
+    nfd = unicodedata.normalize("NFD", str(text))
+    if not any(ch in POLY_DROP or ch in POLY_ACUTE for ch in nfd):
+        return unicodedata.normalize("NFC", str(text))
+    mono = unicodedata.normalize("NFC", "".join("\u0301" if ch in POLY_ACUTE else ch for ch in nfd if ch not in POLY_DROP))
+    return re.sub(r"[^\W\d_]+", lambda m: monosyllable(m.group(0)), mono)
+
+
+MONO_KEEP = {"ή", "πού", "πώς"}   # односложные, которые и в монотонике пишутся с ударением
+
+
+def monosyllable(word: str) -> str:
+    """В монотонике односложные слова без ударения: τῆς → της (кроме ή, πού, πώς)."""
+    if word.lower() in MONO_KEEP:
+        return word
+    bare = unicodedata.normalize("NFD", word)
+    plain = "".join(ch for ch in bare if ch != "\u0301").lower()
+    if len(plain) <= 4:
+        plain = re.sub(r"ι(?=[αεοω])", "", plain)   # μιας, για, πια: ι перед гласной — не слог
+    if len(re.findall(r"αι|ει|οι|ου|υι|αυ|ευ|ηυ|[αεηιουω]", plain)) != 1:
+        return word
+    return unicodedata.normalize("NFC", "".join(ch for ch in bare if ch != "\u0301"))
+
+
 def bare_lemma(head: str) -> str:
     """'το αγόρι' -> 'αγόρι'. Ключ карточки не зависит от артикля."""
-    head = unicodedata.normalize("NFC", head.strip())
+    head = monotonic(head.strip())
     stripped = ARTICLE_RE.sub("", head)
     return stripped or head
 
@@ -656,7 +692,7 @@ def run_llm(text: str, sentences: list[dict], words: list[dict], config: dict,
         for item in reply.get("words", []):
             if isinstance(item, list) and len(item) >= 3 and as_int(item[0]) in w_map:
                 word = w_map[as_int(item[0])]
-                head = unicodedata.normalize("NFC", str(item[1]).strip())
+                head = monotonic(str(item[1]).strip())
                 if head and pure_greek(head):
                     word["head"] = head
                 word["ru"] = str(item[2]).strip()
@@ -726,8 +762,8 @@ def apply_lemma_reply(chunk, reply: dict, info: dict) -> None:
             continue
         key, head, _ = chunk[n - 1]
         if len(item) >= 5:      # [n, исправленная форма, ru, en, pos]
-            fixed = unicodedata.normalize("NFC", str(item[1]).strip())
-            head = fixed if pure_greek(fixed) else head
+            fixed = monotonic(str(item[1]).strip())
+            head = fixed if pure_greek(fixed) else monotonic(head)
             ru, en, pos = item[2], item[3], item[4]
         elif len(item) == 4:    # старый формат без исправленной формы
             ru, en, pos = item[1], item[2], item[3]
@@ -752,7 +788,7 @@ def run_lemmas(words: list[dict], client: LLMClient, config: dict, cache: Cache,
     for key, head, hint in entries:
         hit = cache.get(one(head, hint))
         if isinstance(hit, dict) and hit.get("head"):
-            info[key] = dict(hit)
+            info[key] = dict(hit, head=monotonic(hit["head"]))
         else:
             rest.append((key, head, hint))
     batches = list(lemma_batches(words, entries=rest))
@@ -871,9 +907,79 @@ def check_phrase(head: str, ru: str, members: list[dict]) -> str | None:
     return " ".join(tokens)
 
 
+def unaccented(text: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFD", text) if not unicodedata.combining(ch))
+
+
+def accents(word: str) -> int:
+    return unicodedata.normalize("NFD", word).count("\u0301")
+
+
+def settle_lemmas(chapters: list[dict], lemma_info: dict, deck_keys) -> tuple[int, int]:
+    """Сверка словарных форм с уже известными словами — словами колод игры и ключами лемм книги (без таблиц).
+    Перевод в контексте иногда даёт словарной формой саму форму слова (μπορούσα, είπε) или обрывок (λλάζω), а проход
+    лемм её исправляет (μπορώ, λέω, αλλάζω), но лёгкая модель иногда портит и верную (μεγαλώνω → «μεγαλώνον»).
+    - исправленная форма известна (или без ударения — и ровно одно известное слово с ним: ξερω → ξέρω) —
+      слова переходят к ней: одна лемма — один ключ;
+    - прежняя форма — слово из колод игры, а исправленная — нет; в исправленной два ударения; исправленная потеряла
+      ударение (ποτέ → «ποτε») — остаётся прежняя.
+    Возвращает (сколько лемм слилось с известными, сколько вернулось к прежней форме)."""
+    deck_keys = set(deck_keys)
+    known = {fold(k): k for k in lemma_info}
+    plain: dict[str, set] = {}
+    for f in set(known) | deck_keys:
+        plain.setdefault(unaccented(f), set()).add(f)
+    first_head: dict[str, str] = {}
+    for chapter in chapters:
+        for w in chapter["words"]:
+            first_head.setdefault(lemma_key(w.get("head") or w["lemma"]), monotonic(w.get("head") or w["lemma"]))
+    move: dict[str, str] = {}
+    reverted = 0
+    for key, entry in list(lemma_info.items()):
+        head = entry.get("head", "")
+        if not head or not pure_greek(head):
+            continue
+        new = lemma_key(head)
+        fk, fn = fold(key), fold(new)
+        if fn == fk:
+            continue
+        if any(accents(part) > 1 for part in head.split()) or (fk in deck_keys and fn not in deck_keys):
+            entry["head"] = first_head.get(key, key)
+            reverted += 1
+            continue
+        target = fn if fn in deck_keys or fn in known else None
+        if target is None and not accents(fn):
+            same = plain.get(unaccented(fn), set()) - {fk, fn}
+            target = next(iter(same)) if len(same) == 1 else None
+        if target:
+            move[key] = known.get(target) or (new if target == fn else target)
+        elif " " not in fn and len(re.findall(r"[αεηιουω]+", unaccented(fn))) > 1 and not accents(fn) and accents(fk):
+            entry["head"] = first_head.get(key, key)   # потеряла ударение: ξέρεις → «ξερεις»
+            reverted += 1
+    for key in list(move):   # цепочки: A → B, а B сам → C
+        seen = {key}
+        while move[key] in move and move[key] not in seen:
+            seen.add(move[key])
+            move[key] = move[move[key]]
+    for key, target in move.items():
+        entry = lemma_info.pop(key)
+        if target not in lemma_info and target not in move:
+            lemma_info[target] = entry if lemma_key(entry["head"]) == target else dict(entry, head=target)
+    for key, target in move.items():   # цель тоже ушла (цикл) — оставляем как было
+        if target not in lemma_info:
+            lemma_info[key] = lemma_info.get(key) or {"head": key}
+    if move:
+        for chapter in chapters:
+            for w in chapter["words"]:
+                target = move.get(lemma_key(w.get("head") or w["lemma"]))
+                if target and target in lemma_info:
+                    w["head"] = lemma_info[target]["head"]
+    return sum(1 for t in move.values() if t in lemma_info), reverted
+
+
 def dictionary_head(word: dict, lemma_info: dict) -> str:
     """Словарная форма слова: исправленная проходом лемм (если без смеси алфавитов), иначе — из перевода в контексте."""
-    head = word.get("head") or word["lemma"]
+    head = monotonic(word.get("head") or word["lemma"])
     fixed = (lemma_info.get(lemma_key(head)) or {}).get("head", "")
     return fixed if pure_greek(fixed) else head
 
@@ -889,7 +995,7 @@ def apply_phrase_reply(reply: dict, w_map: dict, index_of: dict, found: dict, le
         if len({w["s"] for w in members}) != 1 or any("PROPN" in w.get("upos", "") for w in members):
             continue
         ru = " ".join(str(item[2]).split())
-        head = check_phrase(unicodedata.normalize("NFC", " ".join(str(item[1]).split())), ru,
+        head = check_phrase(monotonic(" ".join(str(item[1]).split())), ru,
                             [{"form": w["form"], "lemma": dictionary_head(w, lemma_info or {}), "upos": w.get("upos", "")}
                              for w in members])
         if not head:
@@ -950,8 +1056,13 @@ For each form return:
   "причастие страд. залога, ж. р.", "слабая форма местоимения, вин. п.". Mark irregular stems: "неправильный аорист".
 - translation: the Russian translation of THIS exact form, in a matching Russian form, 1–3 words
   ("проснулись", "проснётся", "окон", "его").
-- level: the CEFR level at which a learner normally recognises and uses THIS form (not just the word):
-  regular forms of common words early; irregular stems, passive, rare or learned (katharevousa) forms later.
+- level: the CEFR level of the GRAMMAR of this form only — the inflection pattern, the stem change — as if the
+  learner already knew the word itself. Ignore how rare or difficult the word is: its own level is judged separately.
+  Examples: φρίκης (genitive singular of a feminine noun in -η) → A2, although φρίκη itself is a B2 word;
+  έτρεμε (imperfect of a regular verb) → A2; ήταν → A1; ξύπνησαν (regular aorist) → A2; είπε, ήρθε, βρήκε
+  (irregular aorist stems of the most common verbs) → A2; βρίσκεται (present passive/deponent) → A2;
+  ειπώθηκε (passive aorist with a stem change) → B1; κουρασμένος (passive participle) → B1;
+  τρέχοντας (gerund) → B1; είχε φύγει (pluperfect) → B2; learned/katharevousa endings (-ούσης, -εως) → C1.
   One level "A2", two adjacent levels "A2-B1", or "?" if you cannot judge.
 
 Return ONLY one JSON object, no markdown:
@@ -1031,7 +1142,39 @@ def run_forms(chapters: list[dict], lemma_info: dict, config: dict, cache: Cache
         progress.finish()
     else:
         log("   всё из кеша")
+    lowered = calibrate_form_levels(forms, items)
+    if lowered:
+        log(f"   уровень формы сверен с такой же грамматикой в книге: опущено {lowered}")
     return complete, forms
+
+
+FORM_CALIBRATE_MIN = 8       # сверяем, если в книге не меньше стольких форм с теми же признаками
+FORM_CALIBRATE_SHARE = 0.8   # уровень — не выше того, что покрывает 80% таких форм
+
+
+def calibrate_form_levels(forms: dict, items: dict) -> int:
+    """Уровень формы — про грамматику, но лёгкая модель всё равно поднимает формы редких слов: έδειξε, χάλασε — B1,
+    хотя тот же аорист у сотни других глаголов книги — A2. Сверяем модель саму с собой (без таблиц): формы
+    с одинаковыми признаками Stanza (часть речи + UD feats: «аорист, изъяв., 3 л. ед. ч., действ.») — одна грамматика;
+    B1 и выше, если 80% таких форм книги ниже, опускается до их уровня. C1 и выше (кафаревуса) не трогаем.
+    Значения в forms заменяются новыми списками (ответы модели в кеше остаются как есть). Возвращает, сколько опущено."""
+    groups: dict[tuple, list] = {}
+    for fk, _form, _head, upos, feats, _hint in items.values():
+        value = forms.get(fk)
+        if value and feats and level_top(value[2]) >= 0:
+            groups.setdefault((upos, feats), []).append(fk)
+    b1, c1, lowered = LEVELS.index("B1"), LEVELS.index("C1"), 0
+    for keys in groups.values():
+        if len(keys) < FORM_CALIBRATE_MIN:
+            continue
+        tops = sorted(level_top(forms[k][2]) for k in keys)
+        cap = tops[-(-len(tops) * int(FORM_CALIBRATE_SHARE * 10) // 10) - 1]
+        for k in keys:
+            top = level_top(forms[k][2])
+            if top > cap and b1 <= top < c1:
+                forms[k] = [forms[k][0], forms[k][1], LEVELS[cap]]
+                lowered += 1
+    return lowered
 
 
 # ─────────────────────────── 2d. Уровни (CEFR) ───────────────────────────
@@ -1239,7 +1382,7 @@ def build_book(chapters: list[dict], title: str, lemma_info: dict, meta: dict, f
         for phrase in chapter.get("phrases", []):
             out_phrases.append([[i + w_offset for i in phrase["w"]], phrase["head"], phrase["ru"], phrase.get("level")])
         for word in chapter["words"]:
-            head = word.get("head") or word["lemma"]
+            head = monotonic(word.get("head") or word["lemma"])
             item = {
                 "start": word["start"] + offset,
                 "end": word["end"] + offset,
@@ -1306,7 +1449,7 @@ def save_book_html(data: dict, path: Path) -> None:
     page = re.sub(r"<title>.*?</title>", lambda _m: f"<title>{html_escape(data['title'])}</title>", page, count=1)
     page = page.replace('<html lang="ru">',
                         '<html lang="ru">\n<!-- Собрано bookconverter.py: книга целиком в одном файле. -->', 1)
-    path.write_text(page, encoding="utf-8")
+    write_lf(path, page)
 
 
 def html_escape(value: str) -> str:
@@ -1316,11 +1459,8 @@ def html_escape(value: str) -> str:
 def save_book_data(data: dict, path: Path) -> None:
     encoded = encode_data(data)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "// Автоматически создан tools/library/bookconverter.py. Только данные, без HTML.\n"
-        f"window.GREEK_BOOK_DATA = {encoded};\n",
-        encoding="utf-8",
-    )
+    write_lf(path, "// Автоматически создан tools/library/bookconverter.py. Только данные, без HTML.\n"
+                   f"window.GREEK_BOOK_DATA = {encoded};\n")
 
 
 def read_book_data(path: Path) -> dict:
@@ -1486,6 +1626,36 @@ def build_site_dict(books: list[tuple[dict, dict]]) -> dict:
     }
 
 
+def level_top(level) -> int:
+    parts = [x for x in str(level or "").split("–") if x in LEVELS]
+    return LEVELS.index(parts[-1]) if parts else -1
+
+
+def text_level(data: dict) -> dict | None:
+    """Уровень текста по словарю — как textLevel() в library/owntext.js: самый низкий уровень, при котором знакомы
+    95% слов текста (98% — свободно). Уровень слова в тексте — наибольший из уровня леммы и уровня формы;
+    имена и слова без уровня не считаются. Ципф: частых A1–A2 много в любом тексте, решает «хвост» редких."""
+    text, lemmas, forms = data.get("text", ""), data.get("lemmas", {}), data.get("forms", {}) or {}
+    counts = [0] * len(LEVELS)
+    for w in data.get("words", []):
+        if "PROPN" in w.get("upos", ""):
+            continue
+        lemma = level_top((lemmas.get(w["key"]) or {}).get("level"))
+        if lemma < 0:
+            continue
+        form = level_top((forms.get(form_key(text[w["start"]:w["end"]], w["key"])) or ["", "", ""])[2])
+        counts[max(lemma, form)] += 1
+    total = sum(counts)
+    if total < 15:
+        return None
+    acc, level, fluent = 0, "", ""
+    for i, name in enumerate(LEVELS):
+        acc += counts[i]
+        level = level or (name if acc / total >= 0.95 else "")
+        fluent = fluent or (name if acc / total >= 0.98 else "")
+    return {"level": level or "C2", "fluent": fluent or "C2"}
+
+
 def catalog_entry(book: dict, data: dict) -> dict:
     entry = {"id": book["id"], "title": book.get("title") or data.get("title") or book["id"]}
     for field in ("author", "level", "about", "license"):
@@ -1497,6 +1667,7 @@ def catalog_entry(book: dict, data: dict) -> dict:
         "lemmas": len(data.get("lemmas", {})),
         "phrases": len(data.get("phrases", [])),
         "complete": bool((data.get("meta") or {}).get("complete", True)),
+        "estimate": text_level(data),
         "updated": str((data.get("meta") or {}).get("created", ""))[:10],
     })
     return entry
@@ -1504,7 +1675,7 @@ def catalog_entry(book: dict, data: dict) -> dict:
 
 def write_js(path: Path, comment: str, name: str, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"// {comment}\nwindow.{name} = {encode_data(value)};\n", encoding="utf-8")
+    write_lf(path, f"// {comment}\nwindow.{name} = {encode_data(value)};\n")
 
 
 def rebuild_site(books: list[dict]) -> None:
@@ -1536,6 +1707,51 @@ def rebuild_site(books: list[dict]) -> None:
         f" Словарь сайта: форм {stats['forms']}, лемм {stats['lemmas']}, оборотов {stats['phrases']}.")
 
 
+CANDIDATES_PATH = REPO_DIR / "tools" / "words" / "library_candidates.tsv"
+SKIP_POS = ("арт.", "част.", "предл.", "союз", "мест.", "межд.", "имя собств.")
+
+
+def write_candidates() -> None:
+    """Кандидаты в колоды игры: слова и обороты словаря сайта с точным уровнем A1, A2 или B1, которых ещё нет
+    во встроенных колодах (content/ru/words.js). Не добавляются сами: уровни и переводы лёгкой модели шумные —
+    файл читаем глазами, когда пополняем колоды (как additions_v7.py)."""
+    path = LIB_DIR / "dict.js"
+    if not path.is_file():
+        raise SystemExit("Нет library/dict.js — сначала соберите книги.")
+    content = path.read_text(encoding="utf-8")
+    site = json.loads(content[content.index("{"):content.rstrip().rstrip(";").rindex("}") + 1])
+    decks = set(deck_levels())
+    words_js = REPO_DIR / "content" / "ru" / "words.js"
+    if words_js.is_file():   # стартовая колода (SAMPLE_DECK) — без уровня, но слова в игре уже есть
+        text = words_js.read_text(encoding="utf-8")
+        start = text.find("const SAMPLE_DECK")
+        if start >= 0:
+            decks |= {level_key(w) for w in re.findall(r"\[\s*'([^']+)'", text[start:])}
+    rows, seen = [], set()
+    for key, entry in site["lemmas"].items():
+        head, level, pos = entry.get("head", key), entry.get("level"), entry.get("pos", "")
+        if level not in ("A1", "A2", "B1") or not entry.get("ru") or pos.startswith(SKIP_POS):
+            continue
+        if "+" in head or not pure_greek(head) or level_key(head) in decks:
+            continue
+        rows.append((level, head, entry["ru"], pos, entry.get("en", ""), "слово"))
+    for item in site["phrases"]:
+        level = item[3] if len(item) > 3 else None
+        if level in ("A1", "A2", "B1") and level_key(item[1]) not in decks:
+            rows.append((level, item[1], item[2], "оборот", "", "оборот"))
+    rows.sort(key=lambda r: (r[0], fold(bare_lemma(r[1]))))
+    rows = [r for r in rows if not (level_key(r[1]) in seen or seen.add(level_key(r[1])))]   # одно слово — одна строка
+    CANDIDATES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(CANDIDATES_PATH, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("# Кандидаты в колоды игры из словаря библиотеки (python tools/library/bookconverter.py --candidates).\n"
+                 "# Точный уровень A1/A2/B1 по оценке модели, во встроенных колодах их нет. Проверять глазами.\n")
+        fh.write("level\tgreek\tru\tpos\ten\tkind\n")
+        for r in rows:
+            fh.write("\t".join(r) + "\n")
+    by = {lv: sum(1 for r in rows if r[0] == lv) for lv in ("A1", "A2", "B1")}
+    log(f"Кандидаты в колоды: A1 {by['A1']}, A2 {by['A2']}, B1 {by['B1']} → {CANDIDATES_PATH.relative_to(REPO_DIR)}")
+
+
 # ─────────────────────────── main ───────────────────────────
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -1543,6 +1759,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("books", nargs="*", metavar="ID", help="какие книги собрать (папки в texts/ или private/)")
     parser.add_argument("--all", action="store_true", help="собрать все книги")
     parser.add_argument("--dict", action="store_true", help="только пересобрать каталоги и словарь сайта")
+    parser.add_argument("--candidates", action="store_true",
+                        help="записать tools/words/library_candidates.tsv — кандидаты в колоды игры (A1–B1, которых нет в колодах)")
     parser.add_argument("--offline", action="store_true",
                         help="ничего не запрашивать у модели, собрать из кеша")
     parser.add_argument("--retry-bad", dest="retry_bad", action="store_true",
@@ -1605,12 +1823,17 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         chapters.append({"title": chapter_title, "text": text, "sentences": sentences,
                          "words": words, "phrases": phrases})
 
+    decks = deck_levels()
+    if client:
+        merged, reverted = settle_lemmas(chapters, lemma_info, decks)
+        if merged or reverted:
+            log(f"\nСловарные формы сверены с известными словами: слились {merged}, возвращены прежние {reverted}")
     forms, forms_done = {}, True
     if client and not args.no_forms:
         forms_done, forms = run_forms(chapters, lemma_info, config, cache, client)
     levels_done = True
     if client and not args.no_levels:
-        levels_done = run_levels(lemma_info, [p for ch in chapters for p in ch["phrases"]], config, cache, client, deck_levels())
+        levels_done = run_levels(lemma_info, [p for ch in chapters for p in ch["phrases"]], config, cache, client, decks)
     title = book.get("title") or (chapters[0]["title"] if len(chapters) == 1 else book["id"])
     meta = {
         "provider": provider,
@@ -1670,8 +1893,11 @@ def main(argv=None, nlp=None, client=None) -> None:
         return
 
     books = find_books()
-    if args.dict:
-        rebuild_site(books)
+    if args.dict or args.candidates:
+        if args.dict:
+            rebuild_site(books)
+        if args.candidates:
+            write_candidates()
         return
     chosen = books if args.all else [b for b in books if b["id"] in args.books]
     unknown = sorted(set(args.books) - {b["id"] for b in books})

@@ -68,6 +68,54 @@
   // Оборот — своя лексическая единица: ключ карточки «phrase:<словарная форма>» (NFC, строчные, ς → σ).
   const phraseKey = head => "phrase:" + String(head || "").normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/\s+/g, " ").trim();
   const isPhraseKey = key => String(key).startsWith("phrase:");
+  // Форма — тоже единица для карточки: «βρίσκεται» и «θα βρω» учатся по-разному. Ключ «form:<форма>|<лемма>».
+  const isFormKey = key => String(key).startsWith("form:");
+  const formCardKey = word => `form:${foldForm(word.form)}|${word.key}`;
+  // Уровни: «B1», «A2–B1», «?». Наибольший из нескольких — по верхней границе; «?» и пустые не считаются.
+  const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
+  const levelTop = level => { const parts = String(level || "").split("–").filter(x => LEVEL_ORDER.includes(x)); return parts.length ? LEVEL_ORDER.indexOf(parts[parts.length - 1]) : -1; };
+  const maxLevel = (...levels) => levels.filter(l => levelTop(l) >= 0).sort((a, b) => levelTop(b) - levelTop(a))[0] || levels.find(Boolean) || "";
+
+  // ───────────── Игра: что уже учится и выучено, мой уровень ─────────────
+  // Игра и библиотека — один сайт, у них общее хранилище браузера. Обучение игры читаем (не пишем).
+  // Прогресс в игре — у слова, а не у карточки (ключ — как Decks.wordKey): выучили слово в любой колоде,
+  // в том числе в «Словах из чтения», — оно «выучено в игре» и здесь.
+  const GAME_KEY = "greekgame.learn.v1";
+  const LEVEL_KEY = "greek-reader:my-level";
+  const gameWordKey = front => String(front || "").normalize("NFC").toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim()
+    .replace(/^(ο|η|το|οι|τα) /, "").replace(/άω$/, "ώ");
+  const game = { words: new Map(), level: "" };
+  const GAME_RANK = { new: 1, learning: 2, learned: 3 };
+  function loadGame() {
+    game.words = new Map();
+    game.level = "";
+    let state = null;
+    try { state = JSON.parse(localStorage.getItem(GAME_KEY) || "null"); } catch (error) { state = null; }
+    if (!state || !Array.isArray(state.decks)) return;
+    const progress = state.progress || {}, byWord = state.v >= 2;   // до v2 прогресс был у карточки
+    const put = (key, status) => { if (!game.words.has(key) || GAME_RANK[status] > GAME_RANK[game.words.get(key)]) game.words.set(key, status); };
+    const statusOf = p => p ? (p.rev >= 0 ? "learned" : "learning") : "";
+    if (byWord) for (const [key, p] of Object.entries(progress)) if (p) put(key, statusOf(p));
+    let best = -1;
+    for (const deck of state.decks) {
+      const m = deck.builtin && /^([ab][12])-/.exec(deck.id || "");
+      if (deck.active && m) best = Math.max(best, LEVEL_ORDER.indexOf(m[1].toUpperCase()));
+      for (const card of deck.cards || []) {
+        const key = gameWordKey(card.front), p = byWord ? null : progress[card.id];
+        if (p) put(key, statusOf(p));
+        else if (!deck.reading) put(key, "new");   // «новое» — только из колод игры: «Слова из чтения» — это наши же карточки
+      }
+    }
+    game.level = best >= 0 ? LEVEL_ORDER[best] : "";
+  }
+  const gameStatus = head => game.words.get(gameWordKey(head)) || "";
+  const bestStatus = (...list) => list.reduce((a, b) => (GAME_RANK[b] || 0) > (GAME_RANK[a] || 0) ? b : a, "");
+  const GAME_STATUS = { learned: "✓ выучено в игре", learning: "учится в игре", new: "есть в колодах игры" };
+  function myLevel() {
+    let own = "";
+    try { own = localStorage.getItem(LEVEL_KEY) || ""; } catch (error) { own = ""; }
+    return LEVEL_ORDER.includes(own) ? own : game.level || "A1";
+  }
   // Форма слова и лемма: ключ формы «ξύπνησαν|ξυπνώ» — как form_key() в bookconverter.py
   const foldForm = value => String(value || "").normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/\u2019/g, "'").replace(/^'+|'+$/g, "");
   const bareHead = head => String(head || "").replace(/^(?:ο|η|το|οι|τα|ένας|μία|μια|ένα)\s+/i, "");
@@ -220,6 +268,7 @@
   const elementsByKey = new Map();
   const wordElements = [];                 // номер слова → его элемент
   const phrasesByKey = new Map();          // ключ оборота → номера его вхождений в data.phrases
+  const formsByKey = new Map();            // ключ карточки формы → номера слов в этой форме
   const phraseWords = i => data.phrases[i].w.map(w => wordElements[w]).filter(Boolean);
   // слово как часть оборота: самый длинный оборот, куда оно входит (или null)
   const phraseOfWord = index => (data.phrasesOfWord.get(index) || [])
@@ -250,6 +299,11 @@
     data.phrases.forEach((phrase, i) => {
       if (!phrasesByKey.has(phrase.key)) phrasesByKey.set(phrase.key, []);
       phrasesByKey.get(phrase.key).push(i);
+    });
+    data.words.forEach((word, i) => {
+      const key = formCardKey(word);
+      if (!formsByKey.has(key)) formsByKey.set(key, []);
+      formsByKey.get(key).push(i);
     });
   }
 
@@ -401,6 +455,7 @@
       gram,
       formRu,
       formLevel: word.formLevel || f[2] || "",
+      game: bestStatus(gameStatus(head), inflected ? gameStatus(word.form) : ""),   // слово или эта самая форма
     };
   }
 
@@ -422,7 +477,22 @@
   // они берутся из book_content.js в момент показа и экспорта (см. cardView).
   // Поле saved — копия последнего известного перевода, только на случай, когда
   // слово открыто в другой книге и взять перевод больше неоткуда.
-  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu", "level", "formGram", "formRu", "formLevel"];
+  const TRANSLATION_FIELDS = ["head", "pos", "meaning", "meaningEn", "gloss", "exampleRu", "level", "formGram", "formRu", "formLevel",
+    "lemmaHead", "lemmaMeaning", "lemmaLevel"];
+
+  function cardFromForm(word) {
+    const card = {
+      key: formCardKey(word),
+      kind: "form",
+      form: word.form,
+      example: sentenceOf(word).text,
+      book: data.title,
+      addedAt: new Date().toISOString(),
+      status: "learning",
+    };
+    card.saved = translationsFor(card) || {};
+    return card;
+  }
 
   function cardFromPhrase(phrase) {
     const first = data.words[phrase.w[0]];
@@ -468,6 +538,21 @@
 
   // Переводы для карточки из текущей книги или null, если слова в книге нет.
   function translationsFor(card) {
+    if (isFormKey(card.key)) {
+      const list = (formsByKey.get(card.key) || []).map(i => data.words[i]);
+      if (!list.length) return null;
+      const s = card.example ? findSentence(card.example) : -1;
+      const same = list.find(w => w.s === s);
+      const word = same || list[0];
+      const info = wordInfo(word);
+      return {
+        head: /PROPN/.test(word.upos) ? word.form : word.form.toLocaleLowerCase("el"),
+        pos: "форма", meaning: info.gloss || info.formRu, meaningEn: "", gloss: "",
+        exampleRu: (same || !card.example) && word.s >= 0 ? data.sentences[word.s].ru : "",
+        level: maxLevel(info.level, info.formLevel), formGram: info.gram, formRu: "", formLevel: info.formLevel,
+        lemmaHead: info.head, lemmaMeaning: info.meaning, lemmaLevel: info.level,
+      };
+    }
     if (isPhraseKey(card.key)) {
       const list = (phrasesByKey.get(card.key) || []).map(i => data.phrases[i]);
       if (!list.length) return null;
@@ -528,7 +613,7 @@
     // «απλά», а модель — «απλώς»), находим слово по сохранённому предложению и форме
     // и переносим карточку на новый ключ.
     for (const card of Object.values(next)) {
-      if (isPhraseKey(card.key) || elementsByKey.has(card.key) || !card.example || !card.form) continue;
+      if (isPhraseKey(card.key) || isFormKey(card.key) || elementsByKey.has(card.key) || !card.example || !card.form) continue;
       const s = findSentence(card.example);
       if (s < 0) continue;
       const word = data.words.find(w => w.s === s && w.form === card.form);
@@ -549,7 +634,7 @@
       for (const field of TRANSLATION_FIELDS) {
         if (field in card) { delete card[field]; changed = true; }
       }
-      if (isPhraseKey(card.key)) {
+      if (isPhraseKey(card.key) || isFormKey(card.key)) {
         const fresh = translationsFor(card);
         if (fresh && JSON.stringify(fresh) !== JSON.stringify(card.saved)) { card.saved = fresh; changed = true; }
         continue;
@@ -584,6 +669,7 @@
     const lit = new Set();
     for (const [key, elements] of elementsByKey) if (learningCard(key)) for (const element of elements) lit.add(element);
     for (const [key, list] of phrasesByKey) if (learningCard(key)) for (const i of list) for (const element of phraseWords(i)) lit.add(element);
+    for (const [key, list] of formsByKey) if (learningCard(key)) for (const i of list) lit.add(wordElements[i]);
     for (const element of wordElements) if (element) element.classList.toggle("word--learning", lit.has(element));
   }
 
@@ -598,7 +684,7 @@
 
   function refreshMeta() {
     if (!data) return;
-    const known = [...elementsByKey.keys(), ...phrasesByKey.keys()].filter(key => cards[key]).length;
+    const known = [...elementsByKey.keys(), ...phrasesByKey.keys(), ...formsByKey.keys()].filter(key => cards[key]).length;
     const parts = [];
     const n = data.chapters.length;
     if (n > 1) {
@@ -612,8 +698,17 @@
       parts.push(`${n.toLocaleString("ru")} ${a > 10 && a < 20 ? "оборотов" : b === 1 ? "оборот" : b >= 2 && b <= 4 ? "оборота" : "оборотов"}`);
     }
     if (known) parts.push(`в колоде ${known}`);
+    if (textLevel) parts.push(`уровень ≈ ${textLevel.level}`);
     $("#book-meta").textContent = parts.join(" · ");
+    $("#book-meta").title = textLevel ? textLevelTip(textLevel) : "";
   }
+
+  // уровень текста по словарю (owntext.js): покрытие 95% — понятно с опорой на контекст, 98% — свободно
+  let textLevel = null;
+  const pct = x => `${Math.round(x * 100)}%`;
+  const textLevelTip = t => `Уровень текста по словарю ≈ ${t.level}: при ${t.level} знакомы ${pct(t.coverage[t.level])} слов текста`
+    + (t.fluent !== t.level ? `, свободно (98%) — с ${t.fluent}` : " — читается свободно")
+    + `. Считается по уровням слов и их форм; частые слова A1–A2 есть в любом тексте, решает «хвост» редких.`;
 
   function refreshAll() {
     refreshHighlights();
@@ -683,6 +778,10 @@
       if (!learningCard(key)) continue;
       for (const i of list) add(data.phrases[i].w[0], data.phrases[i]);
     }
+    for (const [key, list] of formsByKey) {
+      if (!learningCard(key)) continue;
+      for (const i of list) add(i, phraseOfWord(i));
+    }
     items.sort((a, b) => a.top - b.top);
 
     let bottom = -Infinity;
@@ -709,6 +808,9 @@
       const note = document.createElement("button");
       note.type = "button";
       note.className = item.unit ? "margin-note margin-note--phrase" : "margin-note";
+      // уже выучено в игре — пометка зелёным: подсказка на полях для связности, учить не нужно
+      const known = item.unit ? gameStatus(item.unit.head) : wordInfo(word).game;
+      if (known === "learned") { note.classList.add("margin-note--known"); note.title = "Выучено в игре"; }
       note.dataset.i = String(item.index);
       const greek = el("span", "margin-note__gr", note);
       greek.lang = "el";
@@ -767,6 +869,7 @@
   const pGram = el("div", "popover__gram", popover);             // грамматика формы + уровень формы
   const pLemma = el("div", "popover__lemma", popover);
   const pSeen = el("div", "popover__seen", popover);
+  const pGame = el("div", "popover__game", popover);
   const pGrammar = el("div", "popover__grammar", popover);
   const pRaw = el("div", "popover__raw", popover);
   const pSentence = el("div", "popover__sentence", popover);
@@ -811,15 +914,22 @@
   }
 
   function renderPopoverActions() {
-    // Запоминается лексическая единица: оборот, если слово в него входит, иначе слово.
-    const unitKey = currentPhrase ? currentPhrase.key : currentWord.key;
-    const card = cards[unitKey];
-    const what = currentPhrase ? "Оборот" : "Слово";
+    // Единицы для карточки: оборот (если слово в нём) или слово — главная; форма слова (если она изменённая)
+    // и само слово внутри оборота — запасные, ссылками ниже.
+    const info = wordInfo(currentWord);
+    const units = [];
+    if (currentPhrase) units.push({ key: currentPhrase.key, make: () => cardFromPhrase(currentPhrase), what: "Оборот", button: "Запомнить оборот", link: "" });
+    units.push({ key: currentWord.key, make: () => cardFromWord(currentWord), what: "Слово",
+      button: info.inflected ? "Запомнить слово" : "Запомнить", link: `или только слово «${bareHead(info.head)}»` });
+    if (info.inflected) units.push({ key: formCardKey(currentWord), make: () => cardFromForm(currentWord), what: "Форма",
+      button: "", link: `или эту форму «${currentWord.form}»` });
+    const [main, ...rest] = units;
+    const card = cards[main.key];
     pActions.replaceChildren();
     if (!card) {
-      pActions.append(button(currentPhrase ? "Запомнить оборот" : "Запомнить", "button", () => {
+      pActions.append(button(main.button, "button", () => {
         const rect = currentElement.getBoundingClientRect();
-        const fresh = currentPhrase ? cardFromPhrase(currentPhrase) : cardFromWord(currentWord);
+        const fresh = main.make();
         if (updateCards(next => { next[fresh.key] = fresh; })) {
           flyToDeck(rect, cardView(fresh));
           lastAddedKey = fresh.key;
@@ -827,7 +937,7 @@
       }));
     } else if (card.status !== "learned") {
       const status = el("span", "popover__status");
-      status.textContent = `✓ ${what} в карточках`;
+      status.textContent = `✓ ${main.what} в карточках`;
       pActions.append(
         status,
         button("Выучил", "button button--quiet", () => {
@@ -837,7 +947,7 @@
       );
     } else {
       const status = el("span", "popover__status");
-      status.textContent = `✓ ${what} выучен${currentPhrase ? "" : "о"}`;
+      status.textContent = `✓ ${main.what} — выучено`;
       pActions.append(
         status,
         button("Снова учить", "button button--quiet", () => {
@@ -845,14 +955,13 @@
         }),
       );
     }
-    // внутри оборота можно запомнить и само слово — отдельной карточкой
-    if (currentPhrase) {
-      const wordCard = cards[currentWord.key];
+    for (const unit of rest) {
       const extra = el("div", "popover__word-action", pActions);
-      if (wordCard) extra.textContent = `слово «${cardView(wordCard).head}» тоже в карточках`;
-      else extra.append(button(`или только слово «${wordInfo(currentWord).head}»`, "link-button", () => {
-        const fresh = cardFromWord(currentWord);
-        if (updateCards(next => { next[fresh.key] = fresh; })) lastAddedKey = fresh.key;
+      if (cards[unit.key]) extra.textContent = `${unit.what.toLowerCase()} «${cardView(cards[unit.key]).head}» тоже в карточках`;
+      else extra.append(button(unit.link, "link-button", () => {
+        const rect = currentElement.getBoundingClientRect();
+        const fresh = unit.make();
+        if (updateCards(next => { next[fresh.key] = fresh; })) { flyToDeck(rect, cardView(fresh)); lastAddedKey = fresh.key; }
       }));
     }
     pError.textContent = storageError;
@@ -920,6 +1029,11 @@
       link.textContent = "Викисловарь ↗";
     }
     pSeen.hidden = !pSeen.childNodes.length;
+    // в игре это слово (или оборот) уже есть
+    const inGame = phrase ? gameStatus(phrase.head) || info.game : info.game;
+    pGame.textContent = inGame ? GAME_STATUS[inGame] + (phrase && gameStatus(phrase.head) ? " (оборот)" : "") : "";
+    pGame.className = `popover__game popover__game--${inGame || "none"}`;
+    pGame.hidden = !inGame;
 
     // признаки разборщика — только если модель не описала форму
     const { labels, unknown } = parseFeats(word.feats);
@@ -1027,7 +1141,12 @@
   const deckList = $("#deck-list");
   const deckSearch = $("#deck-search");
   let activeTab = "learning";
+  let levelFilter = "mine";   // карточки — кандидаты: «моего уровня» (и ниже), «выше», «все»
   let lastAddedKey = "";
+  const cardBucket = card => {
+    const t = levelTop(card.level);
+    return t < 0 ? "none" : t <= LEVEL_ORDER.indexOf(myLevel()) ? "mine" : "above";
+  };
 
   function openDeck() {
     hidePopover();
@@ -1068,8 +1187,17 @@
 
   function renderDeckList() {
     const query = deckSearch.value.trim().toLocaleLowerCase("ru");
-    const list = Object.values(cards).map(cardView)
-      .filter(card => (activeTab === "learned") === (card.status === "learned"))
+    const tabCards = Object.values(cards).map(cardView).filter(card => (activeTab === "learned") === (card.status === "learned"));
+    const buckets = { mine: 0, above: 0, none: 0 };
+    for (const card of tabCards) buckets[cardBucket(card)] += 1;
+    $("#level-mine-count").textContent = String(buckets.mine);
+    $("#level-above-count").textContent = String(buckets.above);
+    $("#level-all-count").textContent = String(tabCards.length);
+    for (const b of document.querySelectorAll("[data-lf]")) b.setAttribute("aria-pressed", String(b.dataset.lf === levelFilter));
+    const level = $("#my-level");
+    if (level && level.value !== myLevel()) level.value = myLevel();
+    const list = tabCards
+      .filter(card => levelFilter === "all" || cardBucket(card) === levelFilter)
       .filter(card => cardMatches(card, query))
       .sort((a, b) => String(b.learnedAt || b.addedAt).localeCompare(String(a.learnedAt || a.addedAt)));
 
@@ -1081,6 +1209,9 @@
       const empty = el("div", "deck-empty");
       if (query) {
         empty.textContent = "Ничего не найдено.";
+      } else if (activeTab === "learning" && tabCards.length) {
+        empty.textContent = levelFilter === "mine" ? `Карточек вашего уровня (${myLevel()} и ниже) пока нет — они в «выше» или без уровня.`
+          : "Карточек выше вашего уровня нет.";
       } else if (activeTab === "learning") {
         empty.innerHTML = "Пока пусто. Нажми на любое слово в тексте и выбери <b>«Запомнить»</b> — карточка появится здесь.";
       } else {
@@ -1106,10 +1237,31 @@
         const level = el("span", "chip chip--level", top);
         showLevel(level, card.level);
       }
+      // прогресс в игре — у слова: учится или выучено в любой колоде — так и пишем; иначе — едет ли в «Слова из чтения»
+      const inGame = gameStatus(card.head);
+      if (inGame && inGame !== "new") {
+        const chip = el("span", `chip chip--game chip--game-${inGame}`, item);
+        chip.textContent = GAME_STATUS[inGame];
+      } else if (card.status !== "learned" && cardBucket(card) === "mine") {
+        const chip = el("span", "chip chip--game chip--game-reading", item);
+        chip.textContent = "→ в игре: «Слова из чтения»";
+        chip.title = "Карточки вашего уровня и ниже сами попадают в колоду игры «📖 Слова из чтения»."
+          + (inGame ? " Это слово есть и в колодах игры — прогресс у него общий." : "");
+      } else if (inGame) {
+        const chip = el("span", "chip chip--game chip--game-new", item);
+        chip.textContent = GAME_STATUS.new;
+      }
       const meaning = el("div", "card__meaning", item);
       meaning.textContent = card.meaning || card.gloss || card.meaningEn || "—";
+      // карточка формы: ниже — что это за форма и от какого слова
+      if (isFormKey(card.key) && card.lemmaHead) {
+        const form = el("div", "card__form", item);
+        form.append([card.formGram, `от ${bareHead(card.lemmaHead)}${card.lemmaMeaning ? ` — ${card.lemmaMeaning}` : ""}`].filter(Boolean).join(" · "));
+        if (card.formLevel) { const chip = el("span", "chip chip--level", form); showLevel(chip, card.formLevel, "форма"); }
+        if (card.lemmaLevel) { const chip = el("span", "chip chip--level", form); showLevel(chip, card.lemmaLevel, "слово"); }
+      }
       // слово встретилось в изменённой форме — она тоже в карточке, но вторым планом
-      if (!isPhraseKey(card.key) && card.form && isInflected(card.form, card.head)) {
+      if (!isPhraseKey(card.key) && !isFormKey(card.key) && card.form && isInflected(card.form, card.head)) {
         const form = el("div", "card__form", item);
         const gr = el("i", "", form);
         gr.lang = "el";
@@ -1134,7 +1286,7 @@
         actions.append(button("Выучил ✓", "link-button", () =>
           updateCards(next => { next[card.key].status = "learned"; next[card.key].learnedAt = new Date().toISOString(); })));
       }
-      if (elementsByKey.has(card.key) || phrasesByKey.has(card.key)) {
+      if (elementsByKey.has(card.key) || phrasesByKey.has(card.key) || formsByKey.has(card.key)) {
         actions.append(button("Найти в тексте", "link-button", () => revealInText(card.key), false));
       }
       actions.append(button("Удалить", "link-button link-button--danger", () => {
@@ -1152,7 +1304,8 @@
   }
 
   function revealInText(key) {
-    const element = isPhraseKey(key) ? wordElements[data.phrases[(phrasesByKey.get(key) || [])[0]]?.w[0]] : (elementsByKey.get(key) || [])[0];
+    const element = isPhraseKey(key) ? wordElements[data.phrases[(phrasesByKey.get(key) || [])[0]]?.w[0]]
+      : isFormKey(key) ? wordElements[(formsByKey.get(key) || [])[0]] : (elementsByKey.get(key) || [])[0];
     if (!element) return;
     closeDeck();
     element.scrollIntoView({ block: "center", behavior: reduceMotion() ? "auto" : "smooth" });
@@ -1174,7 +1327,9 @@
       .sort((a, b) => String(a.addedAt).localeCompare(String(b.addedAt)));
   }
 
-  const cardInflected = card => !isPhraseKey(card.key) && card.form && isInflected(card.form, card.head);
+  const cardInflected = card => !isPhraseKey(card.key) && !isFormKey(card.key) && card.form && isInflected(card.form, card.head);
+  const formNote = card => isFormKey(card.key) && card.lemmaHead
+    ? [card.formGram, `от ${bareHead(card.lemmaHead)}${card.lemmaMeaning ? ` — ${card.lemmaMeaning}` : ""}`].filter(Boolean).join(", ") : "";
   // лицевая сторона: слово (лемма), а встреченная форма — рядом, вторым планом
   const frontText = card => cardInflected(card) ? `${card.head || card.key} (${card.form})` : (card.head || card.key);
   const formText = card => [card.form, card.formRu && `— ${card.formRu}`, card.formGram && `(${card.formGram})`].filter(Boolean).join(" ");
@@ -1182,6 +1337,7 @@
   function backText(card) {
     const meaning = card.meaning || card.gloss || card.meaningEn || "";
     const base = card.pos ? `${meaning} (${card.pos})` : meaning;
+    if (formNote(card)) return `${meaning} (${formNote(card)})`;
     return cardInflected(card) ? `${base}; в тексте: ${formText(card)}` : base;
   }
 
@@ -1194,6 +1350,7 @@
     const parts = [`<b>${escapeHtml(card.meaning || card.gloss || card.meaningEn)}</b>`];
     if (card.pos || card.level) parts.push(`<small>${escapeHtml([card.pos, card.level && card.level !== "?" ? card.level : ""].filter(Boolean).join(", "))}</small>`);
     if (card.meaningEn) parts.push(`<small>en: ${escapeHtml(card.meaningEn)}</small>`);
+    if (formNote(card)) parts.push(`<small>${escapeHtml(formNote(card))}</small>`);
     if (cardInflected(card)) {
       parts.push(`<br><i>${escapeHtml(card.form)}</i>${card.formRu ? ` — ${escapeHtml(card.formRu)}` : ""}`
         + (card.formGram || card.formLevel ? ` <small>(${escapeHtml([card.formGram, card.formLevel && card.formLevel !== "?" ? "форма " + card.formLevel : ""].filter(Boolean).join("; "))})</small>` : ""));
@@ -1375,8 +1532,10 @@
   }
 
   loadDeck();
+  loadGame();
   renderBook();
   indexPhrases();
+  textLevel = window.OwnText && window.OwnText.textLevel ? window.OwnText.textLevel(raw) : null;
   setupChapters();
   computeParagraphs();
   refreshCardsFromBook();
@@ -1472,15 +1631,23 @@
     if (file) loadBackup(file);
     event.target.value = "";
   });
-  // Синхронизация между вкладками с открытыми книгами.
+  // Синхронизация между вкладками с открытыми книгами и с игрой (выучила слово — на полях оно позеленеет).
   window.addEventListener("storage", event => {
+    if (event.key === GAME_KEY || event.key === LEVEL_KEY) { loadGame(); refreshAll(); return; }
     if (event.key !== STORE_KEY) return;
     loadDeck();
     refreshAll();
   });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadGame(); refreshAll(); } });
+  for (const b of document.querySelectorAll("[data-lf]")) b.addEventListener("click", () => { levelFilter = b.dataset.lf; renderDeckList(); });
+  const levelSelect = $("#my-level");
+  if (levelSelect) levelSelect.addEventListener("change", () => {
+    try { localStorage.setItem(LEVEL_KEY, levelSelect.value); } catch (error) { /* не сохранится — не страшно */ }
+    refreshAll();
+  });
   }
 
-  window.GreekReader = { start, fail };
+  window.GreekReader = { start, fail, myLevel: () => { loadGame(); return myLevel(); } };
   // Самодостаточный файл: данные уже на странице.
   if (window.GREEK_BOOK_DATA) start(window.GREEK_BOOK_DATA);
 })();

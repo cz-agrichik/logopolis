@@ -8,13 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Caveat:wght@500;600&display=swap">
-  <link rel="stylesheet" href="reader.css?v=5">
+  <link rel="stylesheet" href="reader.css?v=7">
   <!-- Читалка библиотеки: ?book=<id> — книга из каталога, ?own — свой текст по словарю сайта -->
   <script src="catalog.js"></script>
   <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
-  <script src="reader.js?v=5" defer></script>
-  <script src="owntext.js?v=5" defer></script>
-  <script src="library.js?v=5" defer></script>
+  <script src="reader.js?v=7" defer></script>
+  <script src="owntext.js?v=7" defer></script>
+  <script src="library.js?v=7" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -79,6 +79,17 @@
     <div class="deck__tabs" role="tablist">
       <button type="button" class="tab" role="tab" data-tab="learning" aria-selected="true">Учу <span id="tab-learning-count"></span></button>
       <button type="button" class="tab" role="tab" data-tab="learned" aria-selected="false">Выучил <span id="tab-learned-count"></span></button>
+    </div>
+    <div class="deck__level">
+      <label>Мой уровень
+        <select id="my-level" title="По умолчанию — по включённым колодам игры. Карточки вашего уровня и ниже сами попадают в колоду игры «Слова из чтения».">
+          <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option>
+        </select></label>
+      <span class="deck__filter" role="group" aria-label="Какие карточки показать">
+        <button type="button" data-lf="mine" aria-pressed="true">моего уровня <span id="level-mine-count"></span></button>
+        <button type="button" data-lf="above" aria-pressed="false">выше <span id="level-above-count"></span></button>
+        <button type="button" data-lf="all" aria-pressed="false">все <span id="level-all-count"></span></button>
+      </span>
     </div>
     <input type="search" class="deck__search" id="deck-search" placeholder="Поиск по-гречески или по-русски" autocomplete="off">
     <div class="deck__list" id="deck-list"></div>

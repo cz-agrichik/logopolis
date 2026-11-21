@@ -36,9 +36,11 @@ Object.assign(Decks, {
     }
   },
 
-  /** Прогресс карточки в актуальном формате (старые «коробки» переводятся на лету). */
-  prog(state, id) {
-    const p = state.progress[id];
+  /** Прогресс карточки — то есть её слова (pkey): у одного слова во всех колодах прогресс общий. */
+  prog(state, card) { return card ? this.progAt(state, this.pkey(card)) : null; },
+  /** Прогресс по ключу в актуальном формате (старые «коробки» переводятся на лету). */
+  progAt(state, key) {
+    const p = state.progress[key];
     if (!p) return null;
     if (p.step == null) {   // миграция с коробок Лейтнера
       const box = p.box || 0, L = this.settings(state).learnSteps;
@@ -53,7 +55,7 @@ Object.assign(Decks, {
   canType(card) { const n = [...card.front].length; return n >= 2 && n <= 18 && !/[\s.,!?;:()'"«»-]/.test(card.front); },
   /** Слово дошло до последнего шага, но ещё ни разу не набрано — последним шагом будет набор. */
   needsBuild(state, card) {
-    const p = this.prog(state, card.id);
+    const p = this.prog(state, card);
     return !!p && p.rev < 0 && !p.built && p.step >= this.settings(state).learnSteps - 1 && this.canType(card);
   },
   /** Есть ли в слове трудное место для «Какая буква?». */
@@ -61,9 +63,13 @@ Object.assign(Decks, {
   /** Сложность задания: 0 — новая, 1–2 — заучивается, 3+ — выучена. */
   level(p) { return !p ? 0 : p.rev >= 0 ? 3 + p.rev : Math.min(2, p.step); },
 
+  /** Карточки включённых колод, каждое слово — один раз (слово из двух колод — карточка первой из них). */
   activeCards(state) {
-    const out = [];
-    for (const d of state.decks) if (d.active) for (const c of d.cards) out.push(c);
+    const out = [], seen = new Set();
+    for (const d of state.decks) if (d.active) for (const c of d.cards) {
+      const k = this.pkey(c);
+      if (!seen.has(k)) { seen.add(k); out.push(c); }
+    }
     return out;
   },
 
@@ -71,7 +77,7 @@ Object.assign(Decks, {
     const now = Date.now();
     const s = { total: deck.cards.length, fresh: 0, learning: 0, learned: 0, due: 0 };
     for (const c of deck.cards) {
-      const p = this.prog(state, c.id);
+      const p = this.prog(state, c);
       if (!p) { s.fresh++; continue; }
       if (this.isLearned(p)) s.learned++; else s.learning++;
       if (p.due <= now) s.due++;
@@ -83,7 +89,7 @@ Object.assign(Decks, {
     const now = Date.now();
     let due = 0, fresh = 0;
     for (const c of this.activeCards(state)) {
-      const p = this.prog(state, c.id);
+      const p = this.prog(state, c);
       if (!p) fresh++;
       else if (p.due <= now) due++;
     }
@@ -113,15 +119,15 @@ Object.assign(Decks, {
     const n = set.roundSize, maxNew = set.newPerRound;
     const learning = [], due = [], fresh = [], early = [];
     for (const c of this.activeCards(state)) {
-      const p = this.prog(state, c.id);
+      const p = this.prog(state, c);
       if (!p) fresh.push(c);
       else if (p.due <= now) (this.isLearned(p) ? due : learning).push(c);
       else early.push(c);
     }
-    const byDue = (a, b) => state.progress[a.id].due - state.progress[b.id].due;
+    const byDue = (a, b) => this.prog(state, a).due - this.prog(state, b).due;
     learning.sort(byDue); due.sort(byDue); early.sort(byDue);
     const picks = [];
-    const add = (c, kind) => picks.push({ card: c, kind, lvl: this.level(this.prog(state, c.id)) });
+    const add = (c, kind) => picks.push({ card: c, kind, lvl: this.level(this.prog(state, c)) });
     for (const c of learning) { if (picks.length >= n) break; add(c, 'due'); }
     for (const c of due) { if (picks.length >= n) break; add(c, 'due'); }
     for (const c of shuffle(fresh).slice(0, maxNew)) { if (picks.length >= n) break; add(c, 'new'); }
@@ -135,7 +141,7 @@ Object.assign(Decks, {
    *  Возвращает 'learned' (стало выученным), 'needtype' (осталось набрать) или null. */
   grade(state, card, correct, kind, task = 'gr2ru') {
     const now = Date.now(), set = this.settings(state), iv = this.intervals(state), L = set.learnSteps;
-    const p = this.prog(state, card.id) || { step: 0, rev: -1, due: 0, right: 0, wrong: 0 };
+    const p = this.prog(state, card) || { step: 0, rev: -1, due: 0, right: 0, wrong: 0 };
     const spelling = task === 'spell' || task === 'build';
     let event = null;
     if (correct) {
@@ -163,13 +169,13 @@ Object.assign(Decks, {
       p.due = now + LEARN_DELAY;
     }
     p.last = now;
-    state.progress[card.id] = p;
+    state.progress[this.pkey(card)] = p;
     return event;
   },
 
   /** Состояние карточки одним словом: new / learning / learned (+ due — пора повторить). */
   status(state, card, now = Date.now()) {
-    const p = this.prog(state, card.id);
+    const p = this.prog(state, card);
     if (!p) return { st: 'new', due: false, p };
     return { st: this.isLearned(p) ? 'learned' : 'learning', due: p.due <= now, p };
   },

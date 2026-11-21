@@ -89,3 +89,19 @@ test('мои тексты: хранилище в браузере — сохра
   mem2['greek-reader:own-texts:v1'] = '{oops';
   assert.deepStrictEqual(S2.list(), []);
 });
+
+test('уровень текста по словарю: покрытие 95% (понятно) и 98% (свободно), уровень формы поднимает слово', () => {
+  const words = [], lemmas = { a: { level: 'A1' }, b: { level: 'A2' }, c: { level: 'B1' }, d: { level: 'A1' }, n: {} };
+  let text = '';
+  const add = (form, key, upos = 'NOUN') => { const start = Array.from(text).length; text += form + ' '; words.push({ start, end: start + Array.from(form).length, key, upos }); };
+  for (let i = 0; i < 90; i++) add('αα', 'a');
+  for (let i = 0; i < 6; i++) add('ββ', 'b');
+  for (let i = 0; i < 3; i++) add('γγ', 'c');
+  add('δδ', 'd');                       // слово A1, но форма B1 — считается B1
+  add('Νίκος', 'n', 'PROPN');           // имя не считается
+  const L = Own.textLevel({ text, words, lemmas, forms: { 'δδ|d': ['аорист', 'x', 'B1'] } });
+  assert.strictEqual(L.total, 100);
+  assert.strictEqual(L.level, 'A2'); assert.strictEqual(L.fluent, 'B1');
+  assert.ok(Math.abs(L.coverage.A2 - 0.96) < 1e-9);
+  assert.strictEqual(Own.textLevel({ text: 'α', words: [], lemmas: {} }), null, 'слишком мало слов — уровня нет');
+});

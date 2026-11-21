@@ -11,7 +11,7 @@ const Learn = {
 
   newState() {
     return {
-      v: 1, spread: 1,
+      v: 2, spread: 1,
       decks: Decks.builtinDecks(), progress: {}, settings: { ...DEFAULT_SETTINGS }, learnLog: {},
       stats: { right: 0, wrong: 0, rounds: 0, learned: 0 },
     };
@@ -19,9 +19,10 @@ const Learn = {
 
   /** Привести сохранение к текущему виду. Возвращает, сколько встроенных колод добавилось. */
   migrate(s) {
-    s.v = 1;
     s.decks = s.decks || [];
     s.progress = s.progress || {};
+    if (!(s.v >= 2)) Decks.progressByWord(s);   // v2: прогресс у слова, а не у карточки
+    s.v = 2;
     s.settings = Object.assign({}, DEFAULT_SETTINGS, s.settings || {});
     s.learnLog = s.learnLog || {};
     s.stats = Object.assign({ right: 0, wrong: 0, rounds: 0, learned: 0 }, s.stats || {});

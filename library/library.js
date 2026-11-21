@@ -43,6 +43,7 @@
           b.chapters > 1 && `${b.chapters} ${plural(b.chapters, "глава", "главы", "глав")}`,
           `${num(b.words)} ${plural(b.words, "слово", "слова", "слов")}`,
           b.phrases && `${num(b.phrases)} ${plural(b.phrases, "оборот", "оборота", "оборотов")}`,
+          b.estimate && `<span title="Уровень по словарю: при ${esc(b.estimate.level)} знакомы 95% слов текста, свободно (98%) — с ${esc(b.estimate.fluent)}">по словарю ≈ ${esc(b.estimate.level)}</span>`,
           !b.complete && "перевод неполный",
           b.local && `<span class="chip chip--local" title="Лежит в library/local/ — на сайт не попадает">только у вас</span>`,
         ].filter(Boolean).join(" · ");
@@ -74,6 +75,7 @@
       const facts = [
         st.total != null && `${num(st.total)} ${plural(st.total, "слово", "слова", "слов")}`,
         st.total && `знакомо ${Math.round(st.known / st.total * 100)}%`,
+        st.level && `уровень ≈ ${st.level}`,
         st.phrases && `${num(st.phrases)} ${plural(st.phrases, "оборот", "оборота", "оборотов")}`,
         `изменён ${date(t.updated)}`,
       ].filter(Boolean).join(" · ");
@@ -178,9 +180,11 @@
   }
 
   // ───────────── read.html: свой текст ─────────────
-  function ownSummary(meta, phrases) {
+  function ownSummary(meta, phrases, level) {
     const share = meta.total ? Math.round(meta.known / meta.total * 100) : 0;
-    return `Свой текст разобран по словарю сайта: знакомо ${num(meta.known)} из ${num(meta.total)} ${plural(meta.total, "слова", "слов", "слов")} (${share}%)`
+    return (level ? `Уровень текста ≈ ${level.level}: при ${level.level} знакомы ${Math.round(level.coverage[level.level] * 100)}% слов`
+      + (level.fluent !== level.level ? `, свободно — с ${level.fluent}. ` : ". ") : "")
+      + `Свой текст разобран по словарю сайта: знакомо ${num(meta.known)} из ${num(meta.total)} ${plural(meta.total, "слова", "слов", "слов")} (${share}%)`
       + (meta.guessed ? `, из них ${num(meta.guessed)} — без учёта ударений` : "")
       + `; оборотов: ${num(phrases)}. Перевода предложений нет — его делает только конвертер книг.`
       + " Незнакомые слова подчёркнуты пунктиром.";
@@ -222,7 +226,7 @@
       document.body.classList.remove("own-mode");
       const again = $("#own-again");
       if (item.id) { again.href = `read.html?own=${encodeURIComponent(item.id)}&edit`; again.hidden = false; }
-      window.GreekReader.start(data, { notice: (note ? note + " " : "") + ownSummary(data.meta, data.phrases.length) });
+      window.GreekReader.start(data, { notice: (note ? note + " " : "") + ownSummary(data.meta, data.phrases.length, window.OwnText.textLevel(data)) });
       window.scrollTo(0, 0);
       return data;
     };
@@ -249,7 +253,8 @@
       }
       const draft = { id: saved ? saved.id : null, title: name.value, text };
       const data = window.OwnText.build(text, window.GREEK_DICT, name.value.trim() || undefined);
-      const stats = { known: data.meta.known, total: data.meta.total, phrases: data.phrases.length };
+      const level = window.OwnText.textLevel(data);
+      const stats = { known: data.meta.known, total: data.meta.total, phrases: data.phrases.length, level: level ? level.level : "" };
       let item = null;
       let note = "";
       try {

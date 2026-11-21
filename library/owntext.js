@@ -164,6 +164,42 @@
     };
   }
 
+  // ───────────── Уровень текста по словарю ─────────────
+  // Ципф: даже в тексте C1 большинство слов — частые A1–A2. Поэтому уровень текста — по покрытию: самый низкий
+  // уровень, при котором знаком 95% слов текста (порог понимания с опорой на контекст и словарь), «свободно» — 98%.
+  // Уровень слова в тексте — наибольший из уровня леммы и уровня её формы (аорист, род. п. мн. ч.…).
+  // Имена, незнакомые словарю слова и слова без уровня (нет ответа, «?») не считаются.
+  const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"];
+  const levelTop = level => {
+    const parts = String(level || "").split("–").filter(x => LEVELS.includes(x));
+    return parts.length ? LEVELS.indexOf(parts[parts.length - 1]) : -1;
+  };
+  function textLevel(raw) {
+    const chars = Array.from(String(raw && raw.text || ""));
+    const lemmas = raw.lemmas || {}, forms = raw.forms || {};
+    const counts = LEVELS.map(() => 0);
+    let total = 0, skipped = 0;
+    for (const w of raw.words || []) {
+      if (w.unknown || /PROPN/.test(w.upos || "")) continue;
+      const lemma = levelTop((lemmas[w.key] || {}).level);
+      if (lemma < 0) { skipped += 1; continue; }
+      const form = chars.slice(w.start, w.end).join("");
+      const formLevel = levelTop(w.formLevel || (forms[`${fold(form).replace(/^'+|'+$/g, "")}|${w.key}`] || [])[2]);
+      counts[Math.max(lemma, formLevel)] += 1;
+      total += 1;
+    }
+    if (total < 15) return null;
+    let acc = 0, level = "", fluent = "";
+    const coverage = {};
+    LEVELS.forEach((L, i) => {
+      acc += counts[i];
+      coverage[L] = acc / total;
+      if (!level && acc / total >= 0.95) level = L;
+      if (!fluent && acc / total >= 0.98) fluent = L;
+    });
+    return { level: level || "C2", fluent: fluent || "C2", coverage, total, skipped };
+  }
+
   // ───────────── «Мои тексты»: хранилище в браузере пользователя ─────────────
   // localStorage (на сайте — у каждого посетителя свой, на сервер ничего не уходит). storage — объект
   // с getItem/setItem/removeItem (в браузере — localStorage, в тестах — подделка). Запись может бросить
@@ -254,7 +290,7 @@
     return api;
   }
 
-  const api = { build, fold, splitSentences, titleOf, Store, hasGreek };
+  const api = { build, fold, splitSentences, titleOf, Store, hasGreek, textLevel, levelTop, LEVELS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OwnText = api;
 })(typeof window !== "undefined" ? window : globalThis);

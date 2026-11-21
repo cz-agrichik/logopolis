@@ -166,6 +166,30 @@ def main():
         assert not bc.pure_greek("τίποта") and not bc.pure_greek("то μυστήριο") and bc.pure_greek("σε + ο")
         assert [bc.normalize_level(x) for x in ("B1", "Β1", "a2-b1", "Γ1", "?", "A1-B2", "C3", "")] == \
             ["B1", "B1", "A2–B1", "C1", "?", None, None, None]
+        # политоника → монотоника: одно слово — один ключ
+        assert [bc.monotonic(x) for x in ("ἀλλάζω", "ἀποκτῶ", "τῆς", "ἤ", "μιᾶς", "ήταν")] == \
+            ["αλλάζω", "αποκτώ", "της", "ή", "μιας", "ήταν"]
+        assert bc.lemma_key("ἀλλάζω") == "αλλάζω"
+        # сверка словарных форм с известными словами
+        words = [{"lemma": k, "head": k} for k in ("μπορούσα", "μπορώ", "λλάζω", "μεγαλώνω", "θέρω", "ξέρω", "ποτέ", "ποτε", "γάτα")]
+        info = {"μπορούσα": {"head": "μπορώ"}, "μπορώ": {"head": "μπορώ", "ru": "мочь"}, "λλάζω": {"head": "αλλάζω"},
+                "μεγαλώνω": {"head": "μεγαλώνον"}, "θέρω": {"head": "ξερω"}, "ξέρω": {"head": "ξέρω"},
+                "ποτέ": {"head": "ποτε"}, "ποτε": {"head": "ποτε"}, "γάτα": {"head": "η γάτα"}}
+        merged, reverted = bc.settle_lemmas([{"words": words}], info, {"αλλάζω", "μεγαλώνω", "ποτέ", "πότε"})
+        assert (merged, reverted) == (3, 2), (merged, reverted)
+        assert [bc.lemma_key(w["head"]) for w in words] == \
+            ["μπορώ", "μπορώ", "αλλάζω", "μεγαλώνω", "ξέρω", "ξέρω", "ποτέ", "ποτε", "γάτα"]
+        assert info["μπορώ"]["ru"] == "мочь" and info["μεγαλώνω"]["head"] == "μεγαλώνω" and info["ποτέ"]["head"] == "ποτέ"
+        assert "μπορούσα" not in info and "λλάζω" not in info and info["αλλάζω"]["head"] == "αλλάζω"
+        # уровень формы сверяется с той же грамматикой в книге
+        aor = "Aspect=Perf|Mood=Ind|Number=Sing|Person=3|Tense=Past|VerbForm=Fin|Voice=Act"
+        items = {f"f{i}": (f"f{i}", "x", "y", "VERB", aor, "") for i in range(10)}
+        items["k"] = ("k", "x", "y", "ADJ", "Case=Gen|Number=Sing", "")
+        forms = {f"f{i}": ["аорист", "", "A2"] for i in range(10)}
+        forms["f8"] = ["аорист", "", "B1"]; forms["f9"] = ["аорист", "", "C1"]; forms["k"] = ["род. п.", "", "B1"]
+        kept = forms["f8"]
+        assert bc.calibrate_form_levels(forms, items) == 1
+        assert forms["f8"][2] == "A2" and kept[2] == "B1" and forms["f9"][2] == "C1" and forms["k"][2] == "B1"
 
         assert FakeClient.bad == 1, "негодная пачка — один раз"
         assert book["sentences"][1][2] == "перевод 1", "после негодной пачки — по одному предложению"
