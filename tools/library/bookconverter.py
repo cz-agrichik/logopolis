@@ -54,6 +54,7 @@ CACHE_DIR = BASE_DIR / "cache"
 DATA_VERSION = 3   # 3: + обороты (phrases)
 PROMPT_VERSION = "2"  # меняется при правке промптов -> кеш не смешивается
 LEMMA_PROMPT_VERSION = "3"  # отдельно: правка словаря не сбрасывает дорогой контекстный перевод
+VERB_PROMPT_VERSION = "1"   # глаголы, оставшиеся в словаре изменённой формой (σκεφτόταν → σκέφτομαι)
 PHRASE_PROMPT_VERSION = "1"  # обороты — свой проход и свой кеш: старые ответы остаются в силе
 FORM_PROMPT_VERSION = "2"    # грамматика форм (аорист, род. п. мн. ч.…), перевод формы и уровень ГРАММАТИКИ формы
 LEVEL_PROMPT_VERSION = "1"   # уровни (CEFR) лемм и оборотов — тоже свой проход и свой кеш
@@ -206,6 +207,9 @@ class BadReply(Exception):
     Кусок пропускаем, остальное переводим дальше."""
 
 
+EMPTY_REPLY = "модель ничего не вернула"   # отказ фильтра (у Gemini — PROHIBITED_CONTENT/RECITATION на известных книгах)
+
+
 # ─────────────────────────── конфигурация ───────────────────────────
 
 def read_jsonc(path: Path) -> dict:
@@ -314,6 +318,9 @@ def load_stanza():
 
 # ─────────────────────────── кеш ───────────────────────────
 
+MANUAL_FILE, BLOCKED_FILE = "manual.json", "blocked.json"
+
+
 class Cache:
     """Все ответы модели, ключ — хеш промпта. Один файл на все книги и главы:
     одинаковый кусок текста никогда не переводится дважды."""
@@ -329,9 +336,29 @@ class Cache:
             except (json.JSONDecodeError, OSError):
                 log(f"Кеш {file.name} повреждён — пропускаю.")
                 continue
-            if isinstance(loaded, dict):
+            if isinstance(loaded, dict) and file.name not in (MANUAL_FILE, BLOCKED_FILE):
                 for key, value in loaded.items():
                     self.data.setdefault(key, value)
+        # Ручные ответы (cache/manual.json): там, где модель отказалась (фильтр на известной книге), ответ можно вписать
+        # самому — по запросу из cache/blocked.json, в том же формате, что ждут от модели. Они главнее кеша.
+        self.manual: dict = {}
+        manual = path.parent / MANUAL_FILE
+        if manual.is_file():
+            try:
+                self.manual = json.loads(manual.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as exc:
+                log(f"{MANUAL_FILE} повреждён — пропускаю ({exc}).")
+        self.blocked: dict = {}   # отказы фильтра этого запуска без ручного ответа → cache/blocked.json
+
+    def save_blocked(self) -> None:
+        """cache/blocked.json — запросы, на которые модель так и не ответила (ключ → что, промпт). Нет таких — файла нет."""
+        target = self.path.parent / BLOCKED_FILE
+        if self.blocked:
+            target.write_text(json.dumps(self.blocked, ensure_ascii=False, indent=1), encoding="utf-8")
+            log(f"\n⚠ Модель отказалась отвечать на {len(self.blocked)} {'запрос' if len(self.blocked) == 1 else 'запроса' if len(self.blocked) < 5 else 'запросов'}"
+                f" (фильтр): список — cache/{BLOCKED_FILE}. Ответы можно вписать в cache/{MANUAL_FILE} — следующий запуск их возьмёт.")
+        elif target.exists():
+            target.unlink()
 
     def get(self, key: str):
         return self.data.get(key)
@@ -388,6 +415,7 @@ class LLMClient:
 
     def chat_json(self, system: str, user: str) -> dict:
         attempt = 0
+        self.last_bad = ""   # только ответ этого запроса: иначе отказ фильтра записался бы с чужим старым ответом
         while True:
             attempt += 1
             wait = self.interval - (time.monotonic() - self.last_call)
@@ -414,7 +442,8 @@ class LLMClient:
                     # Пустой ответ: обычно сработал фильтр модели (у Gemini —
                     # RECITATION/SAFETY на известных книгах). Повтор не поможет.
                     reason = choice.get("finish_reason") or result.get("promptFeedback") or "пустой ответ"
-                    raise BadReply(f"модель ничего не вернула ({reason})")
+                    self.last_bad = ""
+                    raise BadReply(f"{EMPTY_REPLY} ({reason})")
                 return parse_json_reply(content)
             except urllib.error.HTTPError as exc:
                 body = exc.read().decode("utf-8", "replace")[:800]
@@ -498,7 +527,22 @@ def parse_json_reply(content: str) -> dict:
         pass
     # у пункта списка потеряна открывающая скобка: [[[1, 2], "…", "…"], [3, 4], "…", "…"]] — возвращаем её
     fixed = re.sub(r'("\s*\])\s*,\s*\[(\s*\d+(?:\s*,\s*\d+)*\s*)\]\s*,\s*"', r'\1, [[\2], "', body)
-    return json.loads(commas(fixed), strict=False)
+    try:
+        return json.loads(commas(fixed), strict=False)
+    except json.JSONDecodeError as exc:
+        error = exc
+    # последний шанс — список пунктов [[числа], "…", "…"] (обороты), где скобки перепутаны как угодно:
+    # вынимаем сами пункты; «висячие» [числа] без строк пропускаем
+    key = re.match(r'\{\s*"(\w+)"\s*:', body)
+    items = [[[int(n) for n in re.findall(r"\d+", m.group(1))]] + [json.loads(f'"{x}"', strict=False) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(2))]
+             for m in LIST_ITEM_RE.finditer(body)]
+    if key and items:
+        return {key.group(1): items}
+    raise error
+
+
+# пункт с номерами слов и строками: [3, 4], "ρίχνω μια ματιά", "взглянуть"
+LIST_ITEM_RE = re.compile(r'\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]\s*((?:,\s*"(?:[^"\\]|\\.)*"\s*){2,3})')
 
 
 
@@ -653,16 +697,22 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
     Негодный ответ тоже запоминается ({"_bad": …}): на нём модель спотыкается каждый раз, и раньше каждый запуск
     тратил на него три запроса. Теперь он сразу идёт дальше (у перевода — по одному предложению, они кешируются);
     спросить такие куски заново — --retry-bad."""
+    if key in cache.manual:   # ответ вписан вручную (cache/manual.json)
+        return cache.manual[key], True
     reply = cache.get(key)
     if isinstance(reply, dict) and "_bad" in reply:
+        blocked = str(reply["_bad"]).startswith(EMPTY_REPLY)
         try:   # сырой ответ сохранён — может, теперь его получится разобрать (разбор стал терпимее)
-            salvaged = parse_json_reply(reply.get("raw") or "")
+            # у отказа фильтра своего ответа нет (старые версии сохраняли чужой — его не трогаем)
+            salvaged = None if blocked else parse_json_reply(reply.get("raw") or "")
         except (ValueError, KeyError, IndexError, TypeError):
             salvaged = None
         if isinstance(salvaged, dict) and salvaged:
             cache.put(key, salvaged)
             return salvaged, True
         if not getattr(client, "retry_bad", False) or client.offline:
+            if blocked:
+                cache.blocked[key] = {"what": what, "kind": system_kind(system), "prompt": prompt}
             return {}, True
         reply = None
     if reply is not None:
@@ -681,12 +731,21 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
         log(f"   ! {what}: {exc} — запомнил, в следующий раз не спрашиваю (заново: --retry-bad)")
         raw = getattr(client, "last_bad", "")
         cache.put(key, {"_bad": str(exc)[:300], "when": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "raw": raw[:20000]})
+        if str(exc).startswith(EMPTY_REPLY):
+            cache.blocked[key] = {"what": what, "kind": system_kind(system), "prompt": prompt}
         if raw:
             with open(CACHE_DIR / "bad_replies.txt", "a", encoding="utf-8") as fh:
                 fh.write(f"\n===== {datetime.now(timezone.utc):%Y-%m-%d %H:%M} · {what} · {exc}\n--- запрос:\n{prompt[:3000]}\n--- ответ:\n{raw}\n")
         return {}, False
     cache.put(key, reply)
     return reply, False
+
+
+def system_kind(system: str) -> str:
+    """Какой это запрос — для cache/blocked.json: какой формат ответа ждут."""
+    kinds = {"ctx": "CONTEXT_SYSTEM", "lemmas": "LEMMA_SYSTEM", "verbs": "VERB_SYSTEM", "phrases": "PHRASE_SYSTEM", "forms": "FORM_SYSTEM",
+             "levels": "LEVEL_SYSTEM"}
+    return next((kind for kind, name in kinds.items() if globals().get(name) == system), "?")
 
 
 def run_llm(text: str, sentences: list[dict], words: list[dict], config: dict,
@@ -835,6 +894,86 @@ def run_lemmas(words: list[dict], client: LLMClient, config: dict, cache: Cache,
     else:
         log("   всё из кеша")
     return complete
+
+
+# ─────────────────────────── 2b'. Глаголы в словарной форме ───────────────────────────
+# Лёгкая модель иногда оставляет глаголу словарной формой саму форму из текста: σκεφτόταν, έβαζε, ονειρευόταν, φορώντας.
+# Такие леммы видно по окончанию (у словарной формы глагола — -ω/-ώ, -μαι, безличные — -ται/-ει); их переспрашиваем
+# отдельно, коротким запросом без текста книги, и переносим слова к исправленной лемме.
+
+VERB_SYSTEM = """You are a Modern Greek lexicographer. Each numbered line is an INFLECTED Modern Greek verb form
+(past tense, another person or number, gerund, participle) that was left in a learner's dictionary as a headword,
+with its Russian meaning in brackets.
+
+Return ONLY one JSON object, no markdown:
+{"verbs": [[number, "dictionary form", "Russian infinitive"], ...]}
+
+Rules:
+- Include EVERY number exactly once.
+- Dictionary form: 1st person singular present, monotonic accents: "σκεφτόταν" → "σκέφτομαι", "έβαζε" → "βάζω",
+  "φορώντας" → "φοράω", "κουτσομπολεύουν" → "κουτσομπολεύω"; impersonal verbs — 3rd person singular:
+  "επρόκειτο" → "πρόκειται". If the word is not a verb at all, repeat it unchanged.
+- Russian: 1–3 meanings as infinitives, separated by "; " ("думать; размышлять").
+- Greek in Greek letters only, Russian in Cyrillic only.
+"""
+VERB_HEAD_RE = re.compile(r"(ω|μαι|ται|ει)$")   # по форме без ударений
+
+
+def needs_verb_head(entry: dict) -> bool:
+    """Глагол («гл.»), у которого словарная форма — не словарная: не кончается на -ω/-ώ, -μαι, -ται, -ει."""
+    parts = str(entry.get("head", "")).split()
+    last = parts[-1].lower() if parts else ""
+    return str(entry.get("pos", "")).startswith("гл") and len(last) > 3 and pure_greek(last) and not VERB_HEAD_RE.search(unaccented(last))
+
+
+def fix_verb_heads(chapters: list[dict], info: dict, config: dict, cache: Cache, client: LLMClient) -> int:
+    """Глаголы с изменённой формой вместо словарной — к модели (по 40, кеш по одному), слова — к исправленной лемме.
+    Возвращает, сколько лемм исправлено."""
+    todo = [(k, e) for k, e in info.items() if needs_verb_head(e)]
+    if not todo:
+        return 0
+    one = lambda e: digest("verb1", VERB_PROMPT_VERSION, config["model"], e["head"], e.get("ru", ""))
+    fixed: dict[str, dict] = {}
+    rest = []
+    for k, e in todo:
+        hit = cache.get(one(e))
+        if isinstance(hit, dict) and hit.get("head"):
+            fixed[k] = hit
+        else:
+            rest.append((k, e))
+    for i in range(0, len(rest), 40):
+        chunk = rest[i:i + 40]
+        prompt = "\n".join(f"{n}. {e['head']} ({e.get('ru', '')})" for n, (_, e) in enumerate(chunk, start=1))
+        reply, _ = ask(client, cache, digest("verb", VERB_PROMPT_VERSION, config["model"], prompt), VERB_SYSTEM, prompt,
+                       f"глаголы: {len(chunk)} пропущено")
+        got = {}
+        for item in (reply or {}).get("verbs", []) if isinstance(reply, dict) else []:
+            n = as_int(item[0]) if isinstance(item, list) and item else None
+            if n is None or not 1 <= n <= len(chunk) or len(item) < 3:
+                continue
+            k, e = chunk[n - 1]
+            head = monotonic(str(item[1]).strip())
+            if head and " " not in head and pure_greek(head) and VERB_HEAD_RE.search(unaccented(head.lower())):
+                fixed[k] = got[one(e)] = {"head": head, "ru": str(item[2]).strip()}
+        cache.put_many(got)
+    move: dict[str, str] = {}
+    for k, f in fixed.items():
+        new = lemma_key(f["head"])
+        if new == k or k not in info:
+            continue
+        entry = info.pop(k)
+        if new not in info:
+            info[new] = dict(entry, head=f["head"], ru=f.get("ru") or entry.get("ru", ""))
+        move[k] = new
+    for chapter in chapters:
+        for w in chapter["words"]:
+            new = move.get(lemma_key(w.get("head") or w["lemma"]))
+            if new:
+                w["head"] = info[new]["head"]
+    if move:
+        shown = ", ".join(k + " → " + info[v]["head"] for k, v in list(move.items())[:6])
+        log(f"\nГлаголы: словарная форма вместо изменённой — {len(move)} ({shown}{'…' if len(move) > 6 else ''})")
+    return len(move)
 
 
 # ─────────────────────────── 2c. Обороты ───────────────────────────
@@ -1012,8 +1151,27 @@ def dictionary_head(word: dict, lemma_info: dict) -> str:
     return fixed if pure_greek(fixed) else head
 
 
+def regroup_phrases(items: list) -> list:
+    """Пункты оборотов, где модель потеряла скобку, но JSON остался верным: [[[1, 2], "…", "…"], [3, 4], "…", "…"] —
+    номера и две строки за ними собираем обратно в пункт; «висячие» номера без строк пропускаем."""
+    out, i = [], 0
+    while i < len(items):
+        x = items[i]
+        if isinstance(x, list) and x and isinstance(x[0], list):
+            out.append(x)
+            i += 1
+        elif isinstance(x, list) and x and all(isinstance(n, int) for n in x) and len(items) >= i + 3 \
+                and all(isinstance(y, str) for y in items[i + 1:i + 3]):
+            out.append([x, items[i + 1], items[i + 2]])
+            i += 3
+        else:
+            i += 1
+    return out
+
+
 def apply_phrase_reply(reply: dict, w_map: dict, index_of: dict, found: dict, lemma_info: dict | None = None) -> None:
-    for item in reply.get("phrases", []) if isinstance(reply, dict) else []:
+    items = reply.get("phrases", []) if isinstance(reply, dict) else []
+    for item in regroup_phrases(items if isinstance(items, list) else []):
         if not (isinstance(item, list) and len(item) >= 3 and isinstance(item[0], list)):
             continue
         numbers = sorted({as_int(n) for n in item[0] if as_int(n) in w_map})
@@ -1842,6 +2000,8 @@ def build_one(book: dict, config: dict, args: argparse.Namespace, nlp, client, c
         if client:
             complete &= run_llm(text, sentences, words, config, cache, client)
             complete &= run_lemmas(words, client, config, cache, lemma_info)
+            # глаголы, оставшиеся изменённой формой, — до оборотов: «έδειχναν να» сверяется с «δείχνω να» по лемме
+            fix_verb_heads(chapters + [{"words": words}], lemma_info, config, cache, client)
             if not args.no_phrases:
                 ok, phrases = run_phrases(text, sentences, words, config, cache, client, lemma_info)
                 phrases_done &= ok
@@ -1950,6 +2110,8 @@ def main(argv=None, nlp=None, client=None) -> None:
     cache = Cache(CACHE_DIR / "cache.json") if client else None
     for book in chosen:
         build_one(book, config, args, nlp, client, cache)
+    if cache:
+        cache.save_blocked()
     rebuild_site(books)
 
 

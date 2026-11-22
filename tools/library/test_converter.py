@@ -67,6 +67,10 @@ class FakeClient:
             answer = {"ματιά": "Β1", "καμιά φορά": "Α2-Β1", "ρίχνω μια ματιά": "?", "πίνω": "A1-B2"}
             items = re.findall(r"^(\d+)\. (.+?)(?: — .*)?$", user, re.M)
             return {"levels": [[n, answer.get(h, "A2")] for n, h in items]}   # номера строкой — как иногда отвечает Gemini
+        if system is bc.VERB_SYSTEM:
+            known = {"σκεφτόταν": "σκέφτομαι", "ονειρευόταν": "ονειρεύομαι", "έβαζε": "βάζω"}
+            items = re.findall(r"^(\d+)\. (\S+)", user, re.M)
+            return {"verbs": [[n, known.get(h, h), "рус:" + h] for n, h in items]}
         if system is bc.LEMMA_SYSTEM:
             FakeClient.lemma_prompts.append(user)
             items = re.findall(r"^(\d+)\. (\S+)", user, re.M)
@@ -210,6 +214,63 @@ def main():
         bc.main(["story", *args], nlp=FakeNLP(), client=FakeClient())
         assert len(FakeClient.lemma_prompts) == 1 and FakeClient.lemma_prompts[0].count("\n") == 0 \
             and "σήμερα" in FakeClient.lemma_prompts[0], FakeClient.lemma_prompts
+        # отказ фильтра (у Gemini — на известных книгах): чужой сырой ответ не «спасается», запрос уходит в cache/blocked.json;
+        # ответ, вписанный в cache/manual.json, главнее кеша
+        cache = bc.Cache(bc.CACHE_DIR / "cache.json")
+        cache.put("k1", {"_bad": bc.EMPTY_REPLY + " (content_filter: PROHIBITED_CONTENT)", "raw": '{"sentences": [[1, "чужой"]]}'})
+        cache.put("k2", {"_bad": "не удалось разобрать ответ: x", "raw": '{"phrases": [[[1, 2], "σε λίγο", "вскоре"], [5, 6], "κάτω από", "под"}'})
+        assert bc.ask(FakeClient(), cache, "k1", bc.CONTEXT_SYSTEM, "S1: …", "предложение 1") == ({}, True)
+        assert cache.blocked["k1"] == {"what": "предложение 1", "kind": "ctx", "prompt": "S1: …"}, cache.blocked
+        reply, _ = bc.ask(FakeClient(), cache, "k2", bc.PHRASE_SYSTEM, "S1: …", "обороты")
+        assert reply == {"phrases": [[[1, 2], "σε λίγο", "вскоре"], [[5, 6], "κάτω από", "под"]]}, reply
+        assert cache.get("k2") == reply and "k2" not in cache.blocked
+
+        class Filtered(FakeClient):
+            def chat_json(self, system, user):
+                raise bc.BadReply(bc.EMPTY_REPLY + " (content_filter: PROHIBITED_CONTENT)")
+        assert bc.ask(Filtered(), cache, "k3", bc.PHRASE_SYSTEM, "S1: x", "обороты") == ({}, False)
+        assert cache.blocked["k3"]["kind"] == "phrases" and cache.get("k3")["raw"] == ""
+        cache.save_blocked()
+        assert set(json.loads((bc.CACHE_DIR / "blocked.json").read_text(encoding="utf-8"))) == {"k1", "k3"}
+        (bc.CACHE_DIR / "manual.json").write_text(json.dumps({"k1": {"sentences": [[1, "свой"]], "words": []},
+                                                              "k3": {"phrases": []}}), encoding="utf-8")
+        cache = bc.Cache(bc.CACHE_DIR / "cache.json")
+        assert bc.ask(FakeClient(), cache, "k1", bc.CONTEXT_SYSTEM, "S1: …", "предложение 1") == ({"sentences": [[1, "свой"]], "words": []}, True)
+        assert bc.ask(Filtered(), cache, "k3", bc.PHRASE_SYSTEM, "S1: x", "обороты") == ({"phrases": []}, True)
+        cache.save_blocked()
+        assert not (bc.CACHE_DIR / "blocked.json").exists() and cache.get("k1")["_bad"], "ручные ответы — отдельно от кеша"
+        # глаголы, оставшиеся изменённой формой: σκεφτόταν → σκέφτομαι (к уже известной лемме), ονειρευόταν → ονειρεύομαι (новая);
+        # «μπορεί», «πρόκειται», причастия и не-глаголы не трогаем; ответ, который тоже не словарная форма, не берём
+        info = {"σκεφτόταν": {"head": "σκεφτόταν", "ru": "думал", "pos": "гл."}, "σκέφτομαι": {"head": "σκέφτομαι", "ru": "думать", "pos": "гл."},
+                "ονειρευόταν": {"head": "ονειρευόταν", "ru": "мечтал", "pos": "гл."}, "μπορεί": {"head": "μπορεί", "ru": "может", "pos": "гл."},
+                "πρόκειται": {"head": "πρόκειται", "ru": "идти речь", "pos": "гл."}, "μπράβο": {"head": "μπράβο", "ru": "браво", "pos": "межд."},
+                "κουρασμένος": {"head": "κουρασμένος", "ru": "усталый", "pos": "прил."}, "πλησίαζε": {"head": "πλησίαζε", "ru": "приближался", "pos": "гл."}}
+        assert [k for k, e in info.items() if bc.needs_verb_head(e)] == ["σκεφτόταν", "ονειρευόταν", "πλησίαζε"], \
+            [k for k, e in info.items() if bc.needs_verb_head(e)]
+        ws = [{"lemma": "σκεφτόταν", "head": "σκεφτόταν"}, {"lemma": "x", "head": "ονειρευόταν"}, {"lemma": "πλησίαζε"}]
+        cfg = {"model": "m"}
+        assert bc.fix_verb_heads([{"words": ws}], info, cfg, bc.Cache(bc.CACHE_DIR / "cache.json"), FakeClient()) == 2
+        assert "σκεφτόταν" not in info and info["σκέφτομαι"]["ru"] == "думать" and info["ονειρεύομαι"]["head"] == "ονειρεύομαι"
+        assert info["πλησίαζε"]["head"] == "πλησίαζε", "ответ модели — снова не словарная форма"
+        assert [w.get("head") for w in ws] == ["σκέφτομαι", "ονειρεύομαι", None], ws
+        calls = FakeClient.calls
+        info2 = {"έβαζε": {"head": "έβαζε", "ru": "клал", "pos": "гл."}}
+        bc.fix_verb_heads([{"words": []}], info2, cfg, bc.Cache(bc.CACHE_DIR / "cache.json"), FakeClient())
+        bc.fix_verb_heads([{"words": []}], {"έβαζε": {"head": "έβαζε", "ru": "клал", "pos": "гл."}}, cfg, bc.Cache(bc.CACHE_DIR / "cache.json"), FakeClient())
+        assert info2 == {"βάζω": {"head": "βάζω", "ru": "рус:έβαζε", "pos": "гл."}} and FakeClient.calls == calls + 1, "второй раз — из кеша"
+        # разбор оборотов, где модель перепутала скобки как угодно (4-я глава «Поттера»); JSON верный, но пункт «рассыпан»
+        assert bc.regroup_phrases([[[1, 2], "α β", "а"], [3, 4], "γ δ", "б", [7, 8], [9, 10], "ε ζ", "в"]) == \
+            [[[1, 2], "α β", "а"], [[3, 4], "γ δ", "б"], [[9, 10], "ε ζ", "в"]]
+        assert bc.regroup_phrases(bc.parse_json_reply(
+            '{"phrases": [[[5, 6], "μια άλλη φορά", "в другой раз"], [26, 36], [43, 44], "στο τέλος", "в конце"]}}')["phrases"]) == \
+            [[[5, 6], "μια άλλη φορά", "в другой раз"], [[43, 44], "στο τέλος", "в конце"]]
+        assert bc.parse_json_reply('{"phrases": [[[1, 2], "α β", "а"], [3, 4], "γ δ", "б"]]}}') == \
+            {"phrases": [[[1, 2], "α β", "а"], [[3, 4], "γ δ", "б"]]}
+        try:
+            bc.parse_json_reply('{"sentences": [[1, "перевод"], [2, "обрыв')
+            raise AssertionError("оборванный перевод разобрался")
+        except ValueError:
+            pass
         print("tools/library: конвертер — всё в порядке")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
