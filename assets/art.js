@@ -75,12 +75,26 @@ const Art = (() => {
   // ряды на поле: 4 борозды, на каждой — посадки
   const rows = (furrow, plant) => [14, 27, 40, 53].map((y, r) =>
     `<path d="M3 ${y + 2} Q32 ${y - 1} 61 ${y + 2}" stroke="${furrow}" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>` +
-    [8, 19, 30, 41, 52].map(x => plant(x + (r % 2) * 5, y)).join('')).join('');
-  const tuft = (x, y, c, cd) => `<path d="M${x} ${y} q-3 -6 -5 -8 M${x} ${y} q0 -7 0 -10 M${x} ${y} q3 -6 5 -8" stroke="${cd}" stroke-width="2" fill="none" stroke-linecap="round"/>
+    [8, 19, 30, 41, 52].map(x => plant(x + (r % 2) * 5, y, r)).join('')).join('');
+  const tuft =(x, y, c, cd) => `<path d="M${x} ${y} q-3 -6 -5 -8 M${x} ${y} q0 -7 0 -10 M${x} ${y} q3 -6 5 -8" stroke="${cd}" stroke-width="2" fill="none" stroke-linecap="round"/>
     <path d="M${x} ${y} q-1.5 -6 -3 -7 M${x} ${y} q1.5 -6 3 -7" stroke="${c}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
   const ear = (x, y) => `<path d="M${x} ${y} L${x} ${y - 9}" stroke="${C.wheatD}" stroke-width="1.6"/>
     <ellipse cx="${x}" cy="${y - 11}" rx="2" ry="4" fill="${C.wheat}" stroke="${C.wheatD}" stroke-width="1"/>`;
-  const sheaf = (x, y) => `<g transform="translate(${x} ${y})"><path d="M-5 0 L0 -16 L5 0Z" fill="${C.wheat}" ${st(1.3)}/>
+  // злак по эпохам. Медный век: плёнчатый ячмень и однозернянка — низкие, колос мелкий, а полполя — чечевица и горох;
+  // бронза: остистый ячмень и полба соломенного цвета; железо — золотой колос (ear); эллинский Кипр — тяжёлый колос
+  // голозёрной пшеницы, которую остров уже вывозит
+  const earCu = (x, y) => `<path d="M${x} ${y} L${x} ${y - 6}" stroke="${C.greenD}" stroke-width="1.3"/>
+    <ellipse cx="${x}" cy="${y - 8.5}" rx="1.5" ry="2.9" fill="#c6c466" stroke="#7d8a32" stroke-width="1"/>
+    <path d="M${x} ${y - 11} l0 -2.6" stroke="#7d8a32" stroke-width=".9"/>`;
+  const lentil = (x, y) => `<path d="M${x} ${y} Q${x - 1} ${y - 4} ${x - 4} ${y - 6} M${x} ${y} Q${x} ${y - 5} ${x + 1} ${y - 8} M${x} ${y} Q${x + 2} ${y - 3} ${x + 5} ${y - 5}" stroke="${C.greenD}" stroke-width="1.2" fill="none"/>
+    ${[[-4, -6], [1, -8], [5, -5], [-2.5, -3], [3, -2.5]].map(([a, b]) => `<ellipse cx="${x + a}" cy="${y + b}" rx="1.7" ry="1.2" fill="${C.green}" stroke="${C.greenD}" stroke-width=".7"/>`).join('')}`;
+  const earBz = (x, y) => `<path d="M${x} ${y} L${x} ${y - 8}" stroke="#b39548" stroke-width="1.5"/>
+    <ellipse cx="${x}" cy="${y - 10.5}" rx="1.8" ry="3.8" fill="#ddc685" stroke="#a8893a" stroke-width="1"/>
+    <path d="M${x - 1} ${y - 13} l-2 -5 M${x} ${y - 14} l0 -5.5 M${x + 1} ${y - 13} l2 -5" stroke="#a8893a" stroke-width=".8"/>`;
+  const earGr = (x, y) => `<path d="M${x} ${y} L${x} ${y - 9}" stroke="${C.wheatD}" stroke-width="1.7"/>
+    <ellipse cx="${x}" cy="${y - 12.5}" rx="2.7" ry="5.2" fill="#eebd3c" stroke="${C.wheatD}" stroke-width="1"/>
+    <path d="M${x - 2.3} ${y - 15} l2.3 1.4 l2.3 -1.4 M${x - 2.5} ${y - 12} l2.5 1.4 l2.5 -1.4 M${x - 2.1} ${y - 9} l2.1 1.2 l2.1 -1.2" stroke="${C.wheatD}" stroke-width=".8" fill="none"/>`;
+  const sheaf =(x, y) => `<g transform="translate(${x} ${y})"><path d="M-5 0 L0 -16 L5 0Z" fill="${C.wheat}" ${st(1.3)}/>
     <path d="M-5 -7 L5 -7" stroke="${C.terra}" stroke-width="2.2"/><path d="M0 -16 l-3 -3 M0 -16 l3 -3 M0 -16 l0 -4" stroke="${C.wheatD}" stroke-width="1.4"/></g>`;
   const fence = (y = 44) => `
     <path d="M6 ${y} L58 ${y} M6 ${y + 6} L58 ${y + 6}" stroke="${C.wood}" stroke-width="2.6" stroke-linecap="round"/>
@@ -144,7 +158,7 @@ const Art = (() => {
 
   // Бронзовый век, 7-й уровень строится на этих основах (нарядные облики); 5-й — свой, базовый (ниже, в B).
   // канал у полей с 5-го уровня — не на рисунке, а полосой воды по левому краю клетки (ui: класс canal), чтобы каналы соседей смыкались
-  const fieldIrrigated = rows(C.furrowD, (x, y) => ear(x + 2, y)) + sheaf(52, 54);
+  const fieldIrrigated = rows(C.furrowD, (x, y) => earBz(x + 2, y)) + sheaf(52, 54);
   const lumberShed = shadow(28) + pine(12, 34, 1.15) + `
       <path d="M22 26 L50 20 L56 26 L28 32Z" fill="${C.woodD}" ${st()}/>
       <path d="M28 32 L28 50 M54 26 L54 46" stroke="${C.woodD}" stroke-width="3"/>` +
@@ -198,7 +212,8 @@ const Art = (() => {
 
     // поле — «нарисовано» прямо на земле клетки: без подставки и тени
     field0: rows(C.furrow, (x, y) => sprout(x, y, .85)),
-    field1: rows(C.furrow, (x, y) => ear(x, y)),   // ур. 4+: всходы → спелый золотой колос
+    // ур. 3+: мотыжное поле медного века — ряд мелкого зеленоватого ячменя, ряд чечевицы
+    field1: rows(C.furrow, (x, y, r) => r % 2 ? lentil(x - 2, y) : earCu(x, y)),
     goatpen0: shadow(26) + fence(40) + goat(30, 42, 1.25, C.white),
     // ур. 4+: каменная овчарня с пастушьей хижиной и стадом
     goatpen1: shadow(29) + roundHut(51, 24, .48) +
@@ -219,8 +234,9 @@ const Art = (() => {
       <ellipse cx="32" cy="42" rx="12" ry="4.4" fill="${C.wheat}" ${st()}/>
       <ellipse cx="32" cy="42" rx="6" ry="2.2" fill="none" stroke="${C.wheatD}" stroke-width="1.2"/>` + stoneAxe(37, 18, .95, 18) + `
       <path d="M12 54 l4 -2 M48 56 l4 -3 M16 48 l3 1" stroke="${C.wheatD}" stroke-width="2"/>`,
-    lumber1: shadow(28) + pine(30, 14, .75) + pine(8, 28, .95) + leafTree(55, 24, .9) + logEnds(30, 50) + logEnds(24, 40) + logEnds(36, 40) + logEnds(30, 31, .95) +
-      stoneAxe(55, 40, .9, 14) + pine(4, 50, .6),
+    // ур. 3+: лес ещё стоит, у вырубки — пара брёвен и каменный топор
+    lumber1: shadow(26) + pine(30, 16, .75) + pine(8, 28, .95) + leafTree(55, 24, .9) + logEnds(28, 50) + logEnds(31, 41, .85) +
+      stoneAxe(53, 40, .9, 14) + pine(4, 50, .6),
 
 
     quarry0: shadow(24) + `
@@ -229,10 +245,21 @@ const Art = (() => {
       <path d="M33 33 L39 34.5 L35 42Z M20 33 L25 32 L22.5 39Z" fill="${C.wood}" ${st(1.1)}/>
       <ellipse cx="46" cy="53" rx="6" ry="5" fill="#7f8f7a" ${st(1.4)}/><path d="M42 51 Q44 48 48 49" fill="none" stroke="#a9b6a1" stroke-width="1.1"/>
       <path d="M14 56 l3 -1 M26 57 l3 0 M56 56 l2 -2" stroke="${C.stoneD}" stroke-width="1.8" stroke-linecap="round"/>`,
-    quarry1: shadow(26) + `
-      <path d="M8 40 L12 18 L30 12 L52 16 L58 40Z" fill="${C.stoneD}" ${st()}/>
-      <path d="M18 22 L18 40 M30 18 L30 40 M44 20 L44 40 M12 30 L58 30" stroke="${O}" stroke-width="1.2" opacity=".55"/>` +
-      block(10, 44, 14, 9) + block(25, 44, 14, 9) + block(40, 44, 14, 9) + block(17, 36, 14, 8) + block(32, 36, 14, 8),
+    // ур. 3+: выработка ещё без тёски — скалу колют деревянными клиньями и рычагом, камень идёт рваный, как есть
+    quarry1: shadow(28) + `
+      <path d="M4 42 L7 22 L17 12 L30 15 L39 8 L52 14 L60 26 L60 42Z" fill="${C.stone}" ${st()}/>
+      <path d="M17 12 L21 26 L15 42 M39 8 L35 21 L43 31 L41 42 M21 26 L35 21 M52 14 L49 27 L60 30" fill="none" stroke="${C.stoneD}" stroke-width="1.4"/>
+      <path d="M32 19 L38 20.5 L34.5 27Z M18.5 22 L24 21.5 L21.5 28.5Z M46 25 L51.5 24.5 L49 31Z" fill="${C.wood}" ${st(1.1)}/>
+      <path d="M43 31 L58 31 L60 42 L41 42Z" fill="${C.stoneD}" ${st(1.4)}/>
+      <path d="M38 50 L58 33" stroke="${C.woodD}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M5 54 L7 47 L13 45 L17 49 L15 55Z" fill="${C.stone}" ${st(1.3)}/>
+      <path d="M15 56 L17 49 L24 47 L28 52 L25 57Z" fill="#a9a194" ${st(1.3)}/>
+      <path d="M9 47 L12 41 L18 40 L21 45 L16 49Z" fill="${C.stone}" ${st(1.3)}/>
+      <path d="M26 58 L28 52 L34 51 L36 56 L32 59Z" fill="${C.stone}" ${st(1.3)}/>
+      <ellipse cx="48" cy="54" rx="5.5" ry="4.5" fill="#7f8f7a" ${st(1.4)}/><path d="M44.5 52 Q46 49.5 49.5 50" fill="none" stroke="#a9b6a1" stroke-width="1.1"/>
+      <path d="M54 52 L62 52 L60.5 59 L55.5 59Z" fill="${C.thatch}" ${st(1.2)}/><path d="M55 55.5 L61.5 55.5" stroke="${C.thatchD}" stroke-width="1"/>
+      <circle cx="56.5" cy="51.5" r="1.6" fill="${C.stone}" ${st(.8)}/><circle cx="59.5" cy="51" r="1.4" fill="${C.stoneD}" ${st(.8)}/>
+      <path d="M38 60 l3 -1 M6 60 l3 0" stroke="${C.stoneD}" stroke-width="1.8" stroke-linecap="round"/>`,
 
 
     // мастерская резчиков: верстак, глыба зелёного камня, резец и киянка, нитка бус
@@ -245,22 +272,32 @@ const Art = (() => {
       <rect x="44" y="12" width="12" height="7" rx="2" transform="rotate(30 50 15)" fill="${C.wood}" ${st(1.4)}/>
       <path d="M36 50 Q44 56 52 50" fill="none" stroke="${C.woodD}" stroke-width="1.2"/>
       ${[38, 41.5, 45, 48.5].map((x, i) => `<circle cx="${x}" cy="${52 + (i % 2)}" r="2" fill="${C.pic}" stroke="${O}" stroke-width="1"/>`).join('')}`,
-    // мастерская побогаче: гончарный круг и расписной горшок
-    workshop1: shadow(24) + `
-      <ellipse cx="22" cy="48" rx="15" ry="4" fill="${C.woodD}" ${st(1.6)}/>
-      <rect x="20" y="48" width="4" height="7" fill="${C.woodD}"/>
-      <path d="M14 46 Q12 34 18 30 L26 30 Q32 34 30 46Z" fill="${C.white}" ${st(1.6)}/>
-      <path d="M13 38 Q22 41 31 38" fill="none" stroke="${C.red}" stroke-width="2"/>
-      <path d="M17 34 l2 2 l2 -2 l2 2 l2 -2 l2 2" fill="none" stroke="${C.red}" stroke-width="1.3"/>
-      <path d="M38 52 Q34 38 42 32 L52 32 Q60 38 56 52Z" fill="${C.white}" ${st(1.8)}/>
-      <path d="M36 42 Q47 46 58 42" fill="none" stroke="${C.red}" stroke-width="2.2"/>
-      <path d="M40 36 Q47 39 54 36" fill="none" stroke="${C.red}" stroke-width="1.4"/>`,
-    // гончарная мастерская бронзового века: печь для обжига и кувшины
-    workshop2: shadow(28) + `
-      <path d="M30 52 Q30 26 46 24 Q62 26 62 52Z" fill="${C.mudD}" ${st()}/>
-      <path d="M40 52 Q40 40 46 40 Q52 40 52 52Z" fill="${C.dark}" ${st(1.4)}/>` + flame(46, 47, .9) + smoke(46, 20) +
-      pithos(14, 40, .72, C.white) + `<path d="M7 40 Q14 43 21 40" fill="none" stroke="${C.red}" stroke-width="1.6"/>` +
-      `<path d="M24 54 Q21 46 25 42 L31 42 Q35 46 32 54Z" fill="${C.terra}" ${st(1.4)}/>`,
+    // мастерская резчиков побогаче: навес, на верстаке — глыба пикролита и лучковое сверло для бус;
+    //   готовые фигурки с раскинутыми руками, связка подвесок
+    workshop1: shadow(28) + `
+      <path d="M7 22 L7 55 M41 18 L41 50" stroke="${C.woodD}" stroke-width="3"/>
+      <path d="M1 20 L47 13 L48 19 L2 26Z" fill="${C.thatch}" ${st()}/><path d="M9 23 l0 -4 M19 21.5 l0 -4.5 M29 20 l0 -4.5 M39 18.5 l0 -4" stroke="${C.thatchD}" stroke-width="1.2"/>
+      <path d="M11 25 Q20 32 31 23" fill="none" stroke="${C.woodD}" stroke-width="1.1"/>
+      ${[13, 17, 21, 25, 29].map((x, i) => `<circle cx="${x}" cy="${[26.6, 28.6, 29.4, 28.4, 25.6][i]}" r="1.8" fill="${i === 2 ? C.white : C.pic}" stroke="${O}" stroke-width=".9"/>`).join('')}
+      <rect x="4" y="41" width="40" height="5" rx="1" fill="${C.wood}" ${st(1.4)}/>
+      <path d="M9 46 L9 55 M39 46 L39 55" stroke="${C.woodD}" stroke-width="2.6"/>
+      <path d="M8 41 L10 33 L18 30 L24 35 L22 41Z" fill="${C.pic}" ${st(1.4)}/><path d="M11 35 L16 37 L19 33" fill="none" stroke="${C.picD}" stroke-width="1.2"/>
+      <path d="M32 41 L32 28" stroke="${C.woodD}" stroke-width="1.8"/><circle cx="32" cy="28" r="1.8" fill="${C.wood}" ${st(1)}/>
+      <path d="M24 33 Q32 29 40 33" fill="none" stroke="${C.woodD}" stroke-width="2.2" stroke-linecap="round"/><path d="M24.5 33.5 L32 35 L39.5 33.5" fill="none" stroke="${O}" stroke-width=".9"/>
+      <path d="M14 58 l3 -1 M24 59 l2 -2 M30 57 l3 0" stroke="${C.picD}" stroke-width="1.6" stroke-linecap="round"/>` +
+      `<rect x="47" y="54" width="12" height="4" rx="1" fill="${C.stone}" ${st(1.2)}/>` + idol(53, 43, .62) + idol(27, 52, .36, '#e6dcc2', C.stoneD),
+    // гончарная мастерская бронзового века: мастерская из сырца с плоской кровлей, к ней пристроена печь для обжига;
+    //   у печи — дрова, перед дверью — белый пифос и красный кувшин (белый ангоб и «базовое кольцо» — кипрский вывоз)
+    workshop2: shadow(30) + `
+      <rect x="4" y="22" width="30" height="30" fill="${C.mud}" ${st()}/><rect x="2" y="17" width="34" height="6" fill="${C.woodD}" ${st()}/>
+      <path d="M4 32 L34 32 M4 42 L34 42 M14 22 L14 32 M26 22 L26 32 M9 32 L9 42 M20 32 L20 42 M31 32 L31 42" stroke="${C.mudD}" stroke-width="1.1"/>
+      <rect x="15" y="36" width="9" height="16" fill="${C.dark}" ${st(1.3)}/>
+      <path d="M30 54 Q30 30 44 28 Q58 30 58 54Z" fill="${C.mudD}" ${st()}/>
+      <path d="M38 54 Q38 43 44 43 Q50 43 50 54Z" fill="${C.dark}" ${st(1.4)}/>` + flame(44, 50, .85) + smoke(44, 24) + `
+      <path d="M55 58 L64 58 M54 54.5 L63 54.5 M56 51 L63 51" stroke="${O}" stroke-width="4" stroke-linecap="round"/>
+      <path d="M55 58 L64 58 M54 54.5 L63 54.5 M56 51 L63 51" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>` +
+      pithos(9, 53, .42, C.white) + `<path d="M5 53 Q9 54.5 13 53" fill="none" stroke="${C.red}" stroke-width="1.3"/>` +
+      `<path d="M26 60 Q24 54 27 51 L31 51 Q34 54 32 60Z" fill="${C.terra}" ${st(1.3)}/>`,
     store0: shadow(20) + `
       <path d="M12 30 L52 30 L47 53 L17 53Z" fill="${C.thatch}" ${st()}/>
       <path d="M14 37 L50 37 M15 44 L49 44 M22 30 L24 53 M32 30 L32 53 M42 30 L40 53" stroke="${C.thatchD}" stroke-width="1.4"/>
@@ -395,11 +432,13 @@ const Art = (() => {
     <circle cx="6" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/><circle cx="20" cy="53" r="4" fill="${C.woodD}" ${st(1.3)}/>` + logEnds(14, 41, .55) + logEnds(12, 36, .5);
   B.quarry3 = quarrySledge + ashlar(12, 10, 12, 7) + ashlar(22, 6, 11, 7) + `
     <path d="M6 61 L36 61" stroke="${C.woodD}" stroke-width="2.6" stroke-linecap="round"/><path d="M6 58 L1 55" stroke="${C.woodD}" stroke-width="1.6"/>` + ashlar(9, 53, 25, 7);
-  B.workshop3 = B.workshop2 + `
-    <path d="M3 26 L3 56 M27 26 L27 40" stroke="${C.woodD}" stroke-width="2.4"/>
-    <rect x="1" y="23" width="28" height="3.5" rx="1" fill="${C.wood}" ${st(1.3)}/>` +
-    [6, 14, 22].map((x, i) => `<path d="M${x - 3.5} 23 Q${x - 5} 17 ${x - 2} 14 L${x + 2} 14 Q${x + 5} 17 ${x + 3.5} 23Z" fill="${i === 1 ? C.terra : C.white}" ${st(1.2)}/>
-      <path d="M${x - 4} 19 Q${x} 21 ${x + 4} 19" stroke="${i === 1 ? C.white : C.red}" stroke-width="1.3" fill="none"/>`).join('') + pennant(57, 22);
+  // ур. 7+: на плоской кровле сохнут кувшины, у двери — полка с расписной посудой, флажок: мастерская работает на вывоз
+  B.workshop3 = B.workshop2 + [8, 16, 24].map((x, i) => `<path d="M${x - 3} 17 Q${x - 4.5} 12 ${x - 1.5} 9 L${x + 1.5} 9 Q${x + 4.5} 12 ${x + 3} 17Z" fill="${i === 1 ? C.terra : C.white}" ${st(1.2)}/>
+      <path d="M${x - 3.6} 13.5 Q${x} 15.5 ${x + 3.6} 13.5" stroke="${i === 1 ? C.white : C.red}" stroke-width="1.2" fill="none"/>`).join('') + pennant(32, 17) + `
+    <rect x="13" y="46" width="13" height="3" rx="1" fill="${C.wood}" ${st(1.1)}/>
+    <path d="M14.5 46 Q13 42 15.5 40 L18.5 40 Q21 42 19.5 46Z M21 46 Q20 43 22 41.5 L24 41.5 Q26 43 25 46Z" fill="${C.white}" ${st(1)}/>
+    <path d="M14 43 Q17 44.2 20 43" stroke="${C.red}" stroke-width="1" fill="none"/>` +
+    pithos(19, 61, .34, C.white) + `<ellipse cx="38" cy="61" rx="5" ry="2.2" fill="${C.terra}" ${st(1.1)}/><ellipse cx="38" cy="59.5" rx="4" ry="1.6" fill="${C.white}" ${st(1)}/>`;
   B.store3 = `<path d="M20 13 L40 2 L60 13Z" fill="${C.thatch}" ${st()}/><path d="M28 13 L40 5 M40 5 L52 13 M34 13 L40 5 L46 13" stroke="${C.thatchD}" stroke-width="1.2"/>` + B.store2 +
     `<rect x="22" y="24" width="36" height="3" fill="${C.red}"/>` + pithos(30, 52, .45, C.white) + ingotShape(47, 57, .38) + ingotShape(47, 53, .38);
 
@@ -562,20 +601,29 @@ const Art = (() => {
   const bronzeEdge = (d, w = 3) => `<path d="${d}" stroke="${O}" stroke-width="${w + 2}" stroke-linecap="round" fill="none"/><path d="${d}" stroke="${C.bronze}" stroke-width="${w}" stroke-linecap="round" fill="none"/>`;
   const furrowRows = (ys, col = C.furrowD) => ys.map(y => `<path d="M7 ${y + 2} Q34 ${y - 1} 61 ${y + 2}" stroke="${col}" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>`).join('');
   Object.assign(B, {
-    // Поле с бронзовыми серпами: небольшой орошаемый участок — половина ещё колосится, половина сжата; на меже — бронзовый серп
+    // Поле полбы: небольшой орошаемый участок — половина ещё колосится, половина сжата; на меже — бронзовый серп
     field2: furrowRows([14, 28, 42]) +
-      [14, 28, 42].map((y, r) => [11, 20, 29].map(x => ear(x + (r % 2) * 3, y)).join('') +
+      [14, 28, 42].map((y, r) => [11, 20, 29].map(x => earBz(x + (r % 2) * 3, y)).join('') +
         [40, 48, 56].map(x => `<path d="M${x + (r % 2) * 2} ${y} l0 -4 M${x + 2 + (r % 2) * 2} ${y} l0 -3" stroke="${C.wheatD}" stroke-width="1.5"/>`).join('')).join('') + `
       <path d="M30 61 L38 54" stroke="${C.woodD}" stroke-width="3.6" stroke-linecap="round"/>
       <path d="M37 55 Q40 41 54 42 Q61 43 60 49 Q55 45 47 47 Q41 50 40 57Z" fill="${C.bronze}" ${st(1.5)}/>
       <path d="M41 53 Q44 47 52 45.5" fill="none" stroke="${C.bronzeD}" stroke-width="1.2"/>`,
-    // Лесорубы с бронзовыми топорами: колода с воткнутым бронзовым топором, срубленный ствол
-    lumber2: shadow(26) + pine(11, 28, .95) + logEnds(28, 50, 1.05) + `
-      <path d="M38 36 L38 48 Q47 52 56 48 L56 36Z" fill="${C.wood}" ${st()}/>
-      <ellipse cx="47" cy="36" rx="9" ry="3.6" fill="${C.wheat}" ${st()}/><ellipse cx="47" cy="36" rx="4.5" ry="1.8" fill="none" stroke="${C.wheatD}" stroke-width="1.1"/>
-      <path d="M48 35 L57 13" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
-      <path d="M50 15 Q57 7 64 13 L57 21 Q56 16 50 15Z" fill="${C.bronze}" ${st(1.5)}/><path d="M60 11 L63 14" stroke="${C.bronzeD}" stroke-width="1.2"/>
-      <path d="M34 54 l4 -2 M58 52 l4 -2 M60 45 l3 1" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
+    // Лесорубы с бронзовыми топорами: сосну свалили, обрубают сучья; у пня — бронзовый топор, рядом брёвна на вывоз
+    //   (лес — кипрский товар бронзового века: в письме EA 35 царь Аласии просит фараона платы за «мой лес»)
+    lumber2: shadow(28) + pine(9, 20, .85) + leafTree(57, 15, .8) + `
+      <path d="M14 38 L50 30" stroke="${O}" stroke-width="8.6" stroke-linecap="round"/><path d="M14 38 L50 30" stroke="${C.wood}" stroke-width="6" stroke-linecap="round"/>
+      <path d="M22 34.5 L46 29.2" stroke="${C.woodD}" stroke-width="1" opacity=".7"/>
+      <ellipse cx="51" cy="29.8" rx="2.6" ry="3.4" transform="rotate(-12 51 29.8)" fill="${C.wheat}" ${st(1.2)}/>
+      <path d="M3 40 Q2 32 9 30 Q12 26 18 29 Q23 30 22 36 Q24 42 17 43 Q11 47 6 44 Q2 44 3 40Z" fill="${C.greenD}" ${st(1.4)}/>
+      <path d="M7 35 l4 2 M12 32 l2 4 M15 40 l3 -2 M8 41 l3 -2" stroke="${C.green}" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M30 33.5 l-2 -5 M38 31.6 l1 -5" stroke="${C.woodD}" stroke-width="2" stroke-linecap="round"/>
+      <path d="M26 45 Q30 41 36 43" stroke="${C.greenD}" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M30 42 l1 -3 M33 42.5 l2 -2.5" stroke="${C.greenD}" stroke-width="1.6" stroke-linecap="round"/>` +
+      logEnds(20, 55, .7) + logEnds(16, 48, .6) + logEnds(27, 48, .6) + `
+      <path d="M38 48 L38 56 Q46 60 54 56 L54 48Z" fill="${C.wood}" ${st()}/>
+      <ellipse cx="46" cy="48" rx="8" ry="3.2" fill="${C.wheat}" ${st()}/><ellipse cx="46" cy="48" rx="4" ry="1.6" fill="none" stroke="${C.wheatD}" stroke-width="1.1"/>
+      <path d="M47 47 L55 38" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M51 37 Q56 31 63 35 L58 43 Q57 39 51 37Z" fill="${C.bronze}" ${st(1.4)}/><path d="M59.5 33.5 L62 36" stroke="${C.bronzeD}" stroke-width="1.2"/>
+      <path d="M34 61 l4 -2 M56 61 l4 -2 M58 52 l3 1" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
     // Каменоломня тёсаного камня: у скалы — ровный срез, перед ним один тёсаный блок, бронзовый резец и деревянная колотушка
     quarry2: shadow(26) + `
       <path d="M6 46 L9 22 L22 14 L34 18 L36 46Z" fill="${C.stoneD}" ${st()}/>
@@ -597,24 +645,25 @@ const Art = (() => {
       <rect x="37" y="36" width="11" height="18" fill="${C.wood}" ${st(1.3)}/>
       <path d="M37 40.5 L48 40.5 M37 49 L48 49" stroke="${IRND}" stroke-width="2"/><circle cx="45.5" cy="45" r="1.4" fill="none" stroke="${IRND}" stroke-width="1.2"/>
       <rect x="29" y="29" width="5" height="5" fill="${C.dark}" ${st(1.1)}/><rect x="51" y="29" width="5" height="5" fill="${C.dark}" ${st(1.1)}/>`,
-    // Поле с железным плугом: свежая пашня — всходы только в первом ряду, рало с железным лемехом прямо в борозде
-    field4: furrowRows([10, 22, 34, 46, 58], C.furrow) + `
-      <path d="M6 34 Q34 31 61 34 M6 46 Q34 43 61 46 M6 58 Q34 55 61 58" stroke="#7a4f2a" stroke-width="1.3" fill="none" opacity=".7"/>` +
-      [10, 22].map((y, r) => [10, 21, 32, 43, 54].map(x => sprout(x + r * 4, y, .7)).join('')).join('') + `
+    // Пшеничное поле: старая пашня уже в золотой пшенице, ниже — свежая распашка; рало с железным лемехом прямо в борозде
+    field4: furrowRows([18, 30]) + furrowRows([40, 50, 60], C.furrow) + `
+      <path d="M6 40 Q34 37 61 40 M6 50 Q34 47 61 50 M6 60 Q34 57 61 60" stroke="#7a4f2a" stroke-width="1.3" fill="none" opacity=".7"/>` +
+      [18, 30].map((y, r) => [10, 20, 30, 40, 50].map(x => ear(x + r * 4, y)).join('')).join('') + `
       <path d="M8 51 L22 51" stroke="#6e4423" stroke-width="3" stroke-linecap="round" opacity=".55"/>
       <path d="M20 51 L44 51" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
       <path d="M22 51 L13 36 M10 38 L16 35" stroke="${C.woodD}" stroke-width="2.8" stroke-linecap="round"/>
       <path d="M36 51 L61 31" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/>
       <path d="M42 47 L57 51 L42 55Z" fill="${IRN}" ${st(1.5)}/><path d="M44 49.5 L54 51" stroke="${IRNL}" stroke-width="1.3"/>`,
-    // Лесорубы с железными топорами: толстое бревно, в нём — железный топор, в торце — железный клин
-    lumber4: shadow(28) + `
-      <rect x="6" y="38" width="44" height="15" rx="7" fill="${C.wood}" ${st()}/>
-      <path d="M12 42 Q28 40 44 42 M12 49 Q28 47 44 49" fill="none" stroke="${C.woodD}" stroke-width="1.1"/>
-      <ellipse cx="50" cy="45.5" rx="6" ry="7.5" fill="${C.wheat}" ${st()}/><ellipse cx="50" cy="45.5" rx="3" ry="3.8" fill="none" stroke="${C.wheatD}" stroke-width="1.1"/>
-      <path d="M58 40 L51 45.5 L58 51Z" fill="${IRND}" ${st(1.2)}/>
-      <path d="M27 38 L16 14" stroke="${C.woodD}" stroke-width="3.6" stroke-linecap="round"/>
-      <path d="M21 35 L28 26 Q34 30 33 39Z" fill="${IRN}" ${st(1.5)}/><path d="M28.5 28.5 Q32 31 31.5 37" fill="none" stroke="${IRNL}" stroke-width="1.3"/>
-      <path d="M8 58 l5 -2 M36 58 l4 -2 M58 58 l4 -3" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
+    // Лесорубы с железными топорами: ствол колют железными клиньями на доски, колотые доски — штабелем; топор в бревне
+    lumber4: shadow(30) + pine(8, 20, .85) + pine(57, 14, .8) + leafTree(33, 13, .75) + `
+      <rect x="4" y="30" width="42" height="14" rx="7" fill="${C.wood}" ${st()}/>
+      <path d="M8 37 L44 37" stroke="${O}" stroke-width="1.3"/><path d="M10 33 Q26 31.5 42 33 M10 41 Q26 42.5 42 41" fill="none" stroke="${C.woodD}" stroke-width="1"/>
+      <ellipse cx="46" cy="37" rx="5.5" ry="7" fill="${C.wheat}" ${st()}/><path d="M41 37 L51.5 37" stroke="${O}" stroke-width="1.3"/>
+      <path d="M14 31.5 L18 31.5 L16 38Z M28 31.5 L32 31.5 L30 38Z" fill="${IRND}" ${st(1.1)}/>
+      <path d="M38 31 L47 12" stroke="${C.woodD}" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M36 28 L42 19 Q48 23 46 31Z" fill="${IRN}" ${st(1.4)}/><path d="M42.5 21.5 Q46 24 45 29" fill="none" stroke="${IRNL}" stroke-width="1.2"/>
+      ${[0, 1, 2].map(i => `<rect x="${22 + i * 2}" y="${55 - i * 4.5}" width="${36 - i * 4}" height="4.5" fill="${i === 1 ? '#b0794a' : C.wood}" ${st(1.2)}/><rect x="${55 - i * 2}" y="${55 - i * 4.5}" width="3" height="4.5" fill="${C.wheat}" ${st(1)}/>`).join('')}
+      <path d="M6 61 l5 -2 M16 61 l4 -2 M58 62 l4 -2" stroke="${C.wheatD}" stroke-width="2" stroke-linecap="round"/>`,
     // Каменоломня с железными кирками: ровные ступени выработки, железная кирка, клинья в пропиле, один тёсаный блок
     quarry4: shadow(28) + `
       <path d="M4 46 L4 14 L22 11 L22 26 L40 24 L40 46Z" fill="#d6ccb3" ${st()}/>
@@ -623,12 +672,14 @@ const Art = (() => {
       ashlar(16, 48, 22, 8) + `
       <path d="M48 56 L54 26" stroke="${C.woodD}" stroke-width="3.2" stroke-linecap="round"/>
       <path d="M42 26 Q52 18 63 25 Q53 22 49 30Z" fill="${IRN}" ${st(1.5)}/><path d="M45 25 Q52 20 60 24" fill="none" stroke="${IRNL}" stroke-width="1.2"/>`,
-    // Мастерская расписной керамики: одна печь и один кувшин нового, расписного стиля; у печи — железная кочерга
-    workshop4: shadow(26) + `
-      <path d="M32 52 Q32 28 46 26 Q60 28 60 52Z" fill="${C.mudD}" ${st()}/>
-      <path d="M41 52 Q41 41 46 41 Q51 41 51 52Z" fill="${C.dark}" ${st(1.4)}/>` + flame(46, 48, .8) + smoke(46, 22) + `
-      <path d="M58 54 L64 34" stroke="${IRND}" stroke-width="2.2" stroke-linecap="round"/>
-      <rect x="6" y="50" width="24" height="4" rx="1" fill="${C.wood}" ${st(1.2)}/>` + birdJug(18, 36, .95),
+    // Мастерская расписной керамики: мастерская из тёсаного камня с пристроенной печью, перед ней — один кувшин нового,
+    //   расписного стиля; у печи — железная кочерга
+    workshop4: shadow(30) + wallA(4, 22, 28, 30) + `<rect x="2" y="18" width="32" height="5" fill="${C.woodD}" ${st()}/>
+      <rect x="9" y="36" width="9" height="16" fill="${C.dark}" ${st(1.3)}/>
+      <path d="M30 54 Q30 30 44 28 Q58 30 58 54Z" fill="${C.mudD}" ${st()}/>
+      <path d="M38 54 Q38 43 44 43 Q50 43 50 54Z" fill="${C.dark}" ${st(1.4)}/>` + flame(44, 50, .8) + smoke(44, 24) + `
+      <path d="M57 56 L63 36" stroke="${IRND}" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="15" y="57" width="18" height="3.5" rx="1" fill="${C.wood}" ${st(1.2)}/>` + birdJug(24, 47, .62),
     // Каменный склад амфор: небольшая кладовая из тёсаного камня, дверь в железной оковке, у стены — две амфоры
     store4: shadow(28) + wallA(24, 22, 34, 31) + `<rect x="22" y="18" width="38" height="5" fill="${C.woodD}" ${st()}/>
       <rect x="35" y="35" width="12" height="18" fill="${C.wood}" ${st(1.3)}/>
@@ -742,12 +793,12 @@ const Art = (() => {
       <rect x="27.5" y="39" width="9" height="15" fill="${C.dark}" ${st(1.3)}/><path d="M27.5 39 Q32 47 36.5 39Z" fill="${WINE}" ${st(.9)}/>` +
       ionic(9, 34.4, 19.6, .95) + ionic(21, 34.4, 19.6, .95) + ionic(43, 34.4, 19.6, .95) + ionic(55, 34.4, 19.6, .95),
 
-    // Поле с жерновами (12): спелая пшеница в три ряда, на меже — мельница-тёрка с рычагом и мешок зерна
-    field6: furrowRows([12, 25, 38]) + [12, 25, 38].map((y, r) => [10, 20, 30, 40, 50].map(x => ear(x + (r % 2) * 4, y)).join('')).join('') + `
+    // Поле отборной пшеницы (12): тяжёлый колос в три ряда, на меже — мельница-тёрка с рычагом и мешок зерна
+    field6: furrowRows([12, 25, 38]) + [12, 25, 38].map((y, r) => [10, 20, 30, 40, 50].map(x => earGr(x + (r % 2) * 4, y)).join('')).join('') + `
       <path d="M6 58 Q4 50 9 47 L15 47 Q19 50 17 58Z" fill="#e8d8b0" ${st(1.3)}/><path d="M8 48 Q12 45 16 48" fill="none" stroke="${C.woodD}" stroke-width="1.5"/>` +
       hopperMill(42, 50, 1),
-    // Поле с жерновами (15): ток — каменный круг со снопами и молотильной доской, мельница, мешки, амфора с зерном
-    field7: furrowRows([10, 22]) + [10, 22].map((y, r) => [12, 22, 32, 42, 52].map(x => ear(x + (r % 2) * 4, y)).join('')).join('') + `
+    // Поле отборной пшеницы (15): ток — каменный круг со снопами и молотильной доской, мельница, мешки, амфора с зерном
+    field7: furrowRows([10, 22]) + [10, 22].map((y, r) => [12, 22, 32, 42, 52].map(x => earGr(x + (r % 2) * 4, y)).join('')).join('') + `
       <ellipse cx="24" cy="44" rx="18" ry="8.5" fill="#e3cf98" ${st(1.6)}/><ellipse cx="24" cy="44" rx="14" ry="6" fill="none" stroke="${CALCD}" stroke-width="1" stroke-dasharray="2 2"/>
       <rect x="15" y="41" width="13" height="6" rx="1" fill="${C.wood}" ${st(1.2)}/>${[18, 21, 24].map(x => `<circle cx="${x}" cy="44" r=".8" fill="${C.dark}"/>`).join('')}` +
       sheaf(34, 46) + sheaf(38, 44) + hopperMill(50, 54, .85) + `
