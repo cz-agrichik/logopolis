@@ -756,3 +756,10 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 /* устаревшее здание на карте: серое, со значком перемен */
 .tile.obsolete .b { filter: grayscale(.85) opacity(.75); }
 .tile.obsolete::after { content: '🔄'; position: absolute; top: 1px; right: 2px; font-size: 10px; }
+
+/* гавань: вода рисунка (внизу) продолжается до краёв клетки — бухта; если море рядом слева, справа или снизу, она с ним сливается */
+.tile.has-b.bt-port { background-image: linear-gradient(to top, #3f86b0 0 30%, rgba(63,134,176,0) 37%); }
+.tile.has-b.bt-port .b { filter: none; }
+/* поле с 5-го уровня: оросительный канал по левому краю клетки, во всю высоту — у соседних полей каналы смыкаются */
+.tile.has-b.bt-field.canal { background-image: linear-gradient(to right, transparent 3%, #2c6a91 3% 4.5%, #3f86b0 4.5% 11%, #2c6a91 11% 12.5%, transparent 12.5%); }
+

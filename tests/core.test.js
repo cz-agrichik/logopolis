@@ -179,19 +179,24 @@ function ironAge(C) {
   return G;
 }
 
-test('железный век: предел 11; 10-й уровень просит железо, 11-й — вдвое больше λ, чем 9-й', () => {
-  const C = fresh(), G = ironAge(C), s = G.state;
-  assert.equal(G.maxLevel(), 11);
-  const up10 = G.upgradeCost('house', 10);
-  assert.ok(up10.cost.iron > 0 && !up10.cost.bronze, '10-й — железо вместо бронзы');
-  assert.equal(G.upgradeCost('house', 11).logos, 2 * G.upgradeCost('house', 9).logos);
-  assert.ok(G.upgradeCost('house', 11).cost && !Object.keys(G.upgradeCost('house', 11).cost).length, '11-й — только λ');
+test('железный век: предел 12; 10-й и 11-й — за ресурсы с железом, 12-й — λ, 4 «базы» (9-й — 3)', () => {
+  const C = fresh(), G = ironAge(C), s = G.state, B = C.get('BUILDINGS');
+  assert.equal(G.maxLevel(), 12);
+  for (const L of [10, 11]) {
+    const up = G.upgradeCost('house', L);
+    assert.ok(up.cost.iron > 0 && !up.cost.bronze && !up.logos, L + '-й — ресурсы, железо вместо бронзы');
+  }
+  assert.equal(G.upgradeCost('house', 12).logos, 4 * B.house.lp); assert.equal(G.upgradeCost('house', 9).logos, 3 * B.house.lp);
+  assert.ok(G.upgradeCost('house', 12).cost && !Object.keys(G.upgradeCost('house', 12).cost).length, '12-й — только λ');
+  // работников — на один больше на каждом уровне мудрости: 3, 5, 7, 9, 12
+  const f = { type: 'field', level: 11 }; assert.equal(G.workersOf(f), B.field.workers + 4);
+  f.level = 12; assert.equal(G.workersOf(f), B.field.workers + 5);
   const b = { id: 872, type: 'field', level: 9, x: 7, y: 7 }; s.buildings.push(b);
   s.res.iron = 0;
   assert.deepEqual([...G.upgradeInfo(b).reason.items.map(x => x[0])], ['iron'], 'без железа 10-й не взять');
-  // склады на 10-м и 11-м растут резче обычного
-  assert.ok(Math.abs(G.storeMult(10) / G.storeMult(9) - 1.3) < 1e-9 && Math.abs(G.storeMult(11) / G.storeMult(10) - 1.6) < 1e-9);
-  assert.ok(Math.abs(G.levelMult(11) / G.levelMult(10) - 1.4) < 1e-9);
+  // склады с 10-го растут резче обычного: ×1.2 за ресурсный уровень, ×1.5 — за уровень мудрости
+  assert.deepEqual([10, 11, 12].map(L => Math.round(G.storeMult(L) / G.storeMult(L - 1) * 100) / 100), [1.2, 1.2, 1.5]);
+  assert.deepEqual([10, 11, 12].map(L => Math.round(G.levelMult(L) / G.levelMult(L - 1) * 100) / 100), [1.15, 1.15, 1.4]);
 });
 
 test('железный век: «Железо» — бронза пропадает совсем, литейня устаревает; перестроить или продать', () => {
@@ -320,7 +325,7 @@ test('железный век: святилища улучшаются на св
   assert.equal(G.buildStatus('sp_apollo').reason.code, 'needTech', 'Аполлон — после слогового письма');
   s.techs.push('phoenicians', 'syllabary'); s.res.iron = 3000;
   for (const k of ['stone', 'copper']) s.res[k] = 4500;
-  s.buildings.push({ id: 932, type: 'storehouse', level: 11, x: 11, y: 9 }, { id: 933, type: 'storehouse', level: 11, x: 12, y: 9 }); G.tick(0.001);
+  s.buildings.push({ id: 932, type: 'storehouse', level: 12, x: 11, y: 9 }, { id: 933, type: 'storehouse', level: 12, x: 12, y: 9 }); G.tick(0.001);
   s.res.stone = 15000; s.res.copper = 5000; s.res.cheese = 9000;   // Афродите — сыр (после «Виноградарства» — амфоры) и медь, без серебра
   assert.ok(G.upgradeWonder('sp_aphrodite'));
   assert.equal(sh1.type, 'sp_aphrodite'); assert.deepEqual([sh1.x, sh1.y], [9, 9]);
@@ -959,7 +964,7 @@ function hellenic(C) {
   s.techs = C.get('TECHS').filter(t => t.epoch < 3).map(t => t.id);
   s.pop = 150; s.logos = 5000;
   for (const k of Object.keys(s.res)) s.res[k] = 3000;
-  s.buildings.push({ id: 880, type: 'storehouse', level: 11, x: 5, y: 7 }, { id: 881, type: 'storehouse', level: 11, x: 6, y: 7 });
+  s.buildings.push({ id: 880, type: 'storehouse', level: 12, x: 5, y: 7 }, { id: 881, type: 'storehouse', level: 12, x: 6, y: 7 });
   G.tick(0.001);
   return G;
 }
@@ -970,40 +975,45 @@ const addPort = G => {
 
 test('переход из железного века ведёт в эллинский Кипр — он открыт, игра не кончается; старое «конец прототипа» снимается', () => {
   const C = fresh(), G = ironAge(C), s = G.state, E = C.get('EPOCHS');
-  assert.equal(E[3].maxLevel, 13); assert.ok(!E[3].locked && E[3].advance && !E[4].locked && !E[4].advance && E[4].maxLevel === 13);
+  assert.equal(E[3].maxLevel, 15); assert.ok(!E[3].locked && E[3].advance && !E[4].locked && !E[4].advance && E[4].maxLevel === 15);
   s.techs.push(...C.get('TECHS').filter(t => t.epoch === 2).map(t => t.id));
   for (const [i, w] of ['sp_salamis', 'sp_aphrodite', 'sp_apollo'].entries()) {   // обязательные чудеса царств
     const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(w, t));
     s.buildings.push({ id: 990 + i, type: w, level: 1, x: t.x, y: t.y });
   }
   s.pop = 200; s.res.silver = 2600; s.res.iron = 1600; s.res.stone = 10000;
-  s.buildings.push({ id: 873, type: 'storehouse', level: 11, x: 4, y: 7 }); G.tick(0.001); s.pop = 200;
+  s.buildings.push({ id: 873, type: 'storehouse', level: 12, x: 4, y: 7 }); G.tick(0.001); s.pop = 200;
   assert.ok(G.advanceEpoch());
-  assert.equal(s.epoch, 3); assert.equal(s.finished, false); assert.equal(G.maxLevel(), 13);
+  assert.equal(s.epoch, 3); assert.equal(s.finished, false); assert.equal(G.maxLevel(), 15);
   const req = G.epochReqs(); assert.ok(req && req.some(r => r.kind === 'pop' && r.need === 200), 'переход в Римский Кипр — по своим условиям');
   // старое сохранение, где переход в эпоху 3 был концом прототипа
   const io = memoryIO({ [G.KEY]: JSON.stringify(Object.assign({}, s, { finished: true })) });
   G.io = io; assert.equal(G.load().finished, false);
 });
 
-test('эллинский Кипр: 12-й уровень — после «Своей монеты» и за монеты, 13-й — только λ (в полтора раза дороже 11-го)', () => {
-  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE');
-  const up12 = G.upgradeCost('house', 12), up11 = G.upgradeCost('house', 11);
-  assert.ok(up12.cost.silver >= 60 && up12.cost.iron > 0 && !up12.logos, '12-й — ресурсы, железо и монеты');
-  assert.equal(G.upgradeCost('house', 13).logos, Math.round(1.5 * up11.logos));
-  assert.ok(!Object.keys(G.upgradeCost('house', 13).cost).length, '13-й — только λ');
-  const b = { id: 883, type: 'field', level: 11, x: 7, y: 7 }; s.buildings.push(b);
+test('эллинский Кипр: 13-й и 14-й — после «Своей монеты», за ресурсы и монеты; 15-й — только λ, 5 «баз»', () => {
+  const C = fresh(), G = hellenic(C), s = G.state, BAL = C.get('BALANCE'), B = C.get('BUILDINGS');
+  const up13 = G.upgradeCost('house', 13), up14 = G.upgradeCost('house', 14);
+  assert.ok(up13.cost.silver >= 60 && up13.cost.iron > 0 && !up13.logos, '13-й — ресурсы, железо и монеты');
+  assert.ok(up14.cost.silver > up13.cost.silver && up14.cost.iron > up13.cost.iron && !up14.logos, '14-й — тоже ресурсы, дороже');
+  assert.equal(G.upgradeCost('house', 15).logos, 5 * B.house.lp);
+  assert.ok(!Object.keys(G.upgradeCost('house', 15).cost).length, '15-й — только λ');
+  assert.equal(BAL.coinFromLevel, 13);
+  const f11 = { id: 885, type: 'field', level: 11, x: 9, y: 7 };
+  assert.ok(!(G.upgradeInfo(f11).reason || {}).tech, '12-й (железный век) «Своей монеты» не ждёт');
+  const b = { id: 883, type: 'field', level: 12, x: 7, y: 7 }; s.buildings.push(b);
   let u = G.upgradeInfo(b);
-  assert.ok(!u.ok && u.reason.code === 'needTech' && u.reason.tech === BAL.coinTech, 'без «Своей монеты» 12-го нет');
+  assert.ok(!u.ok && u.reason.code === 'needTech' && u.reason.tech === BAL.coinTech, 'без «Своей монеты» 13-го нет');
   s.techs.push('coinage'); u = G.upgradeInfo(b);
-  for (const [k, v] of Object.entries(u.cost)) s.res[k] = v;   // 12-й поля дорогой (рост ×1.65 за уровень) — даём ровно сколько нужно
+  for (const [k, v] of Object.entries(u.cost)) s.res[k] = v;   // 13-й поля дорогой (рост ×1.65 за уровень) — даём ровно сколько нужно
   u = G.upgradeInfo(b);
-  assert.ok(u.ok, '12-й открыт'); assert.ok(G.upgrade(b)); assert.equal(b.level, 12);
-  // писцам 12-й — ещё и «Алфавит Эвагора»
-  const sc = { id: 884, type: 'scribe', level: 11, x: 8, y: 7 }; s.buildings.push(sc);
+  assert.ok(u.ok, '13-й открыт'); assert.ok(G.upgrade(b)); assert.equal(b.level, 13);
+  // писцам 13-й — ещё и «Алфавит Эвагора»; бонус писцов — +2 п. п. за каждый уровень
+  const sc = { id: 884, type: 'scribe', level: 12, x: 8, y: 7 }; s.buildings.push(sc);
   u = G.upgradeInfo(sc); assert.ok(u.reason && u.reason.code === 'needTech' && u.reason.tech === 'alphabet');
-  // склады на 12-м и 13-м растут резче
-  assert.ok(Math.abs(G.storeMult(12) / G.storeMult(11) - 1.3) < 1e-9 && Math.abs(G.storeMult(13) / G.storeMult(12) - 1.6) < 1e-9);
+  assert.ok(Math.abs(B.scribe.logosBonus + B.scribe.logosBonusPerLevel * 14 - 0.36) < 1e-9, 'писец 15-го — +36% Логоса');
+  // склады: ×1.2 за ресурсный уровень, ×1.5 — за уровень мудрости
+  assert.deepEqual([13, 14, 15].map(L => Math.round(G.storeMult(L) / G.storeMult(L - 1) * 100) / 100), [1.2, 1.2, 1.5]);
 });
 
 test('устаревшее и доживающее здание продают, а не сносят', () => {
@@ -1108,7 +1118,7 @@ test('эллинский Кипр, вторая треть: пять знани�
   for (const id of ids) { const c = G.techPrice(T[id], 'labor').cost, share = c.papyrus * W.papyrus / worth(c); assert.ok(share > 0.45 && share < 0.55, `${id}: папирус ${share}`); }
   s.techs.push('coinage', 'coppercoin', 'piraeus', 'alphabet'); s.logos = 5000;
   for (const k of Object.keys(s.res)) s.res[k] = 30000;
-  s.buildings.push({ id: 990, type: 'storehouse', level: 13, x: 9, y: 9 }, { id: 991, type: 'storehouse', level: 13, x: 10, y: 9 }); G.tick(0.001);
+  s.buildings.push({ id: 990, type: 'storehouse', level: 15, x: 9, y: 9 }, { id: 991, type: 'storehouse', level: 15, x: 10, y: 9 }); G.tick(0.001);
   assert.deepEqual({ ...G.techPrice(T.choregia, 'labor').cost }, { amphora: 4200, silver: 8200, papyrus: 190 });
   assert.deepEqual({ ...G.techPrice(T.alexander, 'labor').cost }, { food: 20000, iron: 1400, silver: 7200, papyrus: 200 });
   // Симпосий и Фалисии: виноградники +30% (рощи — нет), «Обряд урожая» → Фалисии: зерно и виноградники ×3 на 15 минут
@@ -1199,7 +1209,7 @@ test('эллинский Кипр, последняя треть: шесть з�
   for (const id of ['vigil', 'hornedfeast', 'morningstar', 'gnomon']) assert.equal(R[id].dur, 720, id);
   s.techs.push('coinage', 'coppercoin', 'piraeus', 'alphabet', 'symposion', 'kitionsword', 'vounibaths', 'choregia', 'alexander'); s.logos = 9000;
   for (const k of Object.keys(s.res)) s.res[k] = 20000;
-  s.buildings.push({ id: 960, type: 'storehouse', level: 13, x: 9, y: 9 }, { id: 961, type: 'storehouse', level: 13, x: 10, y: 9 }); G.tick(0.001);
+  s.buildings.push({ id: 960, type: 'storehouse', level: 15, x: 9, y: 9 }, { id: 961, type: 'storehouse', level: 15, x: 10, y: 9 }); G.tick(0.001);
   assert.equal(G.ritualDur(R.gnomon), 720); assert.equal(G.ritualDur(R.aphrodisia), 1200);
   // Учение Зенона: за задание с ошибкой — 1 λ (без бонусов), «вспомнить самому» — без утешения
   assert.equal(G.mistakeLogos(), 0);
@@ -1294,7 +1304,7 @@ test('Римский Кипр: четыре знания, Меркуралии �
   assert.equal(G.ritualLogos(R.elders), Math.round(1.4 * 2.3 * 7));
   // гавань и корабли
   const t = G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn('port', t));
-  s.buildings.push({ id: 960, type: 'port', level: 9, x: t.x, y: t.y }, { id: 962, type: 'storehouse', level: 13, x: 7, y: 7 }); G.tick(0.001);
+  s.buildings.push({ id: 960, type: 'port', level: 9, x: t.x, y: t.y }, { id: 962, type: 'storehouse', level: 15, x: 7, y: 7 }); G.tick(0.001);
   assert.ok(G.storageCap() >= 20000);
   for (const k of Object.keys(s.res)) s.res[k] = 20000;
   assert.ok(!G.ritualStatus(R.ingot).hidden); assert.ok(G.ritualStatus(R.mercuralia).hidden);

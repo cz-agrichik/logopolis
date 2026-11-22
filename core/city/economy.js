@@ -86,12 +86,14 @@ Object.assign(Game, {
     for (let l = 2; l <= L; l++) m *= (BALANCE.wisdomLevels[l] || {}).growth || BALANCE.levelGrowth;
     return m;
   },
+  /** Сколько уровней мудрости (за λ) до L включительно: на каждом зданию нужен ещё один работник. */
+  wisdomCount(L) { return Object.keys(BALANCE.wisdomLevels).filter(l => +l <= L).length; },
   /** Во сколько раз растёт выпуск при переходе на уровень L. */
   levelStep(L) { return (BALANCE.wisdomLevels[L] || {}).growth || BALANCE.levelGrowth; },
   workersOf(b) {
     const B = BUILDINGS[b.type];
     if (!B.workers || this.obsoleteType(b.type)) return 0;   // устаревшее здание стоит — работники свободны
-    return B.workers + Math.floor((b.level - 1) / 2);
+    return B.workers + this.wisdomCount(b.level);
   },
   /** Выпуск здания на 1-м уровне без бонусов — с учётом знаний и ушедших ресурсов. Устаревшее здание не работает. */
   baseProd(type) {
@@ -150,10 +152,11 @@ Object.assign(Game, {
     if (!B.cap) return 0;
     return Math.round(B.cap * this.levelMult(level)) + (this.form(b.type).capBonus || 0) + fx.houseCap;
   },
-  /** Рост вместимости склада по уровням: как выпуск, но на 10-м и 11-м резче (BALANCE.storeGrowth). */
+  /** Рост вместимости склада по уровням: как выпуск, но с 10-го резче — ×1.2 за ресурсный уровень, ×1.5 за уровень мудрости (BALANCE.storeGrowth). */
   storeMult(L) {
+    const G = BALANCE.storeGrowth;
     let m = 1;
-    for (let l = 2; l <= L; l++) m *= BALANCE.storeGrowth[l] || (BALANCE.wisdomLevels[l] || {}).growth || BALANCE.levelGrowth;
+    for (let l = 2; l <= L; l++) m *= l >= G.from ? (BALANCE.wisdomLevels[l] ? G.wisdom : G.res) : this.levelStep(l);
     return m;
   },
   storageOf(b, level = b.level) { return BUILDINGS[b.type].storage ? Math.round(BUILDINGS[b.type].storage * this.storeMult(level)) : 0; },

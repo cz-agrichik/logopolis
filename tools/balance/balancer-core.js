@@ -25,8 +25,8 @@ const Balancer = (() => {
     1: { house: 12, field: 4, goatpen: 6, lumber: 10, quarry: 6, workshop: 6, storehouse: 4, mine: 6, port: 4, foundry: 3, scribe: 1 },
     2: { house: 12, field: 4, lumber: 10, quarry: 6, workshop: 10, storehouse: 6, mine: 6, port: 5, scribe: 2, vineyard: 4, olivegrove: 12, forge: 6 },
     3: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
-    // Римский Кипр — описан на четверть, уровни — прежние (до 13-го): пока тот же город, что в конце эллинского.
-    //   Жилища в Риме выше 13-го не растут, даже когда предел остальных зданий поднимется
+    // Римский Кипр — описан на четверть, уровни — прежние (до 15-го): пока тот же город, что в конце эллинского.
+    //   Жилища в Риме выше 15-го не растут, даже когда предел остальных зданий поднимется
     4: { house: 14, field: 4, lumber: 10, quarry: 6, workshop: 12, storehouse: 6, port: 6, scribe: 3, vineyard: 10, olivegrove: 12, forge: 6 },
   };
   // Сколько λ игрок тратит за эпоху на уровни зданий (ориентир; остальной Логос уходит на знания, чудеса и переход)

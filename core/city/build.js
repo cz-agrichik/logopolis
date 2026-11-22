@@ -139,7 +139,7 @@ Object.assign(Game, {
     if (target >= BALANCE.coinFromLevel) cost.silver = (cost.silver || 0) + Math.ceil(60 * Math.pow(BALANCE.upCostGrowth, target - BALANCE.coinFromLevel));
     return { cost: this.liveCost(cost), logos: this.upgradeLogos(type, target) };
   },
-  /** λ нужен только на «уровнях за Логос»: 3, 5, 7, 9, 11, 13. */
+  /** λ нужен только на «уровнях за Логос»: 3, 5, 7, 9, 12, 15 (BALANCE.wisdomLevels). */
   needsLogos(target) { return !!BALANCE.wisdomLevels[target]; },
   /** Символический уровень мудрости (3-й, 7-й) — одна маленькая цена для всех. */
   symbolicLevel(target) { const w = BALANCE.wisdomLevels[target]; return !!(w && w.logos); },
@@ -159,7 +159,7 @@ Object.assign(Game, {
       return { capped: true, target, reason: { code: 'levelCap', max: maxL, next: nextE > 0 ? nextE : null, nextMax: nextE > 0 ? EPOCHS[nextE].maxLevel : null } };
     }
     const { cost, logos } = this.upgradeCost(b.type, target);
-    // уровню нужно знание: с 12-го — «Серебряная монета» у всех зданий, плюс свои знания у здания (levelTech)
+    // уровню нужно знание: с 13-го — «Серебряная монета» у всех зданий, плюс свои знания у здания (levelTech)
     const need = (target >= BALANCE.coinFromLevel && !this.hasTech(BALANCE.coinTech) ? [0, BALANCE.coinTech] : null)
       || Object.entries(B.levelTech || {}).find(([L, t]) => target >= +L && !this.hasTech(t));
     if (need) return { target, cost, logos, ok: false, reason: { code: 'needTech', tech: need[1] } };

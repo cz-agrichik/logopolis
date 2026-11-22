@@ -133,7 +133,7 @@ const TIPS = {
   vineyard: 'Встаёт только на холмах — там же, где каменоломни. Амфоры нужны для обрядов святилищ; до половины склада они копятся, а всё, что сверх, гавань продаёт финикийцам за серебро.',
   olivegrove: 'Встаёт только в лесу и спорит за место с лесорубами — а дерево нужно кузницам. Даёт больше зерна, чем виноградник, но меньше амфор.',
   forge: 'Железо просит 10-й уровень зданий. Кузница жжёт дерево на уголь — держите лесорубов. Когда склад железа полон, кузница отдыхает и дерево не тратит.',
-  scribe: 'Каждый процент к Логосу работает на каждую карточку — писцы особенно выгодны тем, кто много учится. В железном веке 10-й и 11-й уровни писцам открывает «Кипрское слоговое письмо», в эллинском 12-й и 13-й — «Алфавит Эвагора».',
+  scribe: 'Каждый процент к Логосу работает на каждую карточку — писцы особенно выгодны тем, кто много учится. В железном веке 10–12-й уровни писцам открывает «Кипрское слоговое письмо», в эллинском 13–15-й — «Алфавит Эвагора».',
 };
 
 // Источники — при тематических статьях: короткая выписка и ссылки (SOURCES[статья] → ключи SRC)
@@ -638,7 +638,8 @@ const PEDIA_ARTICLES = [
       : `<tr class="${r.level > Cat.epochs[0].maxLevel ? 'ep1' : ''} ${r.logos ? 'lv-logos' : ''}"><td>${r.level}</td>
         <td>${num(r.value)}/с <span class="dim">(×${num(Game.levelMult(r.level))} к 1-му)</span></td><td><b>×${num(r.step)}</b></td>
         <td>${r.logos ? `<b>λ ${r.logos}</b>` : Object.entries(r.cost).map(([k, v]) => `${ri(k)} ${v}`).join(' ')}</td></tr>`).join('');
-    const w3 = BALANCE.wisdomLevels[3], w5 = BALANCE.wisdomLevels[5], w7 = BALANCE.wisdomLevels[7], w9 = BALANCE.wisdomLevels[9], w11 = BALANCE.wisdomLevels[11], w13 = BALANCE.wisdomLevels[13];
+    const w3 = BALANCE.wisdomLevels[3], w5 = BALANCE.wisdomLevels[5], w7 = BALANCE.wisdomLevels[7], w9 = BALANCE.wisdomLevels[9], w12 = BALANCE.wisdomLevels[12], w15 = BALANCE.wisdomLevels[15];
+    const SG = BALANCE.storeGrowth;
     return `
     <p class="story">Дом растёт вместе с семьёй: пристраивают комнату, обносят двор, ставят у входа большой пифос. Но настоящий скачок
     случается, когда меняется сама эпоха.</p>
@@ -646,16 +647,16 @@ const PEDIA_ARTICLES = [
     <h4>Каждый уровень умножает выпуск</h4>
     <p>Новый уровень не прибавляет, а <b>умножает</b>: выпуск здания, места в доме, вместимость склада. Множитель зависит от того, чем платите.</p>
     <table class="pt"><tr><th>Уровни</th><th>Платите</th><th>Рост к прошлому уровню</th></tr>
-      <tr><td>2, 4, 6, 8, 10, 12</td><td>ресурсами; с ${BALANCE.goodsFromLevel}-го — ещё и товарами (после «Финикийцев» — серебром), с ${BALANCE.copperFromLevel}-го — медью, на ${BALANCE.bronzeFromLevel}-м — бронзой, с ${BALANCE.ironFromLevel}-го — железом, на ${BALANCE.coinFromLevel}-м — ещё и монетами (сначала знание ${pl('t:' + BALANCE.coinTech, '«' + Cat.tech[BALANCE.coinTech].name + '»')})</td><td><b>×${BALANCE.levelGrowth}</b></td></tr>
+      <tr><td>2, 4, 6, 8, 10, 11, 13, 14</td><td>ресурсами; с ${BALANCE.goodsFromLevel}-го — ещё и товарами (после «Финикийцев» — серебром), с ${BALANCE.copperFromLevel}-го — медью, на ${BALANCE.bronzeFromLevel}-м — бронзой, с ${BALANCE.ironFromLevel}-го — железом, с ${BALANCE.coinFromLevel}-го — ещё и монетами (сначала знание ${pl('t:' + BALANCE.coinTech, '«' + Cat.tech[BALANCE.coinTech].name + '»')})</td><td><b>×${BALANCE.levelGrowth}</b></td></tr>
       <tr class="lv-logos"><td>3 и 7</td><td>Логосом: всего ${w3.logos} и ${w7.logos} λ</td><td><b>×${w3.growth}</b></td></tr>
-      <tr class="lv-logos"><td>5, 9, 11 и 13</td><td>Логосом: своя цена у каждого здания, 9-й — в ${w9.lp} раза дороже 5-го, 11-й — вдвое дороже 9-го (в ${w11.lp} раз дороже 5-го), 13-й — в полтора раза дороже 11-го (в ${w13.lp} раз)</td><td><b>×${w5.growth}</b></td></tr></table>
+      <tr class="lv-logos"><td>5, 9, 12 и 15</td><td>Логосом: своя цена у каждого здания — 5-й стоит одну «базу», 9-й — ${w9.lp}, 12-й — ${w12.lp}, 15-й — ${w15.lp}; на каждом — новый облик</td><td><b>×${w5.growth}</b></td></tr></table>
     <p>Множители перемножаются: 5-й уровень — ${BALANCE.levelGrowth} × ${w3.growth} × ${BALANCE.levelGrowth} × ${w5.growth} ≈ <b>×${num(Game.levelMult(5))}</b> к первому,
     ${maxL}-й — <b>×${num(Game.levelMult(maxL), 1)}</b>.</p>
     <p>Цена ресурсами растёт в ${BALANCE.upCostGrowth} раза с каждым уровнем, а выпуск — медленнее. Уровни за Логос ресурсов не просят
     и растят сильнее — это главная награда за учёбу в городе.</p>
     <ul>
       <li>Предел: ${Cat.epochs[0].maxLevel}-й уровень в медно-каменном веке, ${Cat.epochs[1].maxLevel}-й — в бронзовом, ${Cat.epochs[2].maxLevel}-й — в железном, ${Cat.epochs[3].maxLevel}-й — в эллинском Кипре.</li>
-      <li>${pl('b:storehouse', 'Склады')} с 10-го уровня растут резче: на 10-м и 12-м ×${BALANCE.storeGrowth[10]}, на 11-м и 13-м ×${BALANCE.storeGrowth[11]} — под большие цены поздних эпох.</li>
+      <li>${pl('b:storehouse', 'Склады')} с ${SG.from}-го уровня растут резче: за ресурсный уровень ×${SG.res}, за уровень за Логос ×${SG.wisdom} — под большие цены поздних эпох.</li>
       <li>На каждом уровне за Логос зданию нужен ещё один работник (жилищам и складам работники не нужны).</li>
       <li>Новое здание того же типа тоже дорожает: каждое следующее в ${BALANCE.buildCostGrowth} раза.</li>
       <li>С уровнями за Логос здание и выглядит богаче — как именно, увидите сами.</li>
