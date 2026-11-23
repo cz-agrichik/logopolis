@@ -38,7 +38,8 @@ const Reading = {
     const cards = [];
     for (const c of all) {
       const t = c && c.saved || {};
-      if (!c || c.status === 'learned' || top(t.level) < 0 || top(t.level) > mine) continue;
+      // без перевода карточка в игре бесполезна: у формы его нет, пока книгу не пересоберут (перевод-инфинитив отброшен)
+      if (!c || c.status === 'learned' || top(t.level) < 0 || top(t.level) > mine || !(t.meaning || t.gloss)) continue;
       const key = String(c.key);
       if (key.startsWith('form:')) {
         cards.push({ key, front: t.head || c.form, back: t.meaning || '', hint: [t.formGram, t.lemmaHead && 'от ' + bare(t.lemmaHead)].filter(Boolean).join(', ') });
@@ -120,7 +121,7 @@ const School = {
     const days = Object.keys(log).filter(k => log[k].a > 0);
     const allA = s.stats.right + s.stats.wrong;
     let h = `<h2>Обзор</h2>
-      <p class="lead">Активные колоды: <b>${s.decks.filter(d => d.active).length}</b> из ${s.decks.length}, слов в них — <b>${t.total}</b>.</p>
+      <p class="lead">Активные колоды: <b>${s.decks.filter(d => d.active).length}</b> из ${s.decks.length}, слов в раундах — <b>${t.total}</b>${(n => n ? `, из них ${n} — начатые из выключенных колод` : '')(Decks.offDeckCount(s))}.</p>
       <div class="plan-now">🎯 Учим: <b>${(() => { const id = Decks.planOf(s); return id ? esc(Cat.plans[id].name) : 'свой набор колод'; })()}</b>
         <button class="link" data-plan-open>Сменить</button></div>
       ${this.bar(t, true)}
@@ -190,8 +191,15 @@ const School = {
   s_decks() {
     const s = Learn.state;
     this.groupOpen = this.groupOpen || {};
-    let h = `<h2>Колоды</h2><p class="dim">Включённые колоды участвуют в раундах. Выключенная колода сохраняет свой прогресс.
+    const set = Decks.settings(s), off = Decks.offDeckCount(s);
+    let h = `<h2>Колоды</h2><p class="dim">Включённые колоды дают новые слова и повторение. Выключенная колода сохраняет свой прогресс.
       Колоды A2 и B1 сначала выключены — включайте их, когда A1 станет лёгким.</p>
+      <div class="settings"><label><span>Выключенные колоды</span><select data-setting="offDecks">${[
+        ['pause', 'на паузе — ни новых слов, ни повторения'], ['review', 'без новых слов — начатые из них учатся и повторяются']]
+        .map(([v, l]) => `<option value="${v}" ${set.offDecks === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+        <div class="dim small">${set.offDecks === 'review'
+          ? `Галочка у колоды — откуда брать новые слова. Слово, которое вы уже начали, доучивается и повторяется, даже если его колода выключена${off ? ` (сейчас таких ${off} ${plural(off, 'слово', 'слова', 'слов')})` : ''}.`
+          : 'Выключили колоду — её слова не попадают в раунды совсем, пока не включите снова.'}</div></div>
       <div class="bar-legend"><span><i class="learned"></i>выучено</span><span><i class="learning"></i>учатся</span><span><i class="fresh"></i>новые</span></div>`;
     for (const g of this.deckGroups()) {
       const on = g.decks.filter(d => d.active).length, { words, learned } = Decks.wordStats(s, g.decks);
@@ -214,7 +222,7 @@ const School = {
     const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
     return `<h2>Слова</h2>
       <div class="sw-filters">
-        <select data-wf="deck">${opt('all', 'Все колоды', f.deck)}${opt('active', 'Только включённые', f.deck)}${this.deckGroups().map(g => `<optgroup label="${esc(this.groupTitle[g.key])}">${g.decks.map(d => opt(d.id, d.name, f.deck)).join('')}</optgroup>`).join('')}</select>
+        <select data-wf="deck">${opt('all', 'Все колоды', f.deck)}${opt('active', 'Только те, что в раундах', f.deck)}${this.deckGroups().map(g => `<optgroup label="${esc(this.groupTitle[g.key])}">${g.decks.map(d => opt(d.id, d.name, f.deck)).join('')}</optgroup>`).join('')}</select>
         <select data-wf="st">${[['all', 'Любой статус'], ['due', 'Пора повторить'], ['learning', 'Учатся'], ['spelling', 'Осталось набрать ✍'], ['learned', 'Выучены'], ['new', 'Новые'], ['hard', 'Трудные (есть ошибки)']].map(([v, l]) => opt(v, l, f.st)).join('')}</select>
         <input type="search" id="swSearch" placeholder="Поиск по слову или переводу" value="${esc(f.q)}">
         <button class="btn small ghost" data-export-words>Экспорт таблицы</button>
@@ -225,10 +233,11 @@ const School = {
   /** Отфильтрованные карточки для таблицы слов. */
   filtered() {
     const s = Learn.state, f = this.filter, now = Date.now();
-    const decks = f.deck === 'all' ? s.decks : f.deck === 'active' ? s.decks.filter(d => d.active) : s.decks.filter(d => d.id === f.deck);
+    // «в раундах» — включённые колоды и (при offDecks: 'review') начатые слова выключенных, каждое слово — один раз
+    const cards = f.deck === 'all' ? s.decks.flatMap(d => d.cards) : f.deck === 'active' ? Decks.activeCards(s) : s.decks.filter(d => d.id === f.deck).flatMap(d => d.cards);
     const q = stripAccents((f.q || '').trim().toLowerCase());
     const out = [];
-    for (const d of decks) for (const c of d.cards) {
+    for (const c of cards) {
       const { st, due, p } = Decks.status(s, c, now);
       if (f.st === 'due' && !(st !== 'new' && due)) continue;
       if (f.st === 'hard' && !(p && p.wrong > 0)) continue;

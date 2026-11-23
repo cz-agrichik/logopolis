@@ -41,6 +41,7 @@ class FakeClient:
     level_prompts = []
     bad = 0
     form_prompts = []
+    fix_prompts = []
     lemma_prompts = []
 
     def chat_json(self, system, user):
@@ -59,9 +60,14 @@ class FakeClient:
             return {"phrases": out}
         if system is bc.FORM_SYSTEM:
             FakeClient.form_prompts.append(user)
-            known = {"έριξε": ["неправильный аорист, 3 л. ед. ч.", "бросил", "Α2"], "πίνει": ["наст. вр., 3 л. ед. ч.", "пьёт", "A1"]}
+            # «πίνει — пить»: личная форма с переводом-инфинитивом — её переспросит FORM_FIX_SYSTEM
+            known = {"έριξε": ["неправильный аорист, 3 л. ед. ч.", "бросил", "Α2"], "πίνει": ["наст. вр., 3 л. ед. ч.", "пить", "A1"]}
             items = re.findall(r"^(\d+)\. (\S+) ← ", user, re.M)
             return {"forms": [[n, *known.get(f, ["форма", "βλα", "?"])] for n, f in items]}   # «βλα» — перевод не по-русски
+        if system is bc.FORM_FIX_SYSTEM:
+            FakeClient.fix_prompts.append(user)
+            items = re.findall(r"^(\d+)\. (\S+) ← ", user, re.M)
+            return {"forms": [[n, {"πίνει": "пьёт"}.get(f, "пить")] for n, f in items]}
         if system is bc.LEVEL_SYSTEM:
             FakeClient.level_prompts.append(user)
             answer = {"ματιά": "Β1", "καμιά φορά": "Α2-Β1", "ρίχνω μια ματιά": "?", "πίνω": "A1-B2"}
@@ -129,6 +135,13 @@ def main():
         assert book["forms"]["έριξε|ρίχνω"] == ["неправильный аорист, 3 л. ед. ч.", "бросил", "A2"], book["forms"]
         assert book["forms"]["πίνει|πίνω"] == ["наст. вр., 3 л. ед. ч.", "пьёт", "A1"]
         assert not any("ματιά ←" in p for p in FakeClient.form_prompts), "словарная форма ушла модели"
+        assert len(FakeClient.fix_prompts) == 1 and "πίνει ← πίνω" in FakeClient.fix_prompts[0] \
+            and "έριξε" not in FakeClient.fix_prompts[0], FakeClient.fix_prompts
+        # инфинитив в переводе: «купить», «не знать», «быть в состоянии» — да; «терпеть не может», «у нас есть», «пьёт» — нет
+        assert [bc.ru_infinitive(t) for t in ("купить", "не знать", "быть в состоянии", "найти; нашёл", "мочь")] == [True] * 5
+        assert not any(bc.ru_infinitive(t) for t in ("терпеть не может", "у нас есть", "есть", "пьёт", "говорили; говорить"))
+        assert bc.personal_form("сослаг. наклонение, аорист, 3 л. ед. ч.") and bc.personal_form("повелит. наклонение, 2 л. ед. ч.")
+        assert not any(bc.personal_form(g) for g in ("инфинитив аориста", "вин. п. мн. ч.", "причастие, ж. р., 3 л."))
         assert all(v[1] != "βλα" for v in book["forms"].values()), "перевод формы греческими буквами"
         assert book["meta"]["forms"] is True
         assert (bc.LIB_DIR / "local" / "books" / "secret.js").is_file()

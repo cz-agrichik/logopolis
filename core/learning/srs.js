@@ -16,7 +16,10 @@ const APPETITES = {
 };
 // roundSize — заданий в раунде (знакомство с новым словом — тоже задание); learnPool — сколько слов заучивается одновременно:
 // новые слова приходят, пока в заучивании меньше learnPool, — раунды ровные, а не «8 новых и 8 проверок» за один раз.
-const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', learnPool: 8, roundSize: 8 };
+// offDecks — что значит выключенная колода: 'pause' — она на паузе, ни новых слов, ни повторения; 'review' — новых слов
+// не даёт, а начатые из неё слова (у которых уже есть прогресс) доучиваются и повторяются: галочка у колоды — откуда брать
+// новые слова, а не что учим вообще.
+const DEFAULT_SETTINGS = { learnSteps: 3, appetite: 'normal', learnPool: 8, roundSize: 8, offDecks: 'pause' };
 // Срок повтора выученного — не ровно ступень лестницы, а ступень × случайный множитель от 10% до 190% (в среднем — ровно ступень).
 // Слова, выученные в один день, возвращаются не одной волной через месяц, а вразбивку — «долг» отрабатывается с первых дней.
 const DUE_SPREAD = [0.1, 1.9];
@@ -72,14 +75,21 @@ Object.assign(Decks, {
   /** Сложность задания: 0 — новая, 1–2 — заучивается, 3+ — выучена. */
   level(p) { return !p ? 0 : p.rev >= 0 ? 3 + p.rev : Math.min(2, p.step); },
 
-  /** Карточки включённых колод, каждое слово — один раз (слово из двух колод — карточка первой из них). */
+  /** Карточки раундов, каждое слово — один раз (слово из двух колод — карточка первой из них): все слова включённых колод,
+   *  а при offDecks: 'review' — ещё и начатые слова выключенных (новых они не дают, начатое доучивается и повторяется). */
   activeCards(state) {
     const out = [], seen = new Set();
-    for (const d of state.decks) if (d.active) for (const c of d.cards) {
-      const k = this.pkey(c);
-      if (!seen.has(k)) { seen.add(k); out.push(c); }
-    }
+    const add = c => { const k = this.pkey(c); if (!seen.has(k)) { seen.add(k); out.push(c); } };
+    for (const d of state.decks) if (d.active) for (const c of d.cards) add(c);
+    if (this.settings(state).offDecks === 'review')
+      for (const d of state.decks) if (!d.active) for (const c of d.cards) if (state.progress[this.pkey(c)]) add(c);
     return out;
+  },
+  /** Сколько слов идёт в раунды из выключенных колод (только при offDecks: 'review'). */
+  offDeckCount(state) {
+    if (this.settings(state).offDecks !== 'review') return 0;
+    const on = this.wordSet(state.decks.filter(d => d.active));
+    return this.activeCards(state).filter(c => !on.has(this.pkey(c))).length;
   },
 
   stats(state, deck) {

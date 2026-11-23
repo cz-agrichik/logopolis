@@ -627,6 +627,29 @@ test('«Что будем учить?»: подборка включает св�
   assert.deepEqual([...s.decks.filter(d => d.active).map(d => d.name)], ['Моя']);
 });
 
+test('выключенные колоды: «на паузе» — ни новых, ни повторения; «без новых слов» — начатое доучивается и повторяется', () => {
+  const C = fresh();
+  const L = C.get('Learn'), D = C.get('Decks'), s = L.state;
+  assert.equal(D.settings(s).offDecks, 'pause', 'по умолчанию — как раньше');
+  const a1 = s.decks.find(d => d.id === 'a1-fem'), [learned, learning, untouched] = a1.cards;
+  s.progress[D.pkey(learned)] = { step: 3, rev: 1, due: 0, right: 3, wrong: 0, built: true };
+  s.progress[D.pkey(learning)] = { step: 1, rev: -1, due: 0, right: 1, wrong: 0 };
+  D.applyPlan(s, 'a2');
+  const keys = () => new Set(D.activeCards(s).map(c => D.pkey(c)));
+  assert.ok(!keys().has(D.pkey(learned)) && !keys().has(D.pkey(learning)), 'на паузе: слов выключенной колоды нет в раундах');
+  assert.equal(D.offDeckCount(s), 0);
+  s.settings.offDecks = 'review';
+  const k = keys();
+  assert.ok(k.has(D.pkey(learned)) && k.has(D.pkey(learning)), 'без новых слов: начатое из выключенной колоды — в раундах');
+  assert.ok(!k.has(D.pkey(untouched)), 'нетронутое слово выключенной колоды новым не приходит');
+  assert.equal(D.offDeckCount(s), 2);
+  const plan = D.roundPlan(s);
+  assert.ok(plan.learning.includes(learning) && plan.due.includes(learned), 'заучиваемое и выученное из A1 идут в раунд');
+  assert.ok(plan.fresh.every(c => D.levelOf(D.deckOfCard(s, c.id)) === 'A2'), 'новые — только из включённых колод');
+  assert.equal(plan.inRotation, 1, 'заучиваемое из выключенной колоды занимает место в заучивании');
+  assert.equal(C.get('Decks').fixSettings({}).offDecks, 'pause', 'старое сохранение без настройки — на паузе');
+});
+
 test('колоды: встроенная колода, которой больше нет, уходит из сохранения вместе с прогрессом слов, которых больше нигде нет', () => {
   const C = fresh();
   const L = C.get('Learn'), D = C.get('Decks'), s = L.state;

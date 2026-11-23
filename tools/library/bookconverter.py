@@ -57,6 +57,7 @@ LEMMA_PROMPT_VERSION = "3"  # отдельно: правка словаря не
 VERB_PROMPT_VERSION = "1"   # глаголы, оставшиеся в словаре изменённой формой (σκεφτόταν → σκέφτομαι)
 PHRASE_PROMPT_VERSION = "1"  # обороты — свой проход и свой кеш: старые ответы остаются в силе
 FORM_PROMPT_VERSION = "2"    # грамматика форм (аорист, род. п. мн. ч.…), перевод формы и уровень ГРАММАТИКИ формы
+FORM_FIX_VERSION = "1"       # личные формы, которым модель дала перевод инфинитивом (αγοράσει — «купить» → «купит»)
 LEVEL_PROMPT_VERSION = "1"   # уровни (CEFR) лемм и оборотов — тоже свой проход и свой кеш
 LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]   # в греческой сертификации — Α1, Α2, Β1, Β2, Γ1, Γ2
 BOOK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -1241,7 +1242,9 @@ For each form return:
   "повелит. наклонение, 2 л. ед. ч.", "род. п. мн. ч.", "вин. п. ед. ч., ж. р.", "сравн. степень",
   "причастие страд. залога, ж. р.", "слабая форма местоимения, вин. п.". Mark irregular stems: "неправильный аорист".
 - translation: the Russian translation of THIS exact form, in a matching Russian form, 1–3 words
-  ("проснулись", "проснётся", "окон", "его").
+  ("проснулись", "проснётся", "окон", "его"). A personal verb form gets a personal Russian form of the same
+  person and number, never an infinitive: the subjunctive after να/θα — "αγοράσει" → "купит", "βρεις" → "найдёшь",
+  "αφήσουμε" → "оставим"; the imperative — "φύγε" → "уходи".
 - level: the CEFR level of the GRAMMAR of this form only — the inflection pattern, the stem change — as if the
   learner already knew the word itself. Ignore how rare or difficult the word is: its own level is judged separately.
   Examples: φρίκης (genitive singular of a feminine noun in -η) → A2, although φρίκη itself is a B2 word;
@@ -1328,10 +1331,87 @@ def run_forms(chapters: list[dict], lemma_info: dict, config: dict, cache: Cache
         progress.finish()
     else:
         log("   всё из кеша")
+    fixed = fix_form_infinitives(forms, items, config, cache, client)
+    if fixed:
+        log(f"   перевод формы инфинитивом заменён личной формой: {fixed}")
     lowered = calibrate_form_levels(forms, items)
     if lowered:
         log(f"   уровень формы сверен с такой же грамматикой в книге: опущено {lowered}")
     return complete, forms
+
+
+# Подлежащее у формы есть, а перевод — инфинитив: «αγοράσει — купить», «βρεις — найти». Так модель переводит
+# сослагательное после να («хочет купить»), но в карточке формы это перевод леммы, а не формы. Такие формы
+# переспрашиваем отдельно и коротко — только их, без текста книги.
+
+FORM_FIX_SYSTEM = """You translate inflected Modern Greek verb forms into Russian for a learner's flashcard.
+Each numbered line: the form, its dictionary form (after ←), the grammar of the form, and in «» a WRONG
+translation that used the Russian infinitive.
+
+Return ONLY one JSON object, no markdown:
+{"forms": [[number, "translation"], ...]}
+
+Rules:
+- Translate THIS form with a Russian PERSONAL form of the same person and number, 1–3 words, never an infinitive.
+- Aorist subjunctive (after να/θα): Russian perfective future — "αγοράσει" → "купит", "βρεις" → "найдёшь",
+  "αφήσουμε" → "оставим", "βρεθούν" → "окажутся", "'ρθω" → "приду".
+- Present subjunctive: Russian present — "διαβάζει" → "читает".
+- Imperative: Russian imperative — "φύγε" → "уходи". Past tenses: Russian past — "έλεγαν" → "говорили".
+- Include EVERY number exactly once. Russian in Cyrillic only.
+"""
+RU_INFINITIVE_RE = re.compile(r"(ть|ться|ти|тись|чь|чься)$")
+RU_FINITE_RE = re.compile(r"(ет|ёт|ит|ют|ят|ут|ат|ем|ём|им|ешь|ёшь|ишь|ете|ёте|ите|ал|ял|ел|ил|ыл|ла|ло|ли)$")
+
+
+def ru_infinitive(text: str) -> bool:
+    """Перевод — инфинитив: «купить», «не знать», «быть в состоянии»; но не «терпеть не может», не «у нас есть»."""
+    words = re.split(r"[;,(]", str(text or ""))[0].strip().lower().split()
+    if words[:1] == ["не"]:
+        words = words[1:]
+    if not words or words[0] == "есть" or not RU_INFINITIVE_RE.search(words[0]):
+        return False
+    return not any(RU_FINITE_RE.search(w) for w in words[1:])
+
+
+def personal_form(gram: str) -> bool:
+    """Грамматика формы называет лицо («аорист, 3 л. ед. ч.», «повелит. наклонение») — форма личная."""
+    g = str(gram or "").lower()
+    return bool(re.search(r"\d\s*л\.|повелит", g)) and not re.search(r"инфинитив|причаст|деепр", g)
+
+
+def fix_form_infinitives(forms: dict, items: dict, config: dict, cache: Cache, client: LLMClient) -> int:
+    """Личные формы с переводом-инфинитивом — к модели за личной формой (по 50, кеш по одной). Возвращает, сколько исправлено."""
+    todo = [(fk, items[fk]) for fk, v in forms.items() if fk in items and personal_form(v[0]) and ru_infinitive(v[1])]
+    if not todo:
+        return 0
+    one = lambda fk, it: digest("formfix1", FORM_FIX_VERSION, config["model"], it[1], it[2], forms[fk][0], forms[fk][1])
+    fixed, rest = 0, []
+    for fk, it in todo:
+        hit = cache.get(one(fk, it))
+        if isinstance(hit, str) and hit:
+            forms[fk] = [forms[fk][0], hit, forms[fk][2]]
+            fixed += 1
+        else:
+            rest.append((fk, it))
+    for i in range(0, len(rest), FORM_BATCH):
+        chunk = rest[i:i + FORM_BATCH]
+        prompt = "\n".join(f"{n}. {it[1]} ← {it[2]} ({forms[fk][0]}) «{forms[fk][1]}»" for n, (fk, it) in enumerate(chunk, start=1))
+        reply, _ = ask(client, cache, digest("formfix", FORM_FIX_VERSION, config["model"], prompt), FORM_FIX_SYSTEM, prompt,
+                       f"формы с инфинитивом: {len(chunk)} пропущено")
+        got = {}
+        for item in (reply or {}).get("forms", []) if isinstance(reply, dict) else []:
+            n = as_int(item[0]) if isinstance(item, list) and len(item) >= 2 else None
+            if n is None or not 1 <= n <= len(chunk):
+                continue
+            fk, it = chunk[n - 1]
+            ru = " ".join(str(item[1]).split())
+            if not CYRILLIC_RE.search(ru) or has_greek(ru) or ru_infinitive(ru):
+                continue
+            got[one(fk, it)] = ru
+            forms[fk] = [forms[fk][0], ru, forms[fk][2]]
+            fixed += 1
+        cache.put_many(got)
+    return fixed
 
 
 FORM_CALIBRATE_MIN = 8       # сверяем, если в книге не меньше стольких форм с теми же признаками

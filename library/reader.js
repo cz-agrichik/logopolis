@@ -124,9 +124,21 @@
     const f = foldForm(form), h = foldForm(bareHead(head));
     return Boolean(f && h) && f !== h && f !== h.replace(/άω$/, "ώ") && f !== h.replace(/ώ$/, "άω");
   };
-  // перевод личной формы глагола в инфинитиве («ξυπνούσε — просыпаться») — это перевод леммы, а не формы
-  const looksInfinitive = (gloss, feats) => /VerbForm=Fin/.test(feats || "")
-    && /(ть|ться|ти|тись|чь|чься)$/.test(String(gloss || "").split(/[;,(]/)[0].trim());
+  // перевод личной формы глагола в инфинитиве («ξυπνούσε — просыпаться», «αγοράσει — купить») — это перевод леммы,
+  // а не формы. Личная — по разбору (VerbForm=Fin) или по грамматике формы («3 л. ед. ч.», «повелит.»): разборщик
+  // нередко принимает сослагательное после να за инфинитив. Инфинитив — «купить», «не знать», «быть в состоянии»,
+  // но не «терпеть не может» и не «у нас есть» (как ru_infinitive() в bookconverter.py).
+  const RU_INF = /(ть|ться|ти|тись|чь|чься)$/;
+  const RU_FIN = /(ет|ёт|ит|ют|ят|ут|ат|ем|ём|им|ешь|ёшь|ишь|ете|ёте|ите|ал|ял|ел|ил|ыл|ла|ло|ли)$/;
+  const ruInfinitive = gloss => {
+    let words = String(gloss || "").split(/[;,(]/)[0].trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (words[0] === "не") words = words.slice(1);
+    if (!words.length || words[0] === "есть" || !RU_INF.test(words[0])) return false;
+    return !words.slice(1).some(w => RU_FIN.test(w));
+  };
+  const personalForm = (feats, gram) => /VerbForm=Fin/.test(feats || "")
+    || (/\d\s*л\.|повелит/i.test(gram || "") && !/инфинитив|причаст|деепр/i.test(gram || ""));
+  const looksInfinitive = (gloss, feats, gram) => personalForm(feats, gram) && ruInfinitive(gloss);
   const squash = value => String(value || "").replace(/\s+/g, " ").trim();
 
   function normalizeData(input) {
@@ -437,12 +449,13 @@
     const head = lemma.head || word.lemma || word.form;
     const f = data.forms[`${foldForm(word.form)}|${word.key}`] || [];
     const gram = word.gram || f[0] || "";
-    const formRu = word.formRu || f[1] || "";
+    const formRuRaw = word.formRu || f[1] || "";
+    const formRu = looksInfinitive(formRuRaw, word.feats, gram) ? "" : formRuRaw;
     const inflected = !word.unknown && (Boolean(gram) || isInflected(word.form, head));
-    const gloss = word.ru && !looksInfinitive(word.ru, word.feats) ? word.ru : "";
+    const gloss = word.ru && !looksInfinitive(word.ru, word.feats, gram) ? word.ru : "";
     // свой текст: как эту самую форму переводили в книгах — тоже перевод формы
     const seen = (word.seen || "").split(";")[0].trim();
-    const seenGloss = seen && !seen.startsWith("(") && !looksInfinitive(seen, word.feats) ? seen : "";
+    const seenGloss = seen && !seen.startsWith("(") && !looksInfinitive(seen, word.feats, gram) ? seen : "";
     return {
       head,
       pos: lemma.pos || uposLabel(word.upos),
