@@ -110,6 +110,7 @@ DEFAULT_CONFIG = {
     "base_url": "",
     "batch_words": 0,
     "interval": None,
+    "busy_wait": 30,   # минут: сколько ждать и перезванивать, пока модель перегружена (HTTP 503) или нет связи
 }
 
 ARTICLE_RE = re.compile(r"^(?:ο|η|το|οι|τα|ένας|μία|μια|ένα)\s+", re.IGNORECASE)
@@ -201,6 +202,10 @@ def pure_greek(text: str) -> bool:
 
 class QuotaExhausted(Exception):
     """Провайдер исчерпал лимит; продолжим при следующем запуске."""
+
+
+class ModelUnavailable(Exception):
+    """Модель перегружена или нет связи дольше busy_wait; продолжим при следующем запуске."""
 
 
 class BadReply(Exception):
@@ -395,6 +400,8 @@ class LLMClient:
         self.last_call = 0.0
         self.last_bad = ""          # сырой ответ, который не разобрался (пишем в cache/bad_replies.txt)
         self.retry_bad = bool(config.get("retry_bad"))
+        busy = config.get("busy_wait")
+        self.busy_wait = 60 * float(30 if busy is None else busy)   # секунд на один запрос
         # offline: лимит исчерпан или запуск с --offline — берём только из кеша.
         self.offline = bool(config.get("offline"))
         if not self.base_url or not self.model:
@@ -414,8 +421,27 @@ class LLMClient:
         result = self._request("/models")
         return sorted(item.get("id", "") for item in result.get("data", []))
 
+    def redial(self, waited: float, tries: int, what: str, header: str | None = None) -> float:
+        """Автодозвон: модель перегружена (HTTP 503 «high demand»), сбой сервера или нет связи — ждём и повторяем
+        с растущей паузой (10, 20, 40, 80 с, дальше по 2 мин), пока на этот запрос не уйдёт busy_wait. Возвращает,
+        сколько ждали всего; если время вышло — None (сдаёмся)."""
+        delay = min(10 * 2 ** (tries - 1), 120)
+        if header:
+            try:
+                delay = max(1.0, min(float(header) + 1, 300))
+            except ValueError:
+                pass
+        if waited + delay > self.busy_wait:
+            return None
+        clock = time.strftime("%H:%M")
+        log(f"   {what} — {clock}, жду {delay:.0f} с и звоню снова"
+            + (f" (уже {waited / 60:.0f} из {self.busy_wait / 60:.0f} мин)" if waited >= 60 else ""))
+        time.sleep(delay)
+        return waited + delay
+
     def chat_json(self, system: str, user: str) -> dict:
         attempt = 0
+        busy_tries, busy_waited = 0, 0.0   # автодозвон: сколько раз и сколько секунд ждали перегруженную модель или сеть
         self.last_bad = ""   # только ответ этого запроса: иначе отказ фильтра записался бы с чужим старым ответом
         while True:
             attempt += 1
@@ -469,16 +495,22 @@ class LLMClient:
                     log(f"   лимит запросов, жду {delay:.0f} с…")
                     time.sleep(delay)
                     continue
-                if exc.code >= 500 and attempt <= 4:
-                    time.sleep(5 * attempt)
-                    continue
+                if exc.code >= 500 or exc.code == 408:
+                    busy_tries += 1
+                    what = "модель перегружена (HTTP 503)" if exc.code == 503 else f"сбой на стороне модели (HTTP {exc.code})"
+                    waited = self.redial(busy_waited, busy_tries, what, exc.headers.get("Retry-After") if exc.headers else None)
+                    if waited is not None:
+                        busy_waited = waited
+                        continue
+                    raise ModelUnavailable(f"HTTP {exc.code} — не дозвонился за {self.busy_wait / 60:.0f} мин: {body}") from exc
                 raise RuntimeError(f"HTTP {exc.code}: {body}") from exc
             except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
-                if attempt <= 3:
-                    log(f"   сеть: {exc}; повтор…")
-                    time.sleep(5 * attempt)
+                busy_tries += 1
+                waited = self.redial(busy_waited, busy_tries, f"нет связи ({exc})")
+                if waited is not None:
+                    busy_waited = waited
                     continue
-                raise RuntimeError(f"Нет связи с {self.base_url}: {exc}") from exc
+                raise ModelUnavailable(f"нет связи с {self.base_url} за {self.busy_wait / 60:.0f} мин: {exc}") from exc
             except (ValueError, KeyError, IndexError, TypeError) as exc:
                 self.last_bad = (locals().get("content") or "")[:4000]
                 if attempt <= 2:
@@ -727,6 +759,12 @@ def ask(client: LLMClient, cache: Cache, key: str, system: str, prompt: str,
         log("\n⚠ Провайдер исчерпал лимит запросов. Дальше беру только то, что уже есть в кеше.\n"
             "   Запусти скрипт позже (или с другим translator) — он продолжит с этого места.\n"
             f"   Ответ сервера: {str(exc)[:300]}\n")
+        return None, False
+    except ModelUnavailable as exc:
+        client.offline = True
+        log(f"\n⚠ Модель так и не ответила: {str(exc)[:300]}\n"
+            "   Дальше беру только то, что уже есть в кеше. Запусти скрипт позже — он продолжит с этого места.\n"
+            "   Ждать дольше: \"busy_wait\" в config.json (минуты на один запрос).\n")
         return None, False
     except BadReply as exc:
         log(f"   ! {what}: {exc} — запомнил, в следующий раз не спрашиваю (заново: --retry-bad)")

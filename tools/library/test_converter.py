@@ -284,6 +284,38 @@ def main():
             raise AssertionError("оборванный перевод разобрался")
         except ValueError:
             pass
+        # автодозвон: 503 «high demand» и обрыв связи — ждём с растущей паузой и повторяем, пока не выйдет busy_wait
+        import io
+        import urllib.error
+        slept, real_sleep = [], bc.time.sleep
+        bc.time.sleep = slept.append
+        try:
+            def busy(code):
+                return urllib.error.HTTPError("u", code, "busy", {}, io.BytesIO(b'{"error": {"code": 503, "status": "UNAVAILABLE"}}'))
+            answers = [busy(503), busy(503), urllib.error.URLError("reset"), busy(502),
+                       {"choices": [{"message": {"content": '{"ok": 1}'}}]}]
+            llm = bc.LLMClient({"base_url": "http://x", "model": "m", "busy_wait": 30})
+            def fake(path, payload=None, timeout=240):
+                item = answers.pop(0)
+                if isinstance(item, Exception):
+                    raise item
+                return item
+            llm._request = fake
+            assert llm.chat_json("s", "u") == {"ok": 1} and slept == [10, 20, 40, 80], slept
+            slept.clear()
+            llm = bc.LLMClient({"base_url": "http://x", "model": "m", "busy_wait": 2})   # 2 минуты: 10+20+40 = 70 с, 80 уже не влезает
+            llm._request = lambda *a, **k: (_ for _ in ()).throw(busy(503))
+            try:
+                llm.chat_json("s", "u")
+                raise AssertionError("перегруженная модель — бесконечный дозвон")
+            except bc.ModelUnavailable as exc:
+                assert "не дозвонился за 2 мин" in str(exc) and slept == [10, 20, 40], (exc, slept)
+            # не дозвонился — дальше только кеш, как при исчерпанном лимите: книга соберётся из того, что есть
+            slept.clear()
+            assert bc.ask(llm, bc.Cache(bc.CACHE_DIR / "busy.json"), "kb", bc.CONTEXT_SYSTEM, "S1: …", "предложение 1") == (None, False)
+            assert llm.offline and slept == [10, 20, 40]
+        finally:
+            bc.time.sleep = real_sleep
         print("tools/library: конвертер — всё в порядке")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
