@@ -5,11 +5,11 @@
 
 /** Подборки колод для вопроса «Что будем учить?»: decks — id колод, groups — целые группы ('start', 'A1', 'A2', 'B1', 'own'). */
 const LEARN_PLANS = {
-  a1start: { decks: ['cyprus-starter', 'a1-people', 'a1-num', 'a1-time', 'a1-food', 'a1-home', 'a1-body', 'a1-city', 'a1-adv', 'a1-conn', 'a1-pron', 'a1-adj', 'a1-adj2', 'a1-omega1', 'a1-omega2'] },
+  a1start: { decks: ['cyprus-starter', 'a1-hello', 'a1-family', 'a1-num', 'a1-time', 'a1-food', 'a1-home', 'a1-shop', 'a1-body', 'a1-city', 'a1-adj', 'a1-adv', 'a1-conn', 'a1-pron', 'a1-omega1', 'a1-omega2'] },
   a1:      { groups: ['start', 'A1'] },
   a2:      { groups: ['A2'] },
   b1:      { groups: ['B1'] },
-  verbs:   { decks: ['a1-omega1', 'a1-omega2', 'a1-contr', 'a1-mid', 'a2-verbs', 'a2-verbs3', 'a2-verbs2', 'b1-verbs', 'b1-verbs3', 'b1-verbs2', 'b1-verbs4'] },
+  verbs:   { decks: ['a1-omega1', 'a1-omega2', 'a1-contr', 'a1-mid', 'a2-verbs', 'a2-verbs4', 'a2-verbs3', 'a2-verbs2', 'b1-verbs', 'b1-verbs3', 'b1-verbs2', 'b1-verbs4'] },
   own:     { groups: ['own'] },
 };
 

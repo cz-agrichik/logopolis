@@ -9,7 +9,10 @@
 чтобы новые слова легли в колоду до деления по алфавиту).
   MOVE — перенести слово в другую колоду (и уровень): { слово: id колоды }; None — убрать слово из колод (повтор, вариант написания);
   EDIT — поправить карточку: { слово: (перевод, подсказка) }, None — оставить как есть;
-  SPLIT — делит пополам по алфавиту; диапазон «: α–ζ» в старом названии заменяется новым.
+  SPLIT — делит пополам по алфавиту; диапазон «: α–ζ» в старом названии заменяется новым;
+  LAYOUT — пересобрать уровень целиком: { 'a1': [(id, название, [слово | (греч., перевод, подсказка)…]), …] } — колоды уровня
+    заменяются новыми; слово берётся с карточкой (перевод, подсказка) из любой колоды, кортеж — новая карточка. Все слова
+    прежних колод уровня должны попасть в новые колоды или уйти раньше через MOVE — иначе ошибка (в v10 так пересобран A1).
 Проверки (при ошибке ничего не пишется):
   - греческое слово встречается в колодах A1–B1 один раз (варианты глагола -άω/-ώ — одно слово);
   - перевод внутри уровня не повторяется;
@@ -24,7 +27,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 W = os.path.join(ROOT, 'content/ru/words.js')
 if len(sys.argv) < 2: sys.exit(__doc__)
 spec = importlib.util.spec_from_file_location('additions', sys.argv[1]); A = importlib.util.module_from_spec(spec); spec.loader.exec_module(A)
-for k in ('NEW', 'ADD', 'SPLIT', 'RENAME', 'MOVE', 'EDIT'):
+for k in ('NEW', 'ADD', 'SPLIT', 'RENAME', 'MOVE', 'EDIT', 'LAYOUT'):
     if not hasattr(A, k): setattr(A, k, [] if k == 'NEW' else {})
 ORDER = getattr(A, 'ORDER', ['SPLIT', 'RENAME', 'ADD', 'NEW', 'MOVE', 'EDIT'])
 
@@ -75,10 +78,32 @@ def op_edit():
         d, c = find(w)
         if tr is not None: c[1] = tr
         if hint is not None: c[2] = hint
-OPS = {'SPLIT': op_split, 'RENAME': op_rename, 'ADD': op_add, 'NEW': op_new, 'MOVE': op_move, 'EDIT': op_edit}
+LAYOUT_ERR = []
+def op_layout():
+    global byid
+    for L, decks in A.LAYOUT.items():
+        old = [d for d in D if lvl(d['id']) == L]
+        pos = D.index(old[0])
+        new, placed = [], set()
+        for nid, name, items in decks:
+            cards = []
+            for it in items:
+                if isinstance(it, str):
+                    if vkey(it) in placed: LAYOUT_ERR.append(f'{it}: дважды в раскладке'); continue
+                    d, c = find(it); d['cards'].remove(c); cards.append(c)
+                else: cards.append(list(it))
+                placed.add(vkey(cards[-1][0]))
+            new.append({'id': nid, 'name': name, 'cards': cards})
+        left = [c[0] for d in old for c in d['cards']]
+        if left: LAYOUT_ERR.append(f'{L}: не разложены {len(left)}: ' + ', '.join(left))
+        for d in old: D.remove(d)
+        D[pos:pos] = new
+    byid = {d['id']: d for d in D}
+OPS = {'LAYOUT': op_layout, 'SPLIT': op_split, 'RENAME': op_rename, 'ADD': op_add, 'NEW': op_new, 'MOVE': op_move, 'EDIT': op_edit}
 for k in ORDER: OPS[k]()
 
-bad, seen, seenA = 0, {}, {}
+bad, seen, seenA = len(LAYOUT_ERR), {}, {}
+for e in LAYOUT_ERR: print('ОШИБКА: раскладка', e)
 for d in D:
     for c in d['cards']:
         k = vkey(c[0])
