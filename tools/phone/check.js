@@ -73,7 +73,7 @@ function setupCity(ep) {
   ok(gate === await ev(() => BrowserIO.canFullscreen()), 'заслонка «на весь экран» — там, где браузер это умеет');
   if (gate) { await shot('00_gate'); await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
   ok(!(await ev(() => document.body.classList.contains('fs-need'))), 'после касания заслонки её нет');
-  await ev(() => { Game.paused = true; Math.random = () => 0.5; delete Game.state.planPending; UI.closeModal(); });
+  await ev(() => { Game.paused = true; Math.random = () => 0.5; delete Game.state.planPending; if (Game.tutorialSkip) Game.tutorialSkip(); UI.closeModal(); });
   await ev(`(${setupCity})(${EP})`);
   await ev(() => Phone.centerMap());
 
@@ -139,6 +139,29 @@ function setupCity(ep) {
   }
   ok(await ev(() => Game.state.buildings.length) - n0 === 2, '🔁 ещё: два здания подряд');
   await page.tap('[data-cancel-place]');
+
+  // 3. обучение «Первые шаги» в новой игре: стрелка ведёт к рельсу вкладок, к кнопке в выдвижной панели и к клетке
+  await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset'); await page.waitForTimeout(500);
+  await page.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
+  if (await ev(() => document.body.classList.contains('fs-need'))) { await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
+  await ev(() => { Game.paused = true; delete Game.state.planPending; UI.closeModal(); });
+  await shot('12_tut_offer');
+  await page.tap('[data-action=tut-go]'); await page.waitForTimeout(200);
+  const arrow = () => ev(() => { Tutorial.update(); const r = $('#tutRing'), b = r.getBoundingClientRect(); return { on: !r.classList.contains('hidden'), x: b.left + b.width / 2, y: b.top + b.height / 2, in: b.left >= -2 && b.right <= innerWidth + 2 && b.top >= -2 && b.bottom <= innerHeight + 2, step: (Game.tutorialCurrent() || {}).id, say: $('.tut-say').textContent }; });
+  let a = await arrow(); await shot('13_tut_gather');
+  ok(a.on && a.in && a.step === 'gather', 'обучение: стрелка на клетке в пределах экрана');
+  for (let i = 0; i < 3; i++) { a = await arrow(); await page.touchscreen.tap(a.x, a.y); await page.waitForTimeout(120); }
+  await ev(() => Tutorial.tick());
+  ok((await arrow()).step === 'res', 'обучение: касание по стрелке на лес, холмы и равнину — шаг пройден');
+  await page.tap('[data-tut=ack]'); await page.waitForTimeout(150);
+  const seenSay = [];
+  for (let i = 0; i < 3; i++) {
+    a = await arrow(); seenSay.push(a.say); await shot('14_tut_field_' + i);
+    if (!a.on || !a.in) break;
+    await page.touchscreen.tap(a.x, a.y); await page.waitForTimeout(300);
+  }
+  await ev(() => Tutorial.tick());
+  ok(await ev(() => Game.count('field')) === 1, `обучение: поле поставлено по стрелке (${seenSay.join(' → ')})`);
 
   ok(!errs.length, 'ошибок на странице нет' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await browser.close();

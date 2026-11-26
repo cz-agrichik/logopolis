@@ -34,11 +34,12 @@ const Lesson = {
   // ---------- состав раунда ----------
   /** Новый раунд: { pool, tasks } или null, если активных карточек нет.
    *  Длина раунда — roundSize заданий; «Пары» (4 слова на одном экране) считаются за два задания —
-   *  если пары собрались, слов в раунд добирается, чтобы раунды были одной длины. */
-  plan(state) {
-    const size = Decks.settings(state).roundSize, pool = Decks.activeCards(state);
+   *  если пары собрались, слов в раунд добирается, чтобы раунды были одной длины.
+   *  roundSize — своя длина раунда (короткий первый раунд обучения «Первые шаги»), иначе — из настроек. */
+  plan(state, roundSize = null) {
+    const size = roundSize || Decks.settings(state).roundSize, pool = Decks.activeCards(state);
     const weight = tasks => tasks.reduce((t, x) => t + (x.type === 'match' ? 2 : 1), 0);
-    const picks = Decks.selectRound(state);
+    const picks = Decks.selectRound(state, size);
     if (!picks.length) return null;
     let tasks = this.buildTasks(state, pool, picks);
     const short = size - weight(tasks);

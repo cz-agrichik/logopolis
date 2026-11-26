@@ -763,3 +763,45 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 /* поле с 5-го уровня: оросительный канал по левому краю клетки, во всю высоту — у соседних полей каналы смыкаются */
 .tile.has-b.bt-field.canal { background-image: linear-gradient(to right, transparent 3%, #2c6a91 3% 4.5%, #3f86b0 4.5% 11%, #2c6a91 11% 12.5%, transparent 12.5%); }
 
+
+/* ---------- обучение «Первые шаги» (ui/desktop/tutorial.js) ---------- */
+/* карточка задания — над картой, в левом верхнем углу (там море) */
+.tut-card { position: absolute; left: 10px; top: 46px; z-index: 20; width: 290px; background: #fbf3e2f2; border-radius: var(--radius);
+  box-shadow: 0 4px 18px rgba(60,35,10,.28), inset 0 0 0 1.5px var(--gold-l); padding: 8px 12px 10px; font-size: 13px; line-height: 1.4; }
+.tut-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
+.tut-head b { color: var(--accent); white-space: nowrap; }
+.tut-dots { display: flex; gap: 3px; flex: 1; }
+.tut-dots i { width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--parch-3); }
+.tut-dots i.ok { background: var(--gold); box-shadow: none; }
+.tut-dots i.now { box-shadow: inset 0 0 0 2px var(--gold); background: var(--gold-l); }
+.tut-btn { border: 0; background: none; cursor: pointer; color: var(--ink-2); font-size: 13px; padding: 0 2px; line-height: 1; }
+.tut-btn:hover { color: var(--accent); }
+.tut-title { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-weight: 700; font-size: 15px; color: var(--ink); }
+.tut-ic { font-size: 17px; }
+.tut-prize { margin-left: auto; flex: none; font-size: 12px; font-weight: 700; color: #3a2700; background: linear-gradient(180deg, #f3cf6d, #d39b25); border-radius: 10px; padding: 1px 8px; }
+.tut-text { margin-top: 4px; color: var(--ink); }
+.tut-extra { margin-top: 5px; color: var(--terra-d); font-size: 12.5px; }
+.tut-acts { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+/* рамка вокруг цели и стрелка «жми сюда» — поверх всего, кроме окон; клики проходят насквозь */
+.tut-ring { position: fixed; z-index: 450; pointer-events: none; border-radius: 12px; border: 3px solid #f0c040;
+  animation: tutPulse 1.2s ease-out infinite; }
+.tut-ring.tile-ring { border-radius: 6px; }
+@keyframes tutPulse { 0% { box-shadow: 0 0 0 0 rgba(240,192,64,.85), 0 0 12px rgba(240,192,64,.6); } 100% { box-shadow: 0 0 0 12px rgba(240,192,64,0), 0 0 12px rgba(240,192,64,.6); } }
+.tut-arrow { position: fixed; z-index: 460; width: 48px; height: 60px; pointer-events: none; }
+.tut-arrow svg { width: 48px; height: 60px; display: block; overflow: visible; animation: tutBob .8s ease-in-out infinite alternate;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+.tut-arrow path { fill: #f3c64a; stroke: #7a4f06; stroke-width: 2.5px; stroke-linejoin: round; }
+.tut-arrow.up svg { transform: rotate(180deg); animation-name: tutBobUp; }
+.tut-arrow.left svg { transform: rotate(-90deg); animation-name: tutBobLeft; }
+@keyframes tutBob { from { transform: translateY(-10px); } to { transform: translateY(0); } }
+@keyframes tutBobUp { from { transform: rotate(180deg) translateY(-10px); } to { transform: rotate(180deg) translateY(0); } }
+@keyframes tutBobLeft { from { transform: rotate(-90deg) translateY(-10px); } to { transform: rotate(-90deg) translateY(0); } }
+.tut-say { position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translateX(calc(-50% + var(--shift, 0px))); white-space: nowrap;
+  background: var(--ink); color: #fbf3e2; font-weight: 700; font-size: 13px; padding: 4px 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.tut-arrow.up .tut-say { bottom: auto; top: calc(100% + 4px); }
+.tut-arrow.left .tut-say { bottom: auto; left: auto; top: 50%; right: calc(100% + 8px); transform: translateY(-50%); }
+/* приветствие и финал */
+.tut-modal { text-align: center; }
+.tut-modal .tut-hello { font-size: 30px; color: var(--gold); font-weight: 700; letter-spacing: .02em; }
+.tut-modal h2 { margin: 2px 0 10px; color: var(--accent); }
+.tut-modal p { text-align: left; line-height: 1.5; }

@@ -8,7 +8,8 @@ const Study = {
   open: false,
 
   start() {
-    const round = Lesson.plan(Learn.state);
+    // раунд из обучения «Первые шаги» — короткий (TUTORIAL_STEPS: round)
+    const round = Lesson.plan(Learn.state, typeof Tutorial !== 'undefined' ? Tutorial.roundSize() : null);
     if (!round) return UI.toast('Нет активных карточек — включите или импортируйте колоду в «📚 Обучении»');
     UI.cancelPlacing();
     if (typeof School !== 'undefined') School.close(true);

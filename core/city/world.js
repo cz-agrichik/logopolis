@@ -10,6 +10,8 @@ Object.assign(Game, {
     const amt = 1 + this.state.epoch;
     const r = T.gather;
     this.state.res[r] = Math.min(this.storageCap(), this.state.res[r] + amt);
+    const by = this.state.stats.gathered || (this.state.stats.gathered = {});   // сколько чего собрано руками (обучение)
+    by[r] = (by[r] || 0) + 1;
     return { res: r, amt };
   },
 

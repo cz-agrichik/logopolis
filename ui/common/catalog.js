@@ -37,6 +37,7 @@ const Cat = (() => {
     plans: merge(LEARN_PLANS, Lex.plan),
     lords: Lex.lords,
     ship: Lex.ship,
+    tutorial: Lex.tutorial,
     /** Облик здания в эпохе: { name, icon, capBonus }. */
     form(type, epoch = Game.state.epoch) {
       const B = bld[type];

@@ -21,6 +21,7 @@
   Speech.init();
   UI.init();
   Phone.init();   // телефон: подсказки по долгому нажатию, полный экран, режим улучшения
+  Tutorial.init();   // обучение «Первые шаги»: карточка задания и стрелка (новой игре его предложат после вступления)
 
   const firstScreen = () => {
     if (!saved || Game.state.introPending) {
@@ -52,6 +53,7 @@
     Game.tick(dt);
     const mapChanged = Game.events(dt);
     UI.renderTop();
+    Tutorial.tick();
     if (mapChanged || Game.state.buildings.map(b => b.idle).join() !== idleBefore) UI.renderMap();
     sinceRender += dt; sinceSave += dt;
     if (sinceRender >= 1 || Game.state.pop !== popBefore) {

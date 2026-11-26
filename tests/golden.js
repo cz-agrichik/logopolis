@@ -142,6 +142,8 @@ const SOLVE = `((wrongAt) => {
       if (snap) { await shot(page, '01b_plan'); await text(page, 'plan', '#modalBox'); }
       await page.click('[data-plan=a1]');
       await page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
+      const skip = await page.$('[data-action=tut-skip]');   // приветствие обучения «Первые шаги» (с версии 140) — пропускаем
+      if (skip) await skip.click();
     } else await page.click('[data-action=close]');
   }
 
@@ -353,6 +355,50 @@ const SOLVE = `((wrongAt) => {
     for (const id of ['a:basics', 'a:cards', 'b:house', 't:bronze', 'r:copper', 'e:1']) {
       await page.evaluate(id => { Pedia.current = id; Pedia.render(); }, id);
       await shot(page, '40_pedia_' + id.replace(':', '_'));
+    }
+    await ctx.close();
+  }
+
+  // ---------- 8. Обучение «Первые шаги»: приветствие, каждый шаг (карточка и стрелка), финал ----------
+  {
+    const { ctx, page } = await newPage(browser);
+    await page.goto(URL + '?reset');
+    if (await page.evaluate(() => typeof Tutorial !== 'undefined')) {
+      const clearToasts = () => page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
+      await page.click('[data-action=plan]');
+      await page.click('[data-plan=a1]');
+      await clearToasts();
+      await shot(page, '50_tut_offer'); await text(page, 'tut_offer', '#modalBox');
+      await page.click('[data-action=tut-go]');
+      const seen = [];
+      // игрок жмёт туда, куда показывает стрелка (настоящим кликом мыши — рамка и стрелка клики пропускают)
+      for (let guard = 0; guard < 60; guard++) {
+        const st = await page.evaluate(() => {
+          Tutorial.tick();
+          const S = Game.tutorialCurrent(), ring = document.querySelector('#tutRing'), b = ring.getBoundingClientRect();
+          return { id: S && S.id, ring: !ring.classList.contains('hidden'), say: document.querySelector('.tut-say').textContent, x: b.left + b.width / 2, y: b.top + b.height / 2 };
+        });
+        if (!st.id) break;
+        if (!seen.includes(st.id)) {
+          seen.push(st.id);
+          await clearToasts();
+          await shot(page, `${50 + seen.length}_tut_${st.id}`); await text(page, 'tut_' + st.id, '#tutCard');
+        }
+        if (await page.$('#tutCard [data-tut=ack]')) { await page.click('#tutCard [data-tut=ack]'); continue; }   // пояснение — «Понятно»
+        if (st.id === 'study') {   // раунд из обучения — короткий
+          await page.evaluate(() => Study.start());
+          texts.tut_round = await page.evaluate(() => Study.tasks.map(t => t.type).join(','));
+          await page.evaluate(`${SOLVE}([])`); await page.evaluate(() => Study.close()); continue;
+        }
+        if (!st.ring) { errors.push('обучение: на шаге ' + st.id + ' стрелка ни на что не показывает'); break; }
+        if (/копится/.test(st.say)) { await page.clock.runFor(5000); continue; }
+        await page.mouse.click(st.x, st.y);
+      }
+      texts.tut_steps = seen.join(',');
+      await page.evaluate(() => Tutorial.tick());
+      await shot(page, '69_tut_finish'); await text(page, 'tut_finish', '#modalBox');
+      texts.tut_log = await page.evaluate(LOG_TEXT);
+      texts.tut_state = await page.evaluate(() => JSON.stringify({ logos: Game.state.logos, tutorial: Game.state.tutorial, buildings: Game.state.buildings.map(b => b.type) }));
     }
     await ctx.close();
   }

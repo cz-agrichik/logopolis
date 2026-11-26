@@ -32,7 +32,7 @@ const UI = {
     $('#pediaBtn').addEventListener('click', () => Pedia.open());
     $('#schoolBtn').addEventListener('click', () => School.open());
     $('#logosMedal').addEventListener('click', () => Pedia.open('a:logos'));
-    $('#resources').addEventListener('click', () => Pedia.open('a:top'));
+    $('#resources').addEventListener('click', () => { Pedia.open('a:top'); if (Game.tutorialOn()) Tutorial.ack('res'); });
     $('#popbox').addEventListener('click', () => Pedia.open('a:pop'));
     $('#panel').addEventListener('click', e => this.onPanelClick(e));
     this.folds = {};
@@ -243,6 +243,7 @@ const UI = {
       html += `<div class="${cls.join(' ')}" data-x="${t.x}" data-y="${t.y}" title="${esc(title)}">${inner}</div>`;
     }
     map.innerHTML = html;
+    if (typeof Tutorial !== 'undefined') Tutorial.update();   // клетки пересозданы — стрелку обучения на новую
   },
 
   /** Режим улучшения (телефон): можно ли улучшить здание прямо сейчас — up-ok / up-no / up-max, up-l — уровень за λ; чудеса не в счёт. */
@@ -294,6 +295,7 @@ const UI = {
       this.floatText(el, `+${g.amt} ${Cat.res[g.res].icon}`);
       el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
       this.renderTop();
+      Tutorial.tick();   // счётчик «Жми сюда · 2/3» — сразу
     }
   },
 
@@ -426,6 +428,7 @@ const UI = {
     p.dataset.tab = this.tab;
     p.innerHTML = html;
     p.scrollTop = scroll;
+    if (typeof Tutorial !== 'undefined') Tutorial.update();   // кнопка под стрелкой обучения пересоздана
   },
 
   panel_build() {
@@ -576,7 +579,7 @@ const UI = {
     const st = s.stats;
     h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз и вакханок: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
       <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
-      <h3>Игра</h3><button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
+      <h3>Игра</h3>${s.tutorial && s.tutorial.skipped ? `<button class="btn small ghost" data-tut-restart>🎓 Пройти обучение «${esc(Cat.tutorial.name)}»</button> ` : ''}<button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
       <div class="hint dim">Город начнётся заново, а колоды и выученные слова сохранятся.</div>`;
     if (this.dev) h += `<div class="dev"><b>dev:</b> <button class="btn small" data-dev="logos">+500 λ</button> <button class="btn small" data-dev="res">+1000 ресурсов</button> <button class="btn small" data-dev="goat">коза</button> <button class="btn small" data-dev="raid">набег</button></div>`;
     return h;
@@ -629,6 +632,7 @@ const UI = {
       return;
     }
     if (t.dataset.school) return School.open(t.dataset.school);
+    if (t.hasAttribute('data-tut-restart')) { Tutorial.start(); this.lastPanel = null; return this.renderPanel(); }
     if (t.dataset.dev === 'logos') Game.addLogos(500);
     if (t.dataset.dev === 'res') for (const k of RES_KEYS) Game.state.res[k] += 1000;
     if (t.dataset.dev === 'goat') Game.state.timers.goat = 0;
@@ -659,6 +663,7 @@ const UI = {
     $('#modal').classList.add('hidden'); this.modalBuilding = null;
     const next = this.afterModal; this.afterModal = null;
     if (next) next();
+    if (typeof Tutorial !== 'undefined') Tutorial.afterOverlay();   // приветствие обучения — после вступления и выбора колод
   },
 
   showBuilding(b) {
@@ -876,6 +881,8 @@ const UI = {
     if (act === 'confirm-yes') { const f = this.pendingConfirm; this.pendingConfirm = null; this.closeModal(); if (f) f(); return; }
     if (act === 'close') return this.closeModal();
     if (act === 'plan') return this.showLearnPlan();
+    if (act === 'tut-go') return Tutorial.start();
+    if (act === 'tut-skip') return Tutorial.skip();
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
     if (act === 'plan-keep') return this.pickPlan('keep');
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }

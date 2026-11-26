@@ -1553,3 +1553,76 @@ test('прогресс по слову: сохранение v1 (по карто
   D.removeDeck(s, mine);
   assert.ok(!s.decks.includes(mine) && s.progress['ήλιος'] && !s.progress['αλεξίπτωτο']);
 });
+
+test('обучение «Первые шаги»: предложение новой игре, шаги по порядку и вне очереди, λ по 3 за шаг, пропуск и возврат', () => {
+  const C = fresh();
+  const G = C.get('Game'), STEPS = C.get('TUTORIAL_STEPS'), R = C.get('BALANCE').tutorialReward;
+  const s = G.state, J = x => JSON.parse(JSON.stringify(x));   // объекты из vm-контекста — сравниваем как JSON
+  assert.deepEqual(J(s.tutorial), { offer: true }, 'новой игре обучение предлагают');
+  assert.equal(G.tutorialOn(), false);
+  assert.deepEqual(J(STEPS.map(S => S.id)), ['gather', 'res', 'field', 'flow', 'lumber', 'quarry', 'house', 'study', 'rite', 'tech']);
+  const tileOf = t => G.map.find(x => x.t === t && !G.buildingAt(x.x, x.y));
+  G.gather(tileOf('forest'));   // собранное до старта не в счёт
+  G.tutorialStart(5);
+  assert.equal(G.tutorialCurrent().id, 'gather');
+  const free = (type) => G.map.find(t => !G.buildingAt(t.x, t.y) && G.canPlaceOn(type, t));
+  // сбор руками: по клетке каждого вида — лес, холмы, равнина
+  G.gather(tileOf('forest')); G.gather(tileOf('forest')); G.gather(tileOf('hill'));
+  assert.deepEqual(J(G.tutorialCheck(5)), [], 'два ресурса из трёх — шаг ещё не пройден');
+  assert.deepEqual(J(G.tutorialGathered(STEPS[0])), ['wood', 'stone']);
+  assert.deepEqual(J(G.tutorialCount(STEPS[0])), { have: 2, need: 3 });
+  G.gather(tileOf('plain'));
+  const l0 = s.logos;
+  assert.deepEqual(J(G.tutorialCheck(5)), [{ id: 'gather', logos: R }]);
+  assert.equal(s.logos, l0 + R);
+  // пояснение «Ваши запасы» — без награды, закрывает игрок
+  assert.equal(G.tutorialCurrent().id, 'res');
+  assert.deepEqual(J(G.tutorialAck('flow')), [], 'пояснение не по очереди закрыть нельзя');
+  assert.deepEqual(J(G.tutorialAck('res')), [{ id: 'res', logos: 0 }]);
+  // вне очереди: хижина построена раньше поля — засчитана сразу
+  s.res.wood = 500; s.res.stone = 500; s.res.food = 500;
+  let t = free('house'); G.build('house', t.x, t.y);
+  assert.deepEqual(J(G.tutorialCheck(5).map(g => g.id)), ['house']);
+  t = free('field'); G.build('field', t.x, t.y);
+  assert.deepEqual(J(G.tutorialCheck(5).map(g => g.id)), ['field']);
+  assert.equal(G.tutorialCurrent().id, 'flow', 'после поля — смотрим, как прибывает зерно');
+  assert.deepEqual(J(G.tutorialAck('flow')), [{ id: 'flow', logos: 0 }]);
+  assert.equal(G.tutorialCurrent().id, 'lumber');
+  // раунд карточек: короткий, считаются раунды после старта обучения
+  assert.equal(G.tutorialStep('study').round, 4);
+  assert.equal(G.tutorialMet(G.tutorialStep('study'), 5), false);
+  assert.equal(G.tutorialMet(G.tutorialStep('study'), 6), true);
+  // пропуск: награды больше нет; возврат — пройденное не награждается второй раз
+  G.tutorialSkip();
+  assert.equal(G.tutorialOn(), false);
+  assert.ok(s.tutorial.skipped);
+  assert.deepEqual(J(G.tutorialCheck(6)), []);
+  G.tutorialStart(6);
+  assert.deepEqual(J(s.tutorial.done), ['gather', 'res', 'house', 'field', 'flow']);
+  t = free('lumber'); G.build('lumber', t.x, t.y);
+  t = free('quarry'); G.build('quarry', t.x, t.y);
+  s.logos = 100;
+  G.perform('elders');
+  assert.ok(G.research('cheesemaking'));
+  const l1 = s.logos;
+  const got = G.tutorialCheck(7);
+  assert.deepEqual(J(got.map(g => g.id)), ['lumber', 'quarry', 'study', 'rite', 'tech']);
+  assert.equal(s.logos, l1 + 5 * R);
+  assert.ok(s.tutorial.finished && !s.tutorial.on, 'все шаги — обучение закончено');
+  assert.equal(s.log[0].k, 'tutorialDone');
+  assert.equal(s.log[0].p.logos, (STEPS.length - 2) * R, 'всего за обучение — по 3 λ за каждый шаг, кроме двух пояснений');
+  // старое сохранение (без поля tutorial) обучение не предлагает
+  const C2 = fresh(); const G2 = C2.get('Game');
+  delete G2.state.tutorial;
+  assert.equal(G2.tutorialCurrent(), null);
+  assert.deepEqual(J(G2.tutorialCheck(3)), []);
+});
+
+test('раунд карточек своей длины (короткий первый раунд обучения): 4 задания — два новых слова, знакомство и проверка', () => {
+  const C = fresh();
+  const L = C.get('Lesson'), LS = C.get('Learn').state;
+  const r = L.plan(LS, 4);
+  assert.equal(r.tasks.length, 4);
+  assert.deepEqual(JSON.parse(JSON.stringify(r.tasks.map(x => x.type).sort())), ['gr2ru', 'gr2ru', 'intro', 'intro'].sort());
+  assert.ok(L.plan(LS).tasks.length > 4, 'без длины — обычный раунд из настроек');
+});

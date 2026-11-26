@@ -81,6 +81,7 @@ Object.assign(Game, {
     if (R.ship && this.shipsOpen()) { this.shipArrive(); result.ship = true; }
     if (R.cooldown && R.realTime) (s.readyAt = s.readyAt || {})[id] = Date.now() + R.cooldown * 1000;
     else if (R.cooldown) s.cooldowns[id] = R.cooldown;
+    s.stats.rites = (s.stats.rites || 0) + 1;
     this.log('rite', { id, result });
     this.save();
     return result;

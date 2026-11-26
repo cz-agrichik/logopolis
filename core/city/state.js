@@ -21,7 +21,8 @@ const Game = {
       pop: 2, popAcc: 0, starveAcc: 0,
       techs: [], buildings: [], nextId: 1,
       buffs: {}, cooldowns: {}, readyAt: {}, stash: [],
-      stats: { goats: 0 },
+      stats: { goats: 0, gathered: {}, rites: 0 },
+      tutorial: { offer: true },   // новой игре предлагаем обучение (core/city/tutorial.js)
       timers: { goat: 40, raid: null, ship: null }, ship: null,
       log: [], lastSave: Date.now(), finished: false,
     };

@@ -322,3 +322,14 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
 }
 /* узкий: на кнопке «Учиться» — только свиток и что ждёт в раунде */
 @media (orientation: landscape) and (max-height: 520px) and (max-width: 620px) { .sb-word { display: none; } }
+
+/* обучение: карточка задания — маленькая, сверху слева, правее столбика благословений */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tut-card { left: 34px; top: 4px; width: 236px; padding: 6px 9px 7px; font-size: 11.5px; }
+  .tut-head { gap: 6px; font-size: 11px; }
+  .tut-dots { gap: 2px; }
+  .tut-dots i { width: 6px; height: 6px; }
+  .tut-title { font-size: 13px; margin-top: 3px; }
+  .tut-acts { margin-top: 5px; }
+  .tut-say { font-size: 12px; padding: 3px 8px; }
+}

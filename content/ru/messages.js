@@ -131,6 +131,8 @@ const Msg = {
       case 'shipSailed': return `${Lex.ship.icon} Корабль отчалил: ${p.deals} ${plural(p.deals, 'сделка', 'сделки', 'сделок')} за стоянку`;
       case 'shipLoaded': return p.how === 'buy' ? `${Lex.ship.icon} Папирус куплен у кормчего: ${this.resList(p.got)}` : `${Lex.ship.icon} Корабль загружен («${Lex.ship.packs[p.pack][0]}»): ${this.resList(p.got)}`;
       case 'newGameKept': return '📚 Новая игра: выученные слова и колоды остались с вами.';
+      case 'tutorialStep': return `🎓 ${Lex.tutorial.steps[p.id].done} — λ +${p.logos}`;
+      case 'tutorialDone': return `🎓 ${Lex.tutorial.name} пройдены! За обучение — λ +${p.logos}`;
     }
     return String(e.k);
   },
