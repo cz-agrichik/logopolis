@@ -9,7 +9,7 @@ const LEARN_PLANS = {
   a1:      { groups: ['start', 'A1'] },
   a2:      { groups: ['A2'] },
   b1:      { groups: ['B1'] },
-  verbs:   { decks: ['a1-omega1', 'a1-omega2', 'a1-contr', 'a1-mid', 'a2-verbs', 'a2-verbs4', 'a2-verbs3', 'a2-verbs2', 'b1-verbs', 'b1-verbs3', 'b1-verbs2', 'b1-verbs4'] },
+  verbs:   { decks: ['a1-omega1', 'a1-omega2', 'a1-contr', 'a1-mid', 'a2-verbs', 'a2-verbs4', 'a2-verbs3', 'a2-verbs5', 'a2-verbs2', 'b1-verbs', 'b1-verbs3', 'b1-verbs2', 'b1-verbs4'] },
   own:     { groups: ['own'] },
 };
 
