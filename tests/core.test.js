@@ -1563,7 +1563,7 @@ test('обучение «Первые шаги»: предложение нов�
   const s = G.state, J = x => JSON.parse(JSON.stringify(x));   // объекты из vm-контекста — сравниваем как JSON
   assert.deepEqual(J(s.tutorial), { offer: true }, 'новой игре обучение предлагают');
   assert.equal(G.tutorialOn(), false);
-  assert.deepEqual(J(STEPS.map(S => S.id)), ['gather', 'res', 'field', 'flow', 'lumber', 'quarry', 'house', 'study', 'rite', 'tech']);
+  assert.deepEqual(J(STEPS.map(S => S.id)), ['gather', 'res', 'field', 'flow', 'lumber', 'quarry', 'house', 'study', 'rite', 'tech', 'pedia', 'library']);
   const tileOf = t => G.map.find(x => x.t === t && !G.buildingAt(x.x, x.y));
   G.gather(tileOf('forest'));   // собранное до старта не в счёт
   G.tutorialStart(5);
@@ -1611,9 +1611,16 @@ test('обучение «Первые шаги»: предложение нов�
   const got = G.tutorialCheck(7);
   assert.deepEqual(J(got.map(g => g.id)), ['lumber', 'quarry', 'study', 'rite', 'tech']);
   assert.equal(s.logos, l1 + 5 * R);
+  // Кипропедию отмечает интерфейс (открыли — шаг пройден, с наградой), библиотека — пояснение «на потом»
+  assert.equal(G.tutorialCurrent().id, 'pedia');
+  assert.deepEqual(J(G.tutorialAck('library')), [], 'библиотеку — только в свою очередь');
+  assert.deepEqual(J(G.tutorialAck('pedia')), [{ id: 'pedia', logos: R }]);
+  assert.deepEqual(J(G.tutorialAck('library')), [{ id: 'library', logos: 0 }]);
   assert.ok(s.tutorial.finished && !s.tutorial.on, 'все шаги — обучение закончено');
   assert.equal(s.log[0].k, 'tutorialDone');
-  assert.equal(s.log[0].p.logos, (STEPS.length - 2) * R, 'всего за обучение — по 3 λ за каждый шаг, кроме двух пояснений');
+  const paid = STEPS.filter(S => !S.info).length;
+  assert.equal(paid, 9);
+  assert.equal(s.log[0].p.logos, paid * R, 'всего за обучение — по 3 λ за каждый шаг, кроме пояснений: 27 λ');
   // старое сохранение (без поля tutorial) обучение не предлагает
   const C2 = fresh(); const G2 = C2.get('Game');
   delete G2.state.tutorial;

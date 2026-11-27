@@ -13,7 +13,7 @@ const ACCOUNT_CONFIG = {
   firebase: null,
   // Вход через Telegram (новый вход Telegram — OpenID Connect): @BotFather → бот → Bot Settings → Login Widget →
   // Allowed URLs: https://grecheskiy.com. Client ID — число (это id бота: цифры токена до двоеточия; сам токен сюда не класть).
-  telegram: null,   // { clientId: 1234567890 }
+  telegram: { clientId: 9008068124 },   // бот @grecheskiycombot
 
   // откуда грузить библиотеки входа (только по нажатию «Войти»)
   firebaseSdk: 'https://www.gstatic.com/firebasejs/10.12.2/',

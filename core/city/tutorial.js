@@ -13,6 +13,7 @@
 // ============================================================
 
 /** Шаги по порядку. each — собрать руками каждый из ресурсов; info — пояснение без задания (закрывает игрок, без награды);
+ *  mark — действие в интерфейсе, о котором сообщает интерфейс (открыть Кипропедию; с наградой);
  *  build — здание, count — сколько их нужно в городе; round — сколько заданий в раунде карточек этого шага (короткий первый раунд). */
 const TUTORIAL_STEPS = [
   { id: 'gather', each: ['wood', 'stone', 'food'] },
@@ -25,6 +26,8 @@ const TUTORIAL_STEPS = [
   { id: 'study', round: 4 },
   { id: 'rite', rite: 'elders' },
   { id: 'tech' },
+  { id: 'pedia', mark: true },     // где искать подробности
+  { id: 'library', info: true },   // библиотека — на будущее (заходить сейчас не нужно)
 ];
 
 Object.assign(Game, {
@@ -48,10 +51,11 @@ Object.assign(Game, {
     this.state.tutorial = { on: false, skipped: true, done: t.done || [] };
     this.save();
   },
-  /** Игрок прочитал пояснение (шаг info) — только текущее: «Ресурсы идут сами» нельзя закрыть, пока нет поля. rounds — как в tutorialCheck. */
+  /** Игрок прочитал пояснение (info) или сделал действие в интерфейсе (mark) — только в свою очередь: «Ресурсы идут сами» нельзя закрыть,
+   *  пока нет поля. rounds — как в tutorialCheck. */
   tutorialAck(id, rounds = 0) {
     const t = this.state.tutorial, S = this.tutorialStep(id);
-    if (!t || !t.on || !S || !S.info || this.tutorialCurrent() !== S) return [];
+    if (!t || !t.on || !S || !(S.info || S.mark) || this.tutorialCurrent() !== S) return [];
     t.ack = t.ack || [];
     if (!t.ack.includes(id)) t.ack.push(id);
     return this.tutorialCheck(rounds);
@@ -71,7 +75,7 @@ Object.assign(Game, {
   /** Выполнено ли условие шага прямо сейчас. */
   tutorialMet(S, rounds = 0) {
     const s = this.state, t = s.tutorial;
-    if (S.info) return (t.ack || []).includes(S.id);
+    if (S.info || S.mark) return (t.ack || []).includes(S.id);
     if (S.each) return this.tutorialGathered(S).length >= S.each.length;
     if (S.build) return this.count(S.build) >= (S.count || 1);
     if (S.id === 'study') return rounds > t.r0;

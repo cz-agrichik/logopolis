@@ -251,6 +251,8 @@ const Tutorial = {
       return { el: this.tileEl('gather:' + ter, t => t.t === ter), say: `${Cat.terrain[ter].name} — жми сюда`, key: 'gather:' + ter };
     }
     if (S.id === 'flow') { const r = Game.rates[S.res] || 0; return { el: this.resCell(S.res), say: r > 0.05 ? `${fmtRate(r)} в секунду — само!` : 'Смотри сюда', key: 'flow' }; }
+    if (S.id === 'pedia') return { el: $(phone ? '#rail [data-open="pedia"]' : '#pediaBtn'), say: 'Жми «?»', key: 'pedia' };
+    if (S.id === 'library') return { el: $(phone ? '#rail [data-open="library"]' : '#libBtn'), say: 'Библиотека — на потом', key: 'library' };
     if (S.info) return { el: $('#resources'), say: 'Ваши запасы', key: 'res' };
     if (S.build) {
       if (UI.placing === S.build) return { el: this.tileEl('place:' + S.build, t => Game.canPlaceOn(S.build, t)), say: 'Ставь сюда', key: 'place' };

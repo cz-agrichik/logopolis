@@ -353,3 +353,10 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .rail button { min-height: 26px; padding: 2px 0; }
   .rail button i { font-size: 17px; }
 }
+
+/* окно входа на телефоне: «со входом / без входа» — плотнее */
+@media (orientation: landscape) and (max-height: 520px) {
+  .acc-two { font-size: 12px; gap: 6px; }
+  .acc-btns { flex-direction: row; flex-wrap: wrap; max-width: none; justify-content: center; }
+  .acc-btns .btn { flex: 1 1 140px; padding: 7px 10px; font-size: 13.5px; }
+}

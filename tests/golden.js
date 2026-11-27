@@ -140,6 +140,7 @@ const SOLVE = `((wrongAt) => {
     const welcome = await page.$('[data-action=welcome-skip]');   // первый экран нового игрока (с версии 142) — без обучения
     if (welcome || await page.$('[data-action=plan]')) {
       await page.click(welcome ? '[data-action=welcome-skip]' : '[data-action=plan]');
+      if (await page.$('[data-action=auth-guest]')) await page.click('[data-action=auth-guest]');   // «Где хранить прогресс?» — без входа (с версии 144)
       if (snap) { await shot(page, '01b_plan'); await text(page, 'plan', '#modalBox'); }
       await page.click('[data-plan=a1]');
       await page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
@@ -392,6 +393,7 @@ const SOLVE = `((wrongAt) => {
       // игрок жмёт туда, куда показывает стрелка (настоящим кликом мыши — рамка и стрелка клики пропускают)
       for (let guard = 0; guard < 60; guard++) {
         const st = await page.evaluate(() => {
+          if (!document.querySelector('#pedia').classList.contains('hidden')) Pedia.close();   // шаг «Кипропедия»: открыли — закрываем
           Tutorial.tick();
           const S = Game.tutorialCurrent(), ring = document.querySelector('#tutRing'), b = ring.getBoundingClientRect();
           return { id: S && S.id, ring: !ring.classList.contains('hidden'), say: document.querySelector('.tut-say').textContent, x: b.left + b.width / 2, y: b.top + b.height / 2 };

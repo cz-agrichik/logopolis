@@ -1,13 +1,11 @@
 'use strict';
 // ============================================================
-//  Вход в интерфейсе: шаг «Где хранить прогресс?» на старте нового игрока, кнопка 👤 в шапке (на телефоне — в полосе справа)
-//  с окном «Вход и прогресс», повторное предложение войти в финале обучения. Сам вход — platform/account.js.
-//  Пока ни один способ входа не настроен (platform/account-config.js), на старте и после обучения не спрашиваем —
-//  чтобы игроки не видели нерабочих кнопок; посмотреть, как это будет, можно с ?auth в адресе.
+//  Вход в интерфейсе: шаг «Где хранить прогресс?» на старте нового игрока, повторное предложение в финале обучения
+//  (для тех, кто выбрал «без входа»), всегда — кнопка 👤 в шапке (на телефоне — «Вход» в полосе справа) с окном «Вход и прогресс».
+//  Сам вход — platform/account.js; способ, который ещё не настроен (platform/account-config.js), показан бледным «скоро».
 // ============================================================
 
 const AccountUI = {
-  preview: /[?&]auth\b/.test(location.search),   // показать шаги входа, даже если вход ещё не настроен
   busy: false,
   NAMES: { google: 'Google', telegram: 'Telegram' },
 
@@ -15,8 +13,6 @@ const AccountUI = {
     $('#accountBtn').addEventListener('click', () => this.showPanel());
     this.renderBtn();
   },
-  /** Спрашивать ли о входе на старте и после обучения: есть хоть один настроенный способ (или ?auth). */
-  available() { return this.preview || Account.PROVIDERS.some(p => Account.configured(p)); },
 
   /** Кнопка 👤: вошёл — зелёная точка и имя в подсказке. */
   renderBtn() {
@@ -31,7 +27,7 @@ const AccountUI = {
   errorText(code, p) {
     const n = this.NAMES[p] || '';
     return {
-      notConfigured: `Вход через ${n} пока не настроен — он скоро появится. Играйте без входа: всё сохранится в этом браузере.`,
+      notConfigured: `Вход через ${n} скоро появится. Пока можно войти другим способом или играть без входа — всё сохранится в этом браузере.`,
       fileProtocol: 'Вход работает только на сайте grecheskiy.com, а не в игре, открытой с диска.',
       offline: `Не удалось связаться с ${n} — проверьте интернет и попробуйте ещё раз.`,
       cancelled: 'Вход отменён.',
@@ -40,32 +36,37 @@ const AccountUI = {
     }[code] || `Не получилось войти через ${n}. Попробуйте ещё раз чуть позже.`;
   },
 
-  /** Кнопки входа. ctx — откуда (welcome | panel | finish): после входа туда и возвращаемся. */
-  buttonsHtml(ctx) {
-    return `<div class="acc-btns">${Account.PROVIDERS.map(p => {
+  /** Кнопки входа (настроенные — первыми). ctx — откуда (welcome | panel | finish): после входа туда и возвращаемся.
+   *  guest — подпись кнопки «без входа» или null (без неё). */
+  buttonsHtml(ctx, guest = null) {
+    const list = Account.PROVIDERS.slice().sort((a, b) => Account.configured(b) - Account.configured(a));
+    return `<div class="acc-btns">${list.map(p => {
       const ok = Account.configured(p);
-      return `<button class="btn acc-${p} ${ok ? '' : 'acc-off'}" data-action="auth" data-provider="${p}" data-ctx="${ctx}">Войти через ${this.NAMES[p]}${ok ? '' : '<small>пока не настроен</small>'}</button>`;
-    }).join('')}</div>`;
+      return `<button class="btn acc-${p} ${ok ? '' : 'acc-off'}" data-action="auth" data-provider="${p}" data-ctx="${ctx}">Войти через ${this.NAMES[p]}${ok ? '' : '<small>скоро</small>'}</button>`;
+    }).join('')}${guest ? `<button class="btn acc-guest" data-action="auth-guest" data-ctx="${ctx}">${guest}<small>💾 всё хранится только в этом браузере</small></button>` : ''}</div>`;
   },
-  /** Что сейчас даёт вход — честно: синхронизации ещё нет. */
+  /** Где кнопка входа на потом. */
+  whereLater() { return UI.compact() ? 'кнопка 👤 «Вход» в полосе справа' : 'кнопка 👤 вверху справа'; },
+  /** Что даёт вход и что значит «без входа» — честно: синхронизации ещё нет. */
   whyHtml() {
-    return `<p>Войдите через Google или Telegram — игра запомнит вас. Когда появится синхронизация (она в работе), город, выученные слова
-      и настройки учёбы поедут за вами на телефон и другой компьютер.</p>
-      <p class="dim">Можно и без входа: тогда всё хранится только в этом браузере — очистите данные сайта, и прогресс пропадёт.
-      Войти можно в любой момент — ${UI.compact() ? 'кнопка 👤 «Вход» в полосе справа' : 'кнопка 👤 вверху справа'}.</p>`;
+    return `<div class="acc-two">
+      <div><b>👤 Со входом</b> Игра запомнит вас. Когда появится синхронизация (она в работе), город, выученные слова и настройки учёбы
+        поедут за вами на телефон и другой компьютер.</div>
+      <div><b>💾 Без входа</b> Всё хранится только <b>в этом браузере</b> на этом устройстве. В другом браузере или на телефоне начнёте
+        с нуля, а очистка данных сайта сотрёт прогресс.</div></div>
+      <p class="dim">Передумаете — войти можно в любой момент: ${this.whereLater()}.</p>`;
   },
 
   // ---------- шаг на старте нового игрока: после выбора обучения, перед «Что будем учить?» ----------
-  /** Следующий экран старта нового игрока: вход (если ещё не решали и вход есть), потом «Что будем учить?», потом игра. */
+  /** Следующий экран старта нового игрока: вход (если ещё не решали), потом «Что будем учить?», потом игра. */
   startNext() {
-    if (!Account.decided() && this.available()) return this.showStep();
+    if (!Account.decided()) return this.showStep();
     if (Game.state.planPending) return UI.showLearnPlan();
     UI.closeModal();
   },
   showStep() {
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>Где хранить ваш прогресс?</h2>
-      ${this.whyHtml()}${this.buttonsHtml('welcome')}
-      <div class="em-actions"><button class="btn ghost" data-action="auth-guest" data-ctx="welcome">Играть без входа →</button></div></div>`,
+      ${this.whyHtml()}${this.buttonsHtml('welcome', 'Играть без входа →')}</div>`,
       { noX: true, sticky: true });
   },
 
@@ -78,7 +79,7 @@ const AccountUI = {
       ${on ? `${who}<p>Пока вход только запоминает вас: прогресс хранится в этом браузере. Синхронизация между устройствами — в работе;
         когда она появится, город и слова поедут за вами.</p>
         <div class="em-actions"><button class="btn ghost small" data-action="auth-out">Выйти</button><button class="btn gold" data-action="close">Готово</button></div>`
-      : `<p><b>Сейчас вы играете без входа.</b></p>${this.whyHtml()}${this.buttonsHtml('panel')}
+      : `<p><b>Сейчас вы играете без входа</b> — прогресс хранится только в этом браузере.</p>${this.whyHtml()}${this.buttonsHtml('panel')}
         <div class="em-actions"><button class="btn ghost small" data-action="close">Пока без входа</button></div>`}
       <div class="acc-id dim">Номер этого браузера в игре: ${esc(s.id)}</div></div>`, { small: true });
   },
@@ -86,10 +87,11 @@ const AccountUI = {
   // ---------- после обучения (для тех, кто играет без входа) ----------
   /** Блок «Сохраните прогресс» для окна финала обучения или пустая строка. */
   finishOfferHtml() {
-    if (Account.signedIn() || !this.available()) return '';
+    if (Account.signedIn()) return '';
     Account.markAsked('AfterTutorial');
-    return `<div class="acc-offer"><b>Сохраните прогресс.</b> Сейчас город и слова хранятся только в этом браузере. Войдите — игра запомнит вас,
-      а когда появится синхронизация, прогресс поедет за вами на другие устройства.${this.buttonsHtml('finish')}</div>`;
+    return `<div class="acc-offer"><b>💾 Сохраните прогресс.</b> Сейчас вы играете без входа: город и слова хранятся только в этом браузере.
+      Войдите — игра запомнит вас, а когда появится синхронизация, прогресс поедет за вами на другие устройства.${this.buttonsHtml('finish')}
+      <div class="dim">Можно и дальше без входа — войти можно в любой момент: ${this.whereLater()}.</div></div>`;
   },
 
   // ---------- действия ----------
