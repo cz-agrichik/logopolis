@@ -10,7 +10,14 @@ const ACCOUNT_CONFIG = {
   // Вход через Google — Firebase Authentication. Консоль Firebase → Project settings → General → Your apps → Web app →
   // SDK setup and configuration → Config: { apiKey, authDomain, projectId, appId }. В Authentication → Sign-in method включить Google,
   // в Authentication → Settings → Authorized domains добавить grecheskiy.com.
-  firebase: null,
+  firebase: {   // проект logos-cyprus (console.firebase.google.com)
+    apiKey: 'AIzaSyBfpJY4dIKiz2Nwm94wckxHWkl5ErIXNc4',
+    authDomain: 'logos-cyprus.firebaseapp.com',
+    projectId: 'logos-cyprus',
+    storageBucket: 'logos-cyprus.firebasestorage.app',
+    messagingSenderId: '511475428752',
+    appId: '1:511475428752:web:3f6f70c9edfa599e039715',
+  },
   // Вход через Telegram (новый вход Telegram — OpenID Connect): @BotFather → бот → Bot Settings → Login Widget →
   // Allowed URLs: https://grecheskiy.com. Client ID — число (это id бота: цифры токена до двоеточия; сам токен сюда не класть).
   telegram: { clientId: 9008068124 },   // бот @grecheskiycombot

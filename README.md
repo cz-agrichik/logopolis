@@ -856,7 +856,8 @@ tools/       ИНСТРУМЕНТЫ (не часть игры): проверка
   в шапке (зелёная точка — вошёл; на телефоне — «Вход» в полосе справа), окно «Вход и прогресс»: войти, выйти, номер браузера. Статья «Вход и прогресс» в Кипропедии.
   - Шаг «Где хранить прогресс?» показывается всегда (решение автора): со входом — игра запомнит; «Играть без входа» — подписано, что всё
     хранится только в этом браузере. Способ, который ещё не настроен (`ACCOUNT_CONFIG` — `null`), — бледная кнопка «скоро».
-  - **Google:** console.firebase.google.com → создать проект → Project settings → Your apps → Web (</>) → скопировать `firebaseConfig`
+  - **Google:** проект Firebase `logos-cyprus`, его `firebaseConfig` — в `ACCOUNT_CONFIG.firebase` (не секрет: защищает список Authorized domains).
+    Как настраивали: console.firebase.google.com → создать проект → «+ Add app» → Web (</>) → «Use a script tag» → скопировать `firebaseConfig`
     (`apiKey, authDomain, projectId, appId`) в `ACCOUNT_CONFIG.firebase`; Authentication → Sign-in method → Google → Enable;
     Authentication → Settings → Authorized domains → добавить `grecheskiy.com`. Вход — всплывающим окном (`signInWithPopup`), с диска не работает.
   - **Telegram:** бот @grecheskiycombot, `ACCOUNT_CONFIG.telegram = { clientId: 9008068124 }` (id бота). В @BotFather → бот → Bot Settings →

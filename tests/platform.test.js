@@ -21,7 +21,7 @@ function loadAccount({ config = {}, protocol = 'https:' } = {}) {
 }
 
 test('вход: гость с номером браузера, «без входа», ненастроенный вход, выход, сброс стирает и вход', async () => {
-  const { A, store, ctx } = loadAccount();
+  const { A, store, ctx } = loadAccount({ config: { firebase: null, telegram: null } });   // способы входа не настроены
   assert.deepEqual([...ctx.Session.extraKeys], [A.KEY], '«Стереть всё» и ?reset стирают и вход');
   const s = A.load();
   assert.match(s.id, /^b-/);
