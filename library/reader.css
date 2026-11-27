@@ -321,12 +321,33 @@ button { font: inherit; color: inherit; }
 .margin-toggle[aria-pressed="true"] { color: var(--pencil); border-color: var(--pencil); }
 .margin-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Совсем узкий экран (телефон, полэкрана): места для полей нет. */
+/* Совсем узкий экран (телефон, полэкрана): места для полей нет — заметки выписываются под абзацем (reader.js, notesBlockFor). */
 @media (max-width: 760px) {
   .page { grid-template-columns: minmax(0, var(--text-width)); }
-  .margin, .margin-toggle { display: none; }
-  .word--noted { text-decoration: none; }
+  .margin { display: none; }
+  .margin-toggle span { display: none; }
+  .margin-toggle { padding: 7px 9px; }
 }
+/* Заметки под абзацем: те же «форма — перевод» карандашом, столбиком; блок съедает пустую строку после абзаца, чтобы не было двойного отступа. */
+.para-notes {
+  display: block;
+  margin: 4px 0 calc(-1.75em + 6px);
+  margin-bottom: calc(-1lh + 6px);
+  padding: 4px 0 4px 16px;
+  border-left: 1px dashed var(--line);
+  white-space: normal;
+}
+.para-notes .margin-note {
+  position: relative;
+  left: auto; right: auto;
+  display: block;
+  font-size: 21px;
+  line-height: 1.15;
+  margin: 2px 0;
+  animation: none;
+}
+.para-notes .margin-note::before { left: -13px; }
+.para-notes .margin-note__gr { font-size: 15px; }
 
 /* ───────── Карточка слова (подсказка) ───────── */
 .popover {

@@ -735,6 +735,7 @@
   // ───────────────────── Заметки на полях ─────────────────────
   // Для каждого слова из колоды («Учу») на правом поле пишется «форма — перевод»
   // на уровне строки, где слово стоит. В одном абзаце слово подписывается один раз.
+  // Узкий экран (телефон): полей нет — те же заметки выписываются под абзацем, где слово стоит.
 
   const page = $("#page");
   const margin = $("#margin");
@@ -762,12 +763,14 @@
     marginToggle.setAttribute("aria-pressed", String(marginEnabled));
     for (const element of book.querySelectorAll(".word--noted")) element.classList.remove("word--noted");
     margin.replaceChildren();
-    if (!marginEnabled || margin.offsetParent === null) return; // выключено или узкий экран
+    for (const block of book.querySelectorAll(".para-notes")) block.remove();
+    if (!marginEnabled) return;
+    const inline = margin.offsetParent === null;   // узкий экран: полей нет — заметки под абзацами
 
     // Заметка — лексическая единица: слово или оборот. Запомненный оборот подписывается целиком;
     // запомненное слово внутри оборота — тоже оборотом (в этом месте текста оно значит то, что весь оборот).
     // В одном абзаце одна и та же единица подписывается один раз.
-    const originTop = margin.getBoundingClientRect().top;
+    const originTop = inline ? 0 : margin.getBoundingClientRect().top;
     const items = [];
     const seen = new Set();
     const add = (index, unit) => {
@@ -777,7 +780,7 @@
       seen.add(id);
       seen.add(once);
       const element = wordElements[index];
-      items.push({ element, index, unit, top: element.getBoundingClientRect().top - originTop });
+      items.push({ element, index, unit, top: inline ? index : element.getBoundingClientRect().top - originTop });
     };
     for (const [key, elements] of elementsByKey) {
       if (!learningCard(key)) continue;
@@ -798,6 +801,7 @@
     items.sort((a, b) => a.top - b.top);
 
     let bottom = -Infinity;
+    const blocks = new Map();   // абзац → блок заметок под ним (узкий экран)
     for (const item of items) {
       const word = data.words[item.index];
       // оборот — словарная форма со словарным переводом («ρίχνω μια ματιά — взглянуть»);
@@ -833,13 +837,31 @@
         const small = el("span", "margin-note__gram", note);
         small.textContent = below;
       }
-      margin.appendChild(note);
-      // Заметки не наезжают друг на друга: следующая сдвигается ниже.
-      const top = Math.max(item.top, bottom + 6);
-      note.style.top = `${top}px`;
-      bottom = top + note.offsetHeight;
+      if (inline) {
+        notesBlockFor(paragraphOfWord[item.index], blocks).appendChild(note);
+      } else {
+        margin.appendChild(note);
+        // Заметки не наезжают друг на друга: следующая сдвигается ниже.
+        const top = Math.max(item.top, bottom + 6);
+        note.style.top = `${top}px`;
+        bottom = top + note.offsetHeight;
+      }
       for (const element of item.unit ? phraseWords(phraseIndex(item.unit)) : [item.element]) element.classList.add("word--noted");
     }
+  }
+
+  /** Блок заметок под абзацем: сразу после последнего предложения абзаца (узкий экран). */
+  function notesBlockFor(paragraph, blocks) {
+    if (blocks.has(paragraph)) return blocks.get(paragraph);
+    let last = -1;
+    for (let i = 0; i < paragraphOfWord.length; i += 1) if (paragraphOfWord[i] === paragraph) last = i;
+    const word = wordElements[last];
+    const after = (word && word.closest(".sentence")) || word;
+    const block = document.createElement("span");
+    block.className = "para-notes";
+    after.after(block);
+    blocks.set(paragraph, block);
+    return block;
   }
 
   let marginTimer = 0;
@@ -1571,6 +1593,14 @@
   refreshAll();
   updateProgress();
 
+  // заметка под абзацем (узкий экран) — как заметка на полях: открывает карточку слова
+  book.addEventListener("click", event => {
+    const note = event.target.closest(".para-notes .margin-note");
+    if (!note) return;
+    event.stopPropagation();
+    const element = book.querySelector(`.word[data-i="${note.dataset.i}"]`);
+    if (element) showPopover(element);
+  }, true);
   book.addEventListener("click", event => {
     const word = event.target.closest(".word");
     if (!word) return;

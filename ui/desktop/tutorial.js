@@ -44,7 +44,7 @@ const Tutorial = {
       books: '<span class="wc-e">📖</span>', history: Art.svg('shrine1'),
     };
     UI.showModal(`<div class="welcome"><div class="meander"></div>
-      <div class="tut-hello">Χαίρετε!</div><h2>Λόγος · Кипр сквозь эпохи</h2><div class="wc-tag">${esc(T.tagline)}</div>
+      <div class="tut-hello">Καλημέρα!</div><h2>Λόγος · Кипр сквозь эпохи</h2><div class="wc-tag">${esc(T.tagline)}</div>
       <p class="wc-lead">${esc(T.lead)}</p>
       <p class="story">${esc(T.story)}</p>
       <ul class="wc-points">${T.points.map(([k, b, t]) => `<li><span class="wc-ic">${ic[k]}</span><span><b>${esc(b.replace('{words}', words))}</b> — ${esc(t)}</span></li>`).join('')}</ul>

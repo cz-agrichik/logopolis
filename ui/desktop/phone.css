@@ -71,9 +71,10 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   #studyBtn { order: 6; flex: none; }
   #resources { order: 7; flex: 0 0 100%; }
   #topbar::after { bottom: -6px; height: 6px; background-size: 12px 6px; }
-  #brand { min-width: 0; gap: 8px; align-items: baseline; }
+  #brand { min-width: 0; gap: 8px; align-items: center; }
   .brand .logo { font-size: 19px; }
-  .brand .epoch-name { font-size: 13px; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* название эпохи — целиком: не влезает в строку — в две, без многоточия */
+  .brand .epoch-name { font-size: 13px; font-weight: 600; line-height: 1.15; opacity: .92; min-width: 0; overflow-wrap: anywhere; }
   .top-tools { gap: 6px; }
   .top-tools .pedia-btn { width: 34px; height: 34px; font-size: 16px; }
   .top-tools .pedia-q { font-size: 19px; }
@@ -88,15 +89,15 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .popbox .short .wide-only { display: none; }   /* «мало рук · прочее 64%» — в подсказке по долгому нажатию, в шапке места нет */
   #studyBtn { padding: 8px 14px; }
   .study-btn .sb-main { font-size: 15px; }
-  /* ресурсы — все сразу, сеткой: значок над числом, под ним прирост */
-  #resources { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); padding: 3px; overflow: visible; }
-  .rs, .resbar[data-fit] .rs { flex-direction: column; justify-content: center; gap: 1px; padding: 3px 2px 7px; max-width: none; min-width: 0; }
+  /* ресурсы — все сразу, сеткой: значок слева, число и прирост справа; ячейки делят ширину поровну (мало ресурсов — шире, без пустот) */
+  #resources { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); padding: 3px; overflow: visible; }
+  .rs, .resbar[data-fit] .rs { flex-direction: row; justify-content: center; align-items: center; gap: 5px; padding: 4px 4px 7px; max-width: none; min-width: 0; }
   .rs + .rs { box-shadow: none; }
-  .rs-v, .resbar[data-fit] .rs-v { align-items: center; }
-  .rs-ic, .rs-ic .ico, .resbar[data-fit] .rs-ic, .resbar[data-fit] .rs-ic .ico { width: 20px; height: 20px; }
-  .rs-v b, .resbar[data-fit] .rs-v b { font-size: 13px; }
-  .rs-v small, .resbar[data-fit] .rs-v small { font-size: 9.5px; }
-  .rs-bar { left: 6px; right: 6px; bottom: 2px; height: 2px; }
+  .rs-v, .resbar[data-fit] .rs-v { align-items: flex-start; }
+  .rs-ic, .rs-ic .ico, .resbar[data-fit] .rs-ic, .resbar[data-fit] .rs-ic .ico { width: 24px; height: 24px; }
+  .rs-v b, .resbar[data-fit] .rs-v b { font-size: 15px; }
+  .rs-v small, .resbar[data-fit] .rs-v small { font-size: 10px; }
+  .rs-bar { left: 8px; right: 8px; bottom: 2px; height: 2px; }
 
   /* ---------- середина: благословения, карта, летопись ---------- */
   main { flex: 1; min-height: 0; flex-direction: column; gap: 0; padding: 6px 0 0; position: relative; }
@@ -197,8 +198,8 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   #modal .modal-box.small { width: calc(100% - 20px); height: auto; max-height: calc(100% - 20px); border-radius: 14px; padding: 14px 16px; }
   .m-x { position: sticky; top: 0; float: right; z-index: 3; margin: -4px -6px 4px 10px; width: 36px; height: 36px; border: 0; border-radius: 50%;
     background: var(--parch-2); color: var(--ink-2); font-size: 16px; align-items: center; justify-content: center; cursor: pointer; }
-  #modal .modal-box:not(.small) .mb-actions, #modal .modal-box:not(.small) .em-actions { position: sticky; bottom: 0; z-index: 2; margin: 12px -16px 0; padding: 12px 16px;
-    background: linear-gradient(rgba(244, 234, 211, 0), var(--parch) 30%); flex-wrap: wrap; }
+  #modal .modal-box:not(.small) .mb-actions, #modal .modal-box:not(.small) .em-actions { position: sticky; bottom: 0; z-index: 2; margin: 12px -16px 0; padding: 10px 16px 12px;
+    background: var(--parch); border-top: 1px solid var(--parch-3); box-shadow: 0 -10px 14px -12px rgba(60, 35, 10, .55); flex-wrap: wrap; }   /* сплошная полоса — без просвета текста */
   #modal .mb-col { display: block; }
   #modal .mb-col:empty { display: none; }
   .epoch-modal h2 { font-size: 22px; }
@@ -257,8 +258,8 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
 }
 
 /* узкий телефон (iPhone SE: 320–360 px): шапка и нижняя панель — плотнее */
+@media (max-width: 420px) { .brand .logo { display: none; } }   /* «Λόγος» — место названию эпохи */
 @media (max-width: 370px) {
-  .brand .logo { display: none; }
   .top-tools { gap: 4px; }
   .top-tools .pedia-btn { width: 30px; height: 30px; font-size: 14px; }
   #logosMedal { padding-right: 9px; }
@@ -274,7 +275,7 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
 @media (max-width: 600px) and (max-height: 640px) {
   #resources { display: flex; overflow-x: auto; scrollbar-width: none; }
   #resources::-webkit-scrollbar { display: none; }
-  #resources .rs { flex: 1 0 46px; }
+  #resources .rs { flex: 1 0 70px; }
   #topbar { padding-top: 4px; padding-bottom: 6px; row-gap: 4px; }
   .top-tools .pedia-btn { width: 30px; height: 30px; }
   #studyBtn { padding: 6px 12px; }
