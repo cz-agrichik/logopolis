@@ -7,21 +7,19 @@
 //  (подпись Telegram без своего сервера не проверить: строка помечена provider: 'telegram', это «со слов браузера»).
 //  Правила доступа — firestore.rules: игрок читает и пишет только свою строку, список целиком видит владелец проекта в консоли.
 //
-//  Браузер и аккаунт. Играют под аккаунтом в одном браузере за раз — он «главный» (его номер — browserId в строке аккаунта).
-//  • Вход (link): то, что переносится (parts — сейчас имя, потом город и учёба), берётся ЦЕЛИКОМ с одной стороны — без слияния.
-//    В аккаунте пусто — пишем туда браузер; в браузере пусто — берём аккаунт; одинаково — ничего; разное — спрашиваем игрока,
-//    какую версию оставить (choose). После этого браузер становится главным (claim).
-//  • Главный браузер пишет свои изменения в аккаунт (push — только если он всё ещё главный).
-//  • Зашли под аккаунтом в другом браузере — он стал главным, а этот устарел (stale): узнаём при запуске, при записи и сразу,
-//    пока игра открыта (watch). Устаревший браузер просит перезагрузиться: берёт версию из аккаунта и снова становится главным (adopt).
+//  Браузер и аккаунт. Главная версия — в аккаунте; пишет в неё один браузер — тот, где вошли последним («главный»,
+//  его номер — browserId в строке аккаунта). Остальные браузеры этого аккаунта заведомо устарели.
+//  • Вход (link) — единственное место, где браузер и аккаунт сравниваются: то, что переносится (parts — сейчас имя, потом город
+//    и учёба), берётся ЦЕЛИКОМ с одной стороны. В аккаунте пусто — пишем туда браузер; в браузере пусто — берём аккаунт;
+//    одинаково — ничего; разное — спрашиваем игрока, какую версию оставить (choose). После этого браузер — главный (claim).
+//  • Главный пишет свои изменения в аккаунт (push), пока он главный. Больше никаких сравнений.
+//  • Вошли в другом браузере — главный теперь тот, а этот устарел (stale): узнаём при запуске, при записи и сразу, пока игра
+//    открыта (watch). Устаревшему не предлагаем ничего, кроме одного: загрузить версию из аккаунта (adopt) — после этого главный он.
 //
-//  🚨 КРАСНЫЕ ЛАМПОЧКИ — всё, что может затереть версию (сейчас имя, потом город — тем более):
-//  • заменить непустую и другую версию браузера или аккаунта можно только с подтверждением игрока (confirmed) — иначе takeRemote
-//    и claim ничего не меняют, а кричат в консоль (alarm) и бросают 'unconfirmedOverwrite'; подтверждение даёт только второй экран
-//    «Точно заменить?» в интерфейсе (choose(which, true), adopt(true)); без него choose и adopt отвечают 'notConfirmed';
-//  • главный браузер пишет, только если он всё ещё главный И в аккаунте лежит ровно то, что он сам записал в прошлый раз
-//    (lastPushed) — иначе считает себя устаревшим и ничего не пишет;
-//  • вход не запоминается, пока игрок не выбрал (held — только в памяти); отказаться можно без потерь.
+//  🚨 Выбор при входе затирает одну из версий. Поэтому заменить непустую и другую версию браузера или аккаунта можно только
+//  с подтверждением игрока (choose(which, true) — его даёт второй экран «Точно заменить?»; без него — 'notConfirmed').
+//  Ловушка на ошибки в коде: takeRemote и claim без подтверждения такую замену не делают — кричат в консоль (alarm) и бросают
+//  'unconfirmedOverwrite'. Вход не запоминается, пока игрок не выбрал (held — только в памяти); отказаться можно без потерь.
 //
 //  Локально (ключ KEY в localStorage) — кто вошёл и имя; «Стереть всё» стирает и его (Session.extraKeys).
 //  Библиотеки Firebase и Telegram грузятся только для входа и для тех, кто вошёл, — без входа игра ничего не тянет из сети.
@@ -35,14 +33,13 @@ const Account = {
    *    provider: null | 'google' | 'telegram', uid — id у поставщика, providerName — имя у поставщика, email, username, photo, since,
    *    fbUid — пользователь Firebase (строка в списке игроков), linked — fbUid, с которым этот браузер сверился при входе и стал главным
    *    (нет — сверка при входе ещё не прошла: пройдёт при следующем запуске); profilePending — изменения ещё не дошли до аккаунта;
-   *    lastPushed — что этот браузер записал в аккаунт в последний раз; localAt — когда версия этого браузера менялась;
+   *    localAt — когда версия этого браузера менялась (показать при выборе на входе);
    *    guest: когда выбрали «без входа»; askedAfterTutorial }. */
   state: null,
   /** Расхождение, ждущее выбора игрока (только в памяти): { acc — вход, который ещё не завершён (или null), remote — строка аккаунта, login }. */
   held: null,
-  /** Этот браузер устарел: главный теперь другой (staleRow — строка аккаунта, по которой это поняли, или null). onStale — что показать. */
+  /** Этот браузер устарел: главный теперь другой. onStale — что показать (интерфейс). */
   stale: false,
-  staleRow: null,
   onStale: null,
   unwatch: null,
 
@@ -55,9 +52,9 @@ const Account = {
       s.providerName = s.name || '';
       if (s.provider === 'google') s.fbUid = s.uid;
     }
-    delete s.nameEdited; delete s.synced;
+    delete s.nameEdited; delete s.synced; delete s.lastPushed;   // от прежних сборок
     this.state = s;
-    this.held = null; this.stale = false; this.staleRow = null; this.unwatch = null;
+    this.held = null; this.stale = false; this.unwatch = null;
     this.save();
     return s;
   },
@@ -125,7 +122,7 @@ const Account = {
   /** Выйти: снова гость этого браузера. Город, слова и имя остаются здесь; войдёт снова — снова сверим при входе. */
   async signOut() {
     const was = this.state.provider;
-    for (const k of ['provider', 'uid', 'providerName', 'email', 'username', 'photo', 'since', 'fbUid', 'linked', 'lastPushed', 'profilePending']) delete this.state[k];
+    for (const k of ['provider', 'uid', 'providerName', 'email', 'username', 'photo', 'since', 'fbUid', 'linked', 'profilePending']) delete this.state[k];
     this.state.provider = null;
     this.state.guest = this.state.guest || Date.now();
     this.held = null; this.stale = false;
@@ -204,8 +201,6 @@ const Account = {
     try { console.error('🚨 Аккаунт: ' + what, { было: was, стало: now }); } catch (e) { /* консоли нет */ }
     return 'unconfirmedOverwrite';
   },
-  /** В аккаунте не то, что этот браузер записал туда последним: его поменяли не отсюда. */
-  foreign(row) { const p = this.state.lastPushed; return !!(row && p && !this.same(this.fromRow(row), p)); },
 
   /** При запуске (вошли раньше). Сверка при входе не прошла — пройти её; этот браузер главный — дописать незаписанное и следить;
    *  главный другой — устарел. Обещание { result: 'ok' | 'stale' | 'ask' | … | 'pending' }. */
@@ -217,7 +212,7 @@ const Account = {
       await this.ensureUser(s);
       if (!this.linked()) return this.link();   // Telegram: анонимный пользователь сменился — это новая строка
       const remote = await this.readRow(s.fbUid);
-      if (remote && (remote.browserId !== s.id || this.foreign(remote))) return { result: this.goStale(remote) };
+      if (remote && remote.browserId !== s.id) return { result: this.goStale() };
       if (!remote || s.profilePending) await this.push();   // строки нет (удалили в консоли) или здесь есть незаписанное
       this.watch();
       return { result: 'ok' };
@@ -231,30 +226,19 @@ const Account = {
     if (!this.linked()) return this.link();   // сверка при входе ещё не прошла — сначала она
     try { await this.push(); return { result: 'push' }; } catch (e) { return { result: e === 'stale' ? 'stale' : this.failed(e) }; }
   },
-  /** Устаревший браузер: что здесь пропадёт при перезагрузке. { local, remote (null — не знаем), lost — здесь есть то, чего нет в аккаунте }. */
-  staleLoss() {
-    const local = this.snapshot(), remote = this.staleRow ? this.fromRow(this.staleRow) : null;
-    return { local, remote, savedAt: this.staleRow ? this.millis(this.staleRow.updatedAt) : null, localAt: this.state.localAt || null,
-      lost: !this.isEmpty(local) && !(remote && this.same(local, remote)) };
-  },
-  /** Этот браузер устарел: взять версию из аккаунта и снова стать главным (интерфейс после этого перезагружает страницу).
-   *  🚨 Здесь есть то, чего нет в аккаунте, — только с confirmed (второй экран «Точно перезагрузить?»).
-   *  Обещание { ok } или { ok: false, error: 'notConfirmed' (версия в аккаунте уже другая — показать снова) | 'offline' }. */
-  async adopt(confirmed = false) {
-    let remote;
-    try { remote = await this.readRow(this.state.fbUid); } catch (e) { this.warn(e); return { ok: false, error: 'offline' }; }
-    const local = this.snapshot();
-    if (remote && !confirmed && !this.isEmpty(local) && !this.same(local, this.fromRow(remote))) { this.staleRow = remote; return { ok: false, error: 'notConfirmed' }; }
+  /** Этот браузер устарел: взять версию из аккаунта (аккаунт главнее — без вопросов) и снова стать главным.
+   *  Интерфейс после этого перезагружает страницу. Обещание { ok } или { ok: false, error: 'offline' } — здесь ничего не поменяли. */
+  async adopt() {
     try {
-      if (remote) this.takeRemote(remote, true);
+      const remote = await this.readRow(this.state.fbUid);
+      if (remote) this.takeRemote(remote, true);   // устаревшая версия браузера не в счёт
       await this.claim(remote, false);
       return { ok: true };
     } catch (e) { this.warn(e); return { ok: false, error: 'offline' }; }
   },
-  goStale(row = null) {
+  goStale() {
     if (!this.stale && this.signedIn()) {
       this.stale = true;
-      this.staleRow = row;
       this.unwatchRow();
       if (this.onStale) this.onStale();
     }
@@ -324,27 +308,24 @@ const Account = {
     }
     const db = await this.fbDb();
     await this.within(db.collection('users').doc(s.fbUid).set(this.rowData(remote, login), { merge: true }));
-    s.linked = s.fbUid; s.lastPushed = this.snapshot(); this.stale = false; this.staleRow = null;
+    s.linked = s.fbUid; this.stale = false;
     delete s.profilePending;
     this.save();
     this.watch();
   },
-  /** Записать изменения, только если этот браузер всё ещё главный и в аккаунте — то, что он сам записал в прошлый раз;
-   *  иначе он устарел (throw 'stale') и ничего не пишет. */
+  /** Записать изменения, только если этот браузер всё ещё главный; нет — он устарел (throw 'stale') и ничего не пишет. */
   async push() {
     const s = this.state, db = await this.fbDb();
     const u = await this.within(this.fbUser(firebase.auth()));
     if (!u || u.uid !== s.fbUid) throw 'sessionLost';
     const ref = db.collection('users').doc(s.fbUid);
-    let other = null;
-    const data = this.snapshot();
+    let other = false;
     await this.within(db.runTransaction(async t => {
       const snap = await t.get(ref), row = snap.exists ? snap.data() : null;
-      other = row && (row.browserId !== s.id || this.foreign(row)) ? row : null;
+      other = !!(row && row.browserId !== s.id);
       if (!other) t.set(ref, this.rowData(row, false), { merge: true });
     }));
-    if (other) { this.goStale(other); throw 'stale'; }
-    s.lastPushed = data;
+    if (other) { this.goStale(); throw 'stale'; }
     delete s.profilePending;
     this.save();
   },
@@ -354,7 +335,7 @@ const Account = {
     try {
       this.unwatch = firebase.firestore().collection('users').doc(this.state.fbUid).onSnapshot(snap => {
         const row = snap.exists ? snap.data() : null;
-        if (row && row.browserId && row.browserId !== this.state.id) this.goStale(row);
+        if (row && row.browserId && row.browserId !== this.state.id) this.goStale();
       }, e => this.warn(e));
     } catch (e) { this.warn(e); }
   },

@@ -221,15 +221,9 @@ test('один аккаунт — один главный браузер: вош
   await two.A.setName('С телефона');
   assert.equal(db.docs['users/g-1'].name, 'С телефона', 'главный пишет смело');
 
-  // первый перезагрузился: здесь «Старое» — в аккаунте этого нет, без второго экрана не заменяем
+  // первый загрузил версию из аккаунта — без вопросов, его «Старое» не в счёт — и стал главным, второй устарел
   assert.equal(one.A.state.name, 'Старое');
-  assert.deepEqual(plain(await one.A.adopt()), { ok: false, error: 'notConfirmed' });
-  assert.equal(one.A.state.name, 'Старое');
-  assert.equal(one.A.staleLoss().lost, true);
-  assert.deepEqual(plain(one.A.staleLoss().remote), { name: 'С телефона' }, 'что останется — по свежей строке');
-  assert.equal(db.docs['users/g-1'].browserId, two.A.state.id, 'главный пока второй');
-  // подтвердили: взял версию из аккаунта и стал главным, второй устарел
-  assert.deepEqual(plain(await one.A.adopt(true)), { ok: true });
+  assert.deepEqual(plain(await one.A.adopt()), { ok: true });
   assert.equal(one.A.state.name, 'С телефона');
   assert.equal(db.docs['users/g-1'].browserId, one.A.state.id);
   assert.equal(two.A.stale, true);
@@ -287,7 +281,7 @@ test('список игроков: без связи вход всё равно 
   assert.equal(old.F.docs['users/g-1'].createdAt, old.F.TS);
 });
 
-test('🚨 красные лампочки: затереть непустую другую версию без подтверждения нельзя; аккаунт поменяли не отсюда — главный не пишет', async () => {
+test('🚨 ловушка: затереть непустую другую версию без подтверждения нельзя', async () => {
   const { A, F } = loadWithFirebase();
   A.load();
   await A.signIn('google');
@@ -304,17 +298,8 @@ test('🚨 красные лампочки: затереть непустую д
   // пустую или ту же — можно молча
   A.takeRemote({ name: 'Андрей' });
   await A.claim({ name: 'Андрей' }, false);
-
-  // в аккаунте имя поменяли не отсюда (браузер тот же — например, вручную в консоли): главный не затирает, а устаревает
-  let stale = 0;
-  A.onStale = () => stale++;
+  // главный пишет, не сравнивая: что бы ни лежало в аккаунте, пока главный — он
   F.docs['users/g-1'].name = 'Из консоли';
-  assert.equal((await A.setName('Моё')).result, 'stale');
-  assert.equal(F.docs['users/g-1'].name, 'Из консоли');
-  assert.equal(stale, 1);
-  assert.equal(A.staleLoss().lost, true, 'и покажет, что здесь пропадёт');
-  // при запуске — то же
-  A.load(); A.onStale = () => stale++;
-  assert.equal((await A.sync()).result, 'stale');
-  assert.equal(F.docs['users/g-1'].name, 'Из консоли');
+  assert.equal((await A.setName('Моё')).result, 'push');
+  assert.equal(F.docs['users/g-1'].name, 'Моё');
 });

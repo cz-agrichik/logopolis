@@ -147,9 +147,9 @@ const AccountUI = {
   },
 
   // ---------- «Что оставить?» — в браузере и в аккаунте разное ----------
-  // 🚨 Здесь что-то затирается навсегда (сейчас имя, потом город). Поэтому: под каждой кнопкой красным — что пропадёт;
-  // второй экран «Точно заменить?» с тем же списком; кнопка «Да, заменить» оживает через 3 секунды. Без второго экрана
-  // Account.choose / Account.adopt ничего не заменят (confirmed).
+  // 🚨 Только при входе. Здесь одна версия затирается навсегда (сейчас имя, потом город). Поэтому: под каждой кнопкой красным —
+  // что пропадёт; второй экран «Точно заменить?» с тем же списком; кнопка «Да, заменить» оживает через 3 секунды.
+  // Без второго экрана Account.choose ничего не заменит (confirmed).
   /** Как показать части версии (Account.parts): сейчас имя; город и учёба добавятся сюда же. */
   partsHtml(v) {
     return `<div class="acc-ver-l">Имя в игре: <b>${v.name ? esc(v.name) : '—'}</b></div>`;
@@ -204,7 +204,7 @@ const AccountUI = {
     const keepLocal = which === 'local';
     const lostWhere = keepLocal ? `в аккаунте ${prov}` : 'в этом браузере';
     const lostAt = keepLocal ? this.when(c.savedAt, 'сохранена') : this.when(c.localAt, 'изменена');
-    this.confirming = { kind: 'choice', which };
+    this.confirming = { which };
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>⚠️ Точно заменить?</h2>
       <div class="acc-loss"><b>Пропадёт навсегда</b> — версия ${lostWhere}${lostAt ? ` (${lostAt})` : ''}:${this.lossList(keepLocal ? c.remote : c.local)}</div>
       <p>Останется версия ${keepLocal ? 'этого браузера' : `из аккаунта ${prov}`}:</p>${this.partsHtml(keepLocal ? c.local : c.remote)}
@@ -232,9 +232,8 @@ const AccountUI = {
   },
   back() {
     clearInterval(this.armTimer);
-    const k = this.confirming && this.confirming.kind;
     this.confirming = null;
-    return k === 'stale' ? this.showStale() : this.showChoice();
+    return this.showChoice();
   },
   async confirm() {
     const f = this.confirming;
@@ -242,7 +241,6 @@ const AccountUI = {
     const b = $('#modalBox [data-action="acc-confirm"]');
     if (!b || b.disabled) return;
     b.disabled = true; b.textContent = 'Заменяем…';
-    if (f.kind === 'stale') return this.adopt(true);
     this.busy = true;
     const c = Account.choice(), ctx = this.choiceCtx;
     const r = await Account.choose(f.which, true);
@@ -267,40 +265,19 @@ const AccountUI = {
   },
 
   // ---------- «Этот браузер устарел» — под аккаунтом играют в другом браузере ----------
-  // 🚨 Перезагрузка заменяет версию этого браузера версией аккаунта. Здесь есть то, чего нет в аккаунте, — показать красным
-  // и спросить второй раз («Точно перезагрузить?»); нет — перезагрузить сразу, ничего не теряется.
+  /** Под аккаунтом вошли в другом браузере: этот устарел. Без выбора — только загрузить версию из аккаунта. */
   showStale() {
-    const l = Account.staleLoss();
-    const lossHtml = l.lost
-      ? `<div class="acc-loss"><b>Здесь есть то, чего нет в аккаунте</b>${l.localAt ? ` (${this.when(l.localAt, 'изменено')})` : ''}:${this.lossList(l.local)}
-          При перезагрузке это пропадёт: останется версия из аккаунта${l.remote ? '' : ' (какая — узнаем при перезагрузке)'}.</div>
-        ${l.remote ? this.partsHtml(l.remote) : ''}`
-      : '<p class="dim">Здесь ничего не потеряется: в аккаунте то же самое.</p>';
     UI.lockWith(`<div class="epoch-modal"><h2>🔄 Этот браузер устарел</h2>
-      <p>Под вашим аккаунтом зашли в игру на другом устройстве или в другом браузере — теперь главная версия там.
-        Здесь продолжать с устаревшей нельзя: она затёрла бы новую.</p>
-      <p>Перезагрузите страницу — возьмём версию из аккаунта, и главным снова станет этот браузер (а устаревшим — тот).</p>
-      ${lossHtml}
-      <div class="em-actions"><button class="btn gold" data-action="acc-adopt">${l.lost ? 'Перезагрузить…' : 'Перезагрузить'}</button></div></div>`, 'account');
+      <p>Под вашим аккаунтом зашли в игру в другом браузере или на другом устройстве. Главная версия — в аккаунте,
+        а здесь — устаревшая.</p>
+      <p>Загрузите версию из аккаунта — и продолжайте здесь: главным снова станет этот браузер.</p>
+      <div class="em-actions"><button class="btn gold" data-action="acc-adopt">Загрузить из аккаунта</button></div></div>`);
   },
-  /** «Перезагрузить»: здесь есть то, чего нет в аккаунте, — второй экран; иначе — сразу. */
-  async adopt(confirmed = false) {
-    if (!confirmed && Account.staleLoss().lost) return this.showConfirmStale();
+  async adopt() {
     const btn = $('#modalBox [data-action="acc-adopt"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Загружаем…'; }
-    const r = await Account.adopt(confirmed);
-    if (r.error === 'notConfirmed') { this.confirming = null; return this.showStale(); }   // в аккаунте уже другое — показать заново
-    BrowserIO.restart();   // не вышло (нет связи) — после перезагрузки попробуем снова; здесь ничего не заменили
-  },
-  showConfirmStale() {
-    const l = Account.staleLoss();
-    this.confirming = { kind: 'stale' };
-    UI.lockWith(`<div class="epoch-modal"><h2>⚠️ Точно перезагрузить?</h2>
-      <div class="acc-loss"><b>Пропадёт навсегда</b> — версия этого браузера${l.localAt ? ` (${this.when(l.localAt, 'изменена')})` : ''}:${this.lossList(l.local)}</div>
-      ${l.remote ? `<p>Останется версия из аккаунта:</p>${this.partsHtml(l.remote)}` : '<p>Останется версия из аккаунта.</p>'}
-      <p><b>Отменить это будет нельзя.</b></p>
-      ${this.confirmButtons('Да, перезагрузить')}</div>`, 'account');
-    this.armConfirm();
+    await Account.adopt();   // не вышло (нет связи) — после перезагрузки попробуем снова
+    BrowserIO.restart();
   },
   async signOut() { await Account.signOut(); this.renderBtn(); UI.toast('👤 Вы вышли. Город и слова остались в этом браузере.'); this.showPanel(); },
   /** Куда дальше после входа или «без входа». */

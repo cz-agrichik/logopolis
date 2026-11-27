@@ -736,16 +736,14 @@ const UI = {
       и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
       <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`);
   },
-  /** Окно, которое не закрыть: поверх всего, учёба закрыта, остаются только его кнопки. owner — чьё окно: 'tab' (другая вкладка)
-   *  главнее всех; своё окно можно сменить (шаги «браузер устарел» → «точно перезагрузить?»). */
-  lockWith(html, owner = 'tab') {
-    if (this.modalLocked && (this.lockOwner === 'tab' || owner !== this.lockOwner) && owner !== 'tab') return;
-    this.modalLocked = false;
+  /** Окно, которое не закрыть: поверх всего, учёба закрыта, остаются только его кнопки (другая вкладка, «браузер устарел»). */
+  lockWith(html) {
+    if (this.modalLocked) return;
     if (Study.open) { Study.open = false; clearTimeout(Study.timer); $('#study').classList.add('hidden'); }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     this.modalBuilding = null; this.afterModal = null;
     this.showModal(html, { small: true, noX: true });
-    this.modalLocked = true; this.lockOwner = owner;
+    this.modalLocked = true;
   },
 
   showAway(a) {
