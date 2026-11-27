@@ -137,8 +137,9 @@ const SOLVE = `((wrongAt) => {
 (async () => {
   /** Закрыть вступление новой игры; где есть «Что будем учить?» — снять его и выбрать «С нуля». */
   async function startGame(page, snap = false) {
-    if (await page.$('[data-action=plan]')) {
-      await page.click('[data-action=plan]');
+    const welcome = await page.$('[data-action=welcome-skip]');   // первый экран нового игрока (с версии 142) — без обучения
+    if (welcome || await page.$('[data-action=plan]')) {
+      await page.click(welcome ? '[data-action=welcome-skip]' : '[data-action=plan]');
       if (snap) { await shot(page, '01b_plan'); await text(page, 'plan', '#modalBox'); }
       await page.click('[data-plan=a1]');
       await page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
@@ -365,11 +366,18 @@ const SOLVE = `((wrongAt) => {
     await page.goto(URL + '?reset');
     if (await page.evaluate(() => typeof Tutorial !== 'undefined')) {
       const clearToasts = () => page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
-      await page.click('[data-action=plan]');
-      await page.click('[data-plan=a1]');
-      await clearToasts();
-      await shot(page, '50_tut_offer'); await text(page, 'tut_offer', '#modalBox');
-      await page.click('[data-action=tut-go]');
+      if (await page.$('[data-action=welcome-tut]')) {   // с версии 142: «Начать с обучением» на первом экране → выбор колод
+        await page.click('[data-action=welcome-tut]');
+        await shot(page, '50_tut_plan'); await text(page, 'tut_plan', '#modalBox');
+        await page.click('[data-plan=a1]');
+        await clearToasts();
+      } else {
+        await page.click('[data-action=plan]');
+        await page.click('[data-plan=a1]');
+        await clearToasts();
+        await shot(page, '50_tut_offer'); await text(page, 'tut_offer', '#modalBox');
+        await page.click('[data-action=tut-go]');
+      }
       const seen = [];
       // игрок жмёт туда, куда показывает стрелка (настоящим кликом мыши — рамка и стрелка клики пропускают)
       for (let guard = 0; guard < 60; guard++) {
@@ -400,6 +408,20 @@ const SOLVE = `((wrongAt) => {
       texts.tut_log = await page.evaluate(LOG_TEXT);
       texts.tut_state = await page.evaluate(() => JSON.stringify({ logos: Game.state.logos, tutorial: Game.state.tutorial, buildings: Game.state.buildings.map(b => b.type) }));
     }
+    await ctx.close();
+  }
+
+  // ---------- 9. Новая игра поверх прежней: игрок игру знает — рассказ о начале пути, потом выбор колод ----------
+  {
+    const { ctx, page } = await newPage(browser);
+    await page.goto(URL + '?reset');
+    await startGame(page);
+    await Promise.all([page.waitForURL(/fresh=/), page.evaluate(() => Game.newGame()).catch(() => {})]);
+    await page.waitForLoadState('load');
+    await shot(page, '70_new_game'); await text(page, 'new_game', '#modalBox');
+    await page.click('[data-action=plan]');
+    await shot(page, '71_new_game_plan');
+    texts.new_game_tutorial = await page.evaluate(() => JSON.stringify(Game.state.tutorial || null));
     await ctx.close();
   }
 

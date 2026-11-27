@@ -1,13 +1,12 @@
 'use strict';
 // ============================================================
-//  Обучение «Первые шаги»: приветствие, карточка задания над картой и стрелка «жми сюда».
+//  Первый экран нового игрока (в чём игра + обучение) и обучение «Первые шаги»: карточка задания над картой и стрелка «жми сюда».
 //  Шаги, проверка и награда — в ядре (core/city/tutorial.js), тексты шагов — Cat.tutorial (content/ru/lexicon.js).
 //  Стрелка и рамка висят поверх страницы (position: fixed) и не ловят клики; их место пересчитывается
 //  каждые 250 мс (main.js), после перерисовки панели и карты, при прокрутке и смене размера окна.
 // ============================================================
 
 const Tutorial = {
-  offered: false,   // приветствие уже показывали в этом сеансе (закрыли мимо кнопок — в карточке остаётся строчка «Показать?»)
   folded: false,    // карточка свёрнута до заголовка
   finishPending: false,
   tileFor: null, tileXY: null,   // клетка под стрелкой: держим её, пока годится, — стрелка не прыгает по карте
@@ -34,16 +33,25 @@ const Tutorial = {
       || !$('#pedia').classList.contains('hidden') || School.isOpen();
   },
 
-  // ---------- приветствие, старт, пропуск, финал ----------
-  maybeOffer() {
-    const t = Game.state.tutorial;
-    if (!t || !t.offer || t.on || this.offered || UI.modalLocked || this.overlay()) return;
-    this.offered = true;
-    UI.showModal(`<div class="tut-modal"><div class="tut-hello">Χαίρετε!</div><h2>Добро пожаловать на Кипр</h2>
-      <p>Покажу первые шаги: как добывать ресурсы, что строить и где брать λ Логос. Это несколько минут, а за каждый шаг — <b>λ ${BALANCE.tutorialReward}</b>.</p>
-      <p class="dim">Стрелка покажет, куда нажать. Пропустите — обучение можно вернуть во вкладке «Эпоха».</p>
-      <div class="em-actions"><button class="btn ghost small" data-action="tut-skip">Пропустить</button>
-      <button class="btn gold" data-action="tut-go">Поехали! →</button></div></div>`, { small: true });
+  // ---------- первый экран, старт, пропуск, финал ----------
+  /** Первый экран совсем нового игрока: в чём игра — и предложение обучения. Дальше — «Что будем учить?», потом игра.
+   *  (Новая игра поверх прежней — другой экран: рассказ об эпохе, UI.showEpoch(true).) Закрыть мимо кнопок нельзя. */
+  showWelcome() {
+    const T = Cat.tutorial, ic = [Art.svg(Looks.icons('house', 1)[0]), '<b class="wc-l">λ</b>', '<span class="wc-e">📜</span>'];
+    UI.showModal(`<div class="welcome"><div class="meander"></div>
+      <div class="tut-hello">Χαίρετε!</div><h2>Λόγος · Кипр сквозь эпохи</h2>
+      <p class="story">${esc(T.story)}</p>
+      <ul class="wc-points">${T.points.map(([b, t], i) => `<li><span class="wc-ic">${ic[i]}</span><span><b>${esc(b)}</b> — ${esc(t)}</span></li>`).join('')}</ul>
+      <div class="wc-offer"><b>🎓 ${esc(T.name)}.</b> ${esc(T.offer.replace('{r}', BALANCE.tutorialReward))}</div>
+      <div class="em-actions"><button class="btn ghost" data-action="welcome-skip">Пропустить обучение</button>
+      <button class="btn gold" data-action="welcome-tut">Начать с обучением →</button></div></div>`, { noX: true, sticky: true });
+    this.update();   // карточка «Показать первые шаги?» под окном не нужна
+  },
+  /** Ответ на первом экране: с обучением или без — и к выбору колод (если его ещё не было). */
+  welcome(go) {
+    if (go) { Game.tutorialStart(this.rounds()); this.folded = false; } else Game.tutorialSkip();
+    if (Game.state.planPending) UI.showLearnPlan(); else UI.closeModal();
+    UI.lastPanel = null; UI.renderPanel();
     this.update();
   },
   start() {
@@ -74,21 +82,17 @@ const Tutorial = {
       <div class="em-actions"><button class="btn ghost" data-pedia="a:basics">? Кипропедия</button>
       <button class="btn gold" data-action="close">Играть дальше →</button></div></div>`, { small: true });
   },
-  /** После закрытия окна (UI.closeModal): приветствие или финал, если их ещё не показали. */
+  /** После закрытия окна (UI.closeModal): финал, если его ещё не показали. */
   afterOverlay() {
     if (this.overlay()) return;
     if (this.finishPending) { this.finishPending = false; this.showFinish(); return; }
-    this.maybeOffer();
     this.update();
   },
 
   /** Каждые 250 мс: проверить шаги, наградить, обновить карточку и стрелку. */
   tick() {
     if (!Game.state || !this.card) return;
-    if (!this.overlay()) {
-      if (this.finishPending) { this.finishPending = false; this.showFinish(); }
-      else this.maybeOffer();
-    }
+    if (!this.overlay() && this.finishPending) { this.finishPending = false; this.showFinish(); }
     const got = Game.tutorialCheck(this.rounds());
     if (got.length) this.reward(got);
     this.update();
@@ -119,7 +123,7 @@ const Tutorial = {
   cardHtml() {
     const t = Game.state.tutorial, T = Cat.tutorial;
     if (t && t.offer && !t.on) {
-      if (!this.offered || !$('#modal').classList.contains('hidden')) return '';   // строчка «Показать?» — только если приветствие закрыли мимо кнопок
+      if (!$('#modal').classList.contains('hidden')) return '';   // строчка «Показать?» — если на первом экране не ответили (окно закрыли кодом)
       return `<div class="tut-head"><b>🎓 ${esc(T.name)}</b></div><div class="tut-body">
         <div class="tut-text">Показать, с чего начать? За каждый шаг — λ ${BALANCE.tutorialReward}.</div>
         <div class="tut-acts"><button class="btn small gold" data-tut="go">Показать</button><button class="link" data-tut="skip">не нужно</button></div></div>`;

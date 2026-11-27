@@ -333,3 +333,14 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .tut-acts { margin-top: 5px; }
   .tut-say { font-size: 12px; padding: 3px 8px; }
 }
+
+/* первый экран нового игрока: плотнее */
+@media (orientation: landscape) and (max-height: 520px) {
+  .welcome .tut-hello { font-size: 22px; }
+  .welcome h2 { font-size: 19px; }
+  .welcome .story { font-size: 12.5px; margin: 4px 0 8px; }
+  .wc-points li { font-size: 12.5px; gap: 9px; }
+  .wc-ic, .wc-ic svg { width: 30px; height: 30px; }
+  .wc-offer { font-size: 12.5px; padding: 8px 10px; margin-bottom: 8px; }
+  .em-vignette svg { width: 40px; height: 40px; }
+}

@@ -106,6 +106,7 @@ const Game = {
   newGame() {
     const s = this.newState();
     s.introPending = true;
+    s.tutorial = { on: false, veteran: true, done: [] };   // игру уже знают: обучение не предлагаем (пройти можно во вкладке «Эпоха»)
     this.state = s;
     this.save();
     this.resetting = true;

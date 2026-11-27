@@ -41,7 +41,7 @@ const UI = {
       if (d) { this.folds[d.dataset.fold] = d.open; this.lastPanel = null; }
     }, true);
     $('#modal').addEventListener('click', e => {
-      if (e.target.id === 'modal') return this.closeModal();
+      if (e.target.id === 'modal') return this.modalSticky ? null : this.closeModal();
       const a = e.target.closest('[data-action], [data-pedia]');
       if (a && a.dataset.pedia) { this.closeModal(); return Pedia.open(a.dataset.pedia); }
       if (a) this.onModalAction(a);
@@ -49,7 +49,7 @@ const UI = {
     document.addEventListener('keydown', e => {
       if (!$('#study').classList.contains('hidden')) return;
       if (e.key === 'Escape') {
-        if (!$('#modal').classList.contains('hidden')) this.closeModal();
+        if (!$('#modal').classList.contains('hidden')) { if (!this.modalSticky) this.closeModal(); }
         else if (!$('#pedia').classList.contains('hidden')) Pedia.close();
         else if (School.isOpen()) School.close();
         else this.cancelPlacing();
@@ -579,7 +579,7 @@ const UI = {
     const st = s.stats;
     h += `<h3>Летопись</h3><div class="statline">Логоса заработано в этой игре: <b>${Math.floor(s.logosEarned)}</b> · поймано коз и вакханок: <b>${st.goats || 0}</b> · слов выучено: <b>${Decks.learnedCount(Learn.state)}</b>
       <button class="link" data-school="ov">📚 подробнее об учёбе</button></div>
-      <h3>Игра</h3>${s.tutorial && s.tutorial.skipped ? `<button class="btn small ghost" data-tut-restart>🎓 Пройти обучение «${esc(Cat.tutorial.name)}»</button> ` : ''}<button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
+      <h3>Игра</h3>${s.tutorial && !s.tutorial.on && !s.tutorial.offer && !s.tutorial.finished ? `<button class="btn small ghost" data-tut-restart>🎓 Пройти обучение «${esc(Cat.tutorial.name)}»</button> ` : ''}<button class="btn small ghost" data-school="reset">🏛️ Новая игра…</button>
       <div class="hint dim">Город начнётся заново, а колоды и выученные слова сохранятся.</div>`;
     if (this.dev) h += `<div class="dev"><b>dev:</b> <button class="btn small" data-dev="logos">+500 λ</button> <button class="btn small" data-dev="res">+1000 ресурсов</button> <button class="btn small" data-dev="goat">коза</button> <button class="btn small" data-dev="raid">набег</button></div>`;
     return h;
@@ -651,8 +651,10 @@ const UI = {
   },
 
   // ---------------- окна ----------------
-  showModal(html, { small = false, noX = false } = {}) {
+  /** sticky — окно закрывается только своими кнопками (не кликом мимо и не Esc): первый экран нового игрока. */
+  showModal(html, { small = false, noX = false, sticky = false } = {}) {
     if (this.modalLocked) return;   // вкладка остановлена — поверх ничего не открываем
+    this.modalSticky = sticky;
     $('#modalBox').className = 'modal-box' + (small ? ' small' : '');
     // телефон: окно на весь экран, закрыть — крестиком в углу (на компьютере крестика нет: там Esc и клик мимо)
     $('#modalBox').innerHTML = (noX ? '' : '<button class="m-x mob-only" data-action="close" title="Закрыть">✕</button>') + html;
@@ -663,7 +665,7 @@ const UI = {
     $('#modal').classList.add('hidden'); this.modalBuilding = null;
     const next = this.afterModal; this.afterModal = null;
     if (next) next();
-    if (typeof Tutorial !== 'undefined') Tutorial.afterOverlay();   // приветствие обучения — после вступления и выбора колод
+    if (typeof Tutorial !== 'undefined') Tutorial.afterOverlay();   // финал обучения, если он ждал, пока закроют окно
   },
 
   showBuilding(b) {
@@ -796,17 +798,17 @@ const UI = {
       <div class="hint dim">${done ? '' : 'Отправить без сделок — без штрафа. '}Следующий корабль придёт через ${Game.shipRules().every / 60} ${plural(Game.shipRules().every / 60, 'минуту', 'минуты', 'минут')} после отправления. ${this.pediaBtn('a:ships')}</div></div>`, { small: true });
   },
 
+  /** Окно эпохи: новая эпоха — или first: новая игра поверх прежней (игрок игру уже знает — только рассказ о начале пути;
+   *  совсем новому игроку — другой первый экран, Tutorial.showWelcome). */
   showEpoch(first = false) {
     const s = Game.state, E = Cat.epochs[s.epoch];
+    // картинки эпохи: круглая хижина, поле, козий загон и крестообразный идол на алтаре (святилище богини плодородия)
+    const vignette = first ? `<div class="em-vignette">${['house', 'field', 'goatpen'].map(t => Art.svg(Looks.icons(t, 1)[0])).join('')}${Art.svg('shrine1')}</div>` : '';
     let h = `<div class="epoch-modal"><div class="meander"></div>
-      <div class="dim">${first ? 'Начало пути' : 'Новая эпоха'}</div>
-      <h2>${esc(E.name)}</h2><div class="epoch-years">${esc(E.sub)}</div><p>${E.intro}</p>`;
-    if (first) h += `<p class="how"><b>Как играть.</b> Кликайте по лесу, холмам и полям, чтобы собирать ресурсы, стройте и улучшайте
-      жилища, поля и козьи загоны — город растёт сам. Но всё важное — знания, чудеса, высокие уровни зданий и переход
-      в новую эпоху — требует <b>λ Логоса</b>. Его не добыть ни киркой, ни торговлей: только решая карточки в «📜 Учиться».
-      Логос можно тратить с первых минут: во вкладке «Обряды» <b>Сбор припасов</b> за ${RITUAL_BY_ID.elders.logos} λ сразу даёт ресурсы,
-      а благословения удваивают производство. Можно и не спешить — поиграть без карточек, пока не упрётесь в λ.
-      Подробности — в <b>Кипропедии</b> (кнопка «?» вверху).</p>`;
+      <div class="dim">${first ? 'Новая игра · начало пути' : 'Новая эпоха'}</div>
+      <h2>${esc(E.name)}</h2><div class="epoch-years">${esc(E.sub)}</div>${vignette}
+      ${first ? `<p class="story">${esc(Cat.tutorial.story)}</p>` : ''}<p>${E.intro}</p>`;
+    if (first) h += `<p class="how">📚 Город начинается заново, а выученные слова, колоды и настройки учёбы — с вами.</p>`;
     const retired = first ? [] : (s.log || []).filter(e => e.k === 'retired' && e.p.epoch === s.epoch);
     if (retired.length) h += `<p class="how">🏛️ ${retired.map(e => esc(Msg.retiredLine(e.p.from, e.p.into, e.p.level, e.p.epoch))).join('; ')}. Бонусы этих чудес больше не действуют.</p>`;
     if (!first && !E.locked && s.epoch === 1) h += `<p class="how">Здания с 5-го уровня сменили облик на бронзовый, предел улучшения поднят до ${E.maxLevel}-го уровня, открыты новые знания и спецстроения.
@@ -822,26 +824,29 @@ const UI = {
       Земли больше не прибавится — город растёт вверх, а старое уходит по ходу эпохи: знания меняют ресурсы и здания (${'<a href="#" data-pedia="a:epochs">как это устроено</a>'}).
       «Народы моря» осели на берегах — теперь срок приходит для <b>дани Ассирии</b>, и Циклопические стены уменьшают её только вдвое.</p>`;
     if (E.locked) h += `<p class="how"><b>Это конец прототипа.</b> Вы провели Кипр от медно-каменного века до Рима. Спасибо!</p>`;
-    h += `<div class="em-actions">${first ? `<button class="btn ghost" data-pedia="a:basics">? Кипропедия</button>` : ''}
-      <button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'Дальше →' : 'Дальше'}</button></div></div>`;
+    h += `<div class="em-actions"><button class="btn gold" data-action="${first ? 'plan' : 'close'}">${first ? 'В путь →' : 'Дальше'}</button></div></div>`;
     this.showModal(h);
   },
 
   /** «Что будем учить?» — в начале каждой новой игры и из «Обучения». thenStudy — после выбора сразу начать раунд. */
   showLearnPlan(thenStudy = false) {
     const s = Learn.state, cur = Decks.planOf(s);
-    const started = Object.keys(s.progress).length > 0;
+    const started = Object.keys(s.progress).length > 0, tutRound = TUTORIAL_STEPS.find(S => S.round);
     this.planThenStudy = thenStudy;
     let h = `<div class="plan-modal"><div class="dim">Учёба</div><h2>Что будем учить?</h2>
       <p>Логос дают за карточки. Выберите, какие слова пойдут в раунды, — поменять можно в любой момент в «📚 Обучении».
       ${started ? 'Прогресс по всем словам сохранится, что бы вы ни выбрали.' : ''}</p>
+      ${started ? '' : `<p class="plan-help">Греческий с нуля — «${esc(Cat.plans.a1start.name)}». Знаете алфавит и самые частые слова — «${esc(Cat.plans.a1.name)}» или A2,
+        читаете и объясняетесь на бытовые темы — B1. Уже знакомые слова игра быстро отпустит.</p>`}
+      ${tutRound && Game.tutorialOn() && !Game.state.tutorial.done.includes(tutRound.id)
+        ? `<p class="plan-help">🎓 В обучении первый раунд короткий — ${tutRound.round} ${plural(tutRound.round, 'карточка', 'карточки', 'карточек')} из выбранных слов.</p>` : ''}
       <div class="plans">`;
     for (const id of Decks.plans(s)) {
       const P = Cat.plans[id], st = Decks.planStats(s, id);
-      const mark = started && id === cur;
-      h += `<button class="plan ${mark ? 'cur' : ''}" data-action="plan-pick" data-plan="${id}">
+      const mark = started && id === cur, tip = !started && id === 'a1start';   // новичку — подсказка, с чего начать
+      h += `<button class="plan ${mark || tip ? 'cur' : ''}" data-action="plan-pick" data-plan="${id}">
         <span class="plan-ico">${P.icon}</span>
-        <span class="plan-txt"><span class="plan-title"><b>${esc(P.name)}</b>${mark ? '<span class="badge">сейчас</span>' : ''}</span>
+        <span class="plan-txt"><span class="plan-title"><b>${esc(P.name)}</b>${mark ? '<span class="badge">сейчас</span>' : tip ? '<span class="badge">с нуля</span>' : ''}</span>
           <span class="plan-desc">${esc(P.desc)}</span>
           <span class="plan-meta">${st.words} ${plural(st.words, 'слово', 'слова', 'слов')}${st.learned ? ` · выучено ${st.learned}` : ''}</span></span>
       </button>`;
@@ -881,8 +886,8 @@ const UI = {
     if (act === 'confirm-yes') { const f = this.pendingConfirm; this.pendingConfirm = null; this.closeModal(); if (f) f(); return; }
     if (act === 'close') return this.closeModal();
     if (act === 'plan') return this.showLearnPlan();
-    if (act === 'tut-go') return Tutorial.start();
-    if (act === 'tut-skip') return Tutorial.skip();
+    if (act === 'welcome-tut') return Tutorial.welcome(true);
+    if (act === 'welcome-skip') return Tutorial.welcome(false);
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
     if (act === 'plan-keep') return this.pickPlan('keep');
     if (act === 'plan-manual') { delete Game.state.planPending; this.planThenStudy = false; this.closeModal(); return School.open('decks'); }

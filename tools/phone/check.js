@@ -144,9 +144,12 @@ function setupCity(ep) {
   await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset'); await page.waitForTimeout(500);
   await page.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
   if (await ev(() => document.body.classList.contains('fs-need'))) { await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
-  await ev(() => { Game.paused = true; delete Game.state.planPending; UI.closeModal(); });
-  await shot('12_tut_offer');
-  await page.tap('[data-action=tut-go]'); await page.waitForTimeout(200);
+  await ev(() => { Game.paused = true; });
+  await shot('12_welcome');
+  ok(await ev(() => !!$('#modal:not(.hidden) [data-action=welcome-tut]')), 'новый игрок: первый экран — в чём игра и обучение');
+  await page.tap('[data-action=welcome-tut]'); await page.waitForTimeout(200);
+  await shot('12b_plan');
+  await page.tap('[data-plan=a1start]'); await page.waitForTimeout(200);
   const arrow = () => ev(() => { Tutorial.update(); const r = $('#tutRing'), b = r.getBoundingClientRect(); return { on: !r.classList.contains('hidden'), x: b.left + b.width / 2, y: b.top + b.height / 2, in: b.left >= -2 && b.right <= innerWidth + 2 && b.top >= -2 && b.bottom <= innerHeight + 2, step: (Game.tutorialCurrent() || {}).id, say: $('.tut-say').textContent }; });
   let a = await arrow(); await shot('13_tut_gather');
   ok(a.on && a.in && a.step === 'gather', 'обучение: стрелка на клетке в пределах экрана');

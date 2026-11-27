@@ -805,3 +805,20 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .tut-modal .tut-hello { font-size: 30px; color: var(--gold); font-weight: 700; letter-spacing: .02em; }
 .tut-modal h2 { margin: 2px 0 10px; color: var(--accent); }
 .tut-modal p { text-align: left; line-height: 1.5; }
+/* первый экран нового игрока (Tutorial.showWelcome) и рассказ о начале пути для новой игры поверх прежней (UI.showEpoch(true)) */
+.modal-box:has(.welcome) { width: min(580px, 100%); }
+.welcome { text-align: center; }
+.welcome .tut-hello { font-size: 30px; color: var(--gold); font-weight: 700; }
+.welcome h2 { font-size: 24px; color: var(--accent); margin: 0 0 8px; }
+.welcome .story, .epoch-modal .story { text-align: left; font-style: italic; color: #5a4632; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 8px 0 12px; line-height: 1.5; font-size: 14px; }
+.wc-points { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 9px; text-align: left; }
+.wc-points li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
+.wc-ic { flex: none; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; }
+.wc-ic svg { width: 38px; height: 38px; }
+.wc-ic .wc-l { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 21px;
+  font-style: italic; color: #ffe08a; background: #3a2700; box-shadow: 0 0 0 3px #e9c25a; }   /* как медальон λ в шапке */
+.wc-ic .wc-e { font-size: 26px; }
+.wc-offer { text-align: left; background: #fff8dc; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--gold-l); padding: 10px 12px; font-size: 14px; line-height: 1.45; margin-bottom: 14px; }
+.em-vignette { display: flex; justify-content: center; gap: 14px; margin: 10px 0 4px; }
+.em-vignette svg { width: 54px; height: 54px; }
+.plan-modal > p.plan-help { font-size: 13px; color: var(--ink-2); margin: -4px 0 6px; }

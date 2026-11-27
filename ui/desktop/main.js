@@ -23,14 +23,20 @@
   Phone.init();   // телефон: подсказки по долгому нажатию, полный экран, режим улучшения
   Tutorial.init();   // обучение «Первые шаги»: карточка задания и стрелка (новой игре его предложат после вступления)
 
+  // Первый экран. Совсем новый игрок: в чём игра и обучение (Tutorial.showWelcome) → «Что будем учить?» → игра с обучением или без.
+  // Новая игра поверх прежней (игру уже знают): рассказ о начале пути в медно-каменном веке → «Что будем учить?» → игра.
   const firstScreen = () => {
-    if (!saved || Game.state.introPending) {
+    const t = Game.state.tutorial;
+    if (Game.state.introPending) {
       delete Game.state.introPending;
       Game.state.planPending = true;   // «Что будем учить?» — после вступления или перед первым раундом
       Game.log('hintGather');
       Game.log('hintLogos');
-      if (saved) Game.log('newGameKept');
+      Game.log('newGameKept');
       UI.showEpoch(true);
+    } else if (!saved || (t && t.offer)) {   // новый игрок — или он ещё не ответил на первом экране (перезагрузил страницу)
+      if (!saved) { Game.state.planPending = true; Game.log('hintGather'); Game.log('hintLogos'); }
+      Tutorial.showWelcome();
     } else if (away) UI.showAway(away);
   };
   // Телефоны и планшеты: честно предупреждаем, что игра сделана под компьютер (раз за сеанс)

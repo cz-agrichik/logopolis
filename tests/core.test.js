@@ -816,6 +816,9 @@ test('сохранение: новая игра не трогает обучен
   C2.get('Session').start(io);
   assert.equal(C2.get('Game').state.logos, 0);
   assert.ok(C2.get('Learn').state.progress.a);
+  // игру уже знают: вместо приветствия новичка — рассказ о начале пути, обучение не предлагается (пройти можно во вкладке «Эпоха»)
+  const t = C2.get('Game').state.tutorial;
+  assert.ok(C2.get('Game').state.introPending && t.veteran && !t.offer && !t.on);
 });
 
 test('две вкладки: старая не затирает новую игру — «отставшая» вкладка больше ничего не пишет', () => {
