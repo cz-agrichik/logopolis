@@ -11,6 +11,11 @@ const AccountUI = {
 
   init() {
     $('#accountBtn').addEventListener('click', () => this.showPanel());
+    // «Имя в игре»: Enter или «Сохранить» в окне «Вход и прогресс»
+    $('#modal').addEventListener('submit', e => {
+      const f = e.target.closest('[data-acc-name]');
+      if (f) { e.preventDefault(); this.saveName(f); }
+    });
     this.renderBtn();
   },
 
@@ -73,13 +78,19 @@ const AccountUI = {
   },
 
   // ---------- окно «Вход и прогресс» (кнопка 👤) ----------
-  showPanel() {
+  /** Окно «Вход и прогресс». editName — сразу открыть поле «Имя в игре». */
+  showPanel(editName = false) {
     const s = Account.state, on = Account.signedIn();
+    const via = `${esc(this.NAMES[s.provider])}${s.email ? ' · ' + esc(s.email) : s.username ? ' · @' + esc(s.username) : ''}`;
+    const nameRow = editName
+      ? `<form class="acc-name" data-acc-name><input name="n" maxlength="40" value="${esc(s.name || '')}" placeholder="Как вас называть в игре" autocomplete="nickname">
+          <button class="btn small gold" type="submit">Сохранить</button><button class="btn small ghost" type="button" data-action="acc-name-cancel">Отмена</button></form>`
+      : `<b>${esc(s.name || s.username || s.email || 'Без имени')}</b> <button class="link" data-action="acc-name-edit">✎ изменить имя</button>`;
     const who = on ? `<div class="acc-who">${s.photo ? `<img src="${esc(s.photo)}" alt="" referrerpolicy="no-referrer">` : '<span class="acc-av">👤</span>'}
-        <div><b>${esc(s.name || s.username || s.email || 'Без имени')}</b><small>${esc(this.NAMES[s.provider])}${s.email ? ' · ' + esc(s.email) : s.username ? ' · @' + esc(s.username) : ''}</small></div></div>` : '';
+        <div class="acc-who-t">${nameRow}<small>${via}</small></div></div>` : '';
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>${on ? 'Вы вошли' : 'Вход'}</h2>
-      ${on ? `${who}<p>Пока вход только запоминает вас: прогресс хранится в этом браузере. Синхронизация между устройствами — в работе;
-        когда она появится, город и слова поедут за вами.</p>
+      ${on ? `${who}<p>Вы в списке игроков под этим именем${s.profilePending ? ' (запишем, как только будет связь)' : ''}. Прогресс пока хранится в этом браузере:
+        синхронизация между устройствами — в работе; когда она появится, город и слова поедут за вами.</p>
         <div class="em-actions"><button class="btn ghost small" data-action="auth-out">Выйти</button><button class="btn gold" data-action="close">Готово</button></div>`
       : `<p><b>Сейчас вы играете без входа</b> — прогресс хранится только в этом браузере.</p>${this.whyHtml()}${this.buttonsHtml('panel')}
         <div class="em-actions"><button class="btn ghost small" data-action="close">Пока без входа</button></div>`}
@@ -116,6 +127,16 @@ const AccountUI = {
     this.after(ctx);
   },
   guest(ctx) { Account.chooseGuest(); this.after(ctx); },
+  /** Сохранить имя в игре (форма в окне «Вход и прогресс»). */
+  async saveName(form) {
+    const btn = form.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Сохраняем…';
+    const r = await Account.setName(form.elements.n.value);
+    if (!r.ok) { btn.disabled = false; btn.textContent = 'Сохранить'; return UI.toast(r.error === 'emptyName' ? 'Имя не может быть пустым' : 'Сначала войдите'); }
+    this.renderBtn();
+    UI.toast(r.pending ? '👤 Имя сохранено здесь — в список игроков запишем, как только будет связь' : `👤 Теперь вы — <b>${esc(Account.state.name)}</b>`);
+    this.showPanel();
+  },
   async signOut() { await Account.signOut(); this.renderBtn(); UI.toast('👤 Вы вышли. Город и слова остались в этом браузере.'); this.showPanel(); },
   /** Куда дальше после входа или «без входа». */
   after(ctx) {

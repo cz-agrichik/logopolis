@@ -1,0 +1,33 @@
+// Правила доступа к Firestore проекта logos-cyprus — список игроков (platform/account.js, saveProfile).
+// Куда вставлять: консоль Firebase → Databases & Storage → Firestore Database → вкладка «Rules» → заменить всё этим → Publish.
+// Игрок читает и пишет только свою строку users/<его uid в Firebase>; удалить строку, читать чужие и писать что-то ещё нельзя.
+// Владелец проекта видит всё в консоли — правила на консоль не действуют.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      function own() { return request.auth != null && request.auth.uid == uid; }
+      function valid() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['provider', 'name', 'providerName', 'email', 'tgId', 'tgUsername', 'photo', 'browserId',
+                                 'createdAt', 'lastLoginAt', 'updatedAt'])
+          && d.provider in ['google', 'telegram']
+          && d.name is string && d.name.size() <= 40
+          && d.providerName is string && d.providerName.size() <= 200
+          && (d.email == null || (d.email is string && d.email.size() <= 200))
+          && (d.photo == null || (d.photo is string && d.photo.size() <= 1000))
+          && (d.tgId == null || (d.tgId is string && d.tgId.size() <= 40))
+          && (d.tgUsername == null || (d.tgUsername is string && d.tgUsername.size() <= 64))
+          && d.browserId is string && d.browserId.size() <= 60;
+      }
+      allow read: if own();
+      allow create: if own() && valid();
+      allow update: if own() && valid() && request.resource.data.createdAt == resource.data.createdAt;   // дату регистрации не переписать
+      allow delete: if false;
+    }
+    // всё остальное — закрыто
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

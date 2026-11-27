@@ -34,7 +34,8 @@
     <div class="dim">Игра «Λόγος · Кипр сквозь эпохи» и библиотека греческих текстов на сайте grecheskiy.com · обновлено 27 ноября 2026 г.</div>
 
     <div class="short"><b>Коротко.</b> Игра работает в вашем браузере, и прогресс хранится там же. Войти через Google или Telegram
-      необязательно; если вошли, мы знаем ваше имя и, в случае Google, почту — только чтобы узнавать вас. Мы ничего не продаём,
+      необязательно; если вошли, вы попадаете в список игроков: имя в игре, почта (Google) или @ник (Telegram), фото — чтобы узнавать вас.
+      Прогресс игры в список не попадает. Мы ничего не продаём,
       рекламы нет, данные не передаём никому, кроме перечисленных ниже сервисов, без которых сайт не работает.</div>
 
     <h2>1. Что хранится в вашем браузере</h2>
@@ -51,52 +52,64 @@
     <h2>2. Вход через Google</h2>
     <p>Вход работает через Firebase Authentication (сервис Google). При первом входе Google спросит согласия и передаст нам ваше имя,
       адрес почты, фото профиля и идентификатор аккаунта Google. Пароль от Google мы не видим никогда.</p>
-    <p>Firebase хранит учётную запись входа: идентификатор, почту, имя, фото, даты регистрации и последнего входа. Эти данные видит только
-      владелец сайта, и нужны они только для того, чтобы узнавать вас при следующем входе. Подробнее о том, как Google обрабатывает данные, —
+    <p>Firebase хранит учётную запись входа: идентификатор, почту, имя, фото, даты регистрации и последнего входа; кроме того, вы попадаете
+      в список игроков (п. 4). Подробнее о том, как Google обрабатывает данные, —
       в <a href="https://policies.google.com/privacy" rel="noopener">политике конфиденциальности Google</a> и
       <a href="https://firebase.google.com/support/privacy" rel="noopener">документах Firebase</a>.</p>
 
     <h2>3. Вход через Telegram</h2>
     <p>Вход работает через официальный «Log In With Telegram». Telegram передаёт ваш идентификатор, имя, имя пользователя и фото профиля
-      (телефон и право писать вам мы не запрашиваем). Эти данные сохраняются только в вашем браузере (см. п. 1); на наш сервер они не отправляются.</p>
+      (телефон и право писать вам мы не запрашиваем). Эти данные сохраняются в вашем браузере (п. 1) и в списке игроков (п. 4). Чтобы записать
+      вас в список, браузер заводит в Firebase Authentication анонимную учётную запись — без имени и почты, только служебный идентификатор.</p>
 
-    <h2>4. Синхронизация между устройствами</h2>
+    <h2>4. Список игроков</h2>
+    <p>Всех, кто вошёл, мы записываем в список игроков — базу данных Firebase Firestore (Google). Для каждого игрока там хранятся:</p>
+    <ul>
+      <li>способ входа (Google или Telegram) и имя в игре — его можно поменять в окне «Вход и прогресс»;</li>
+      <li>имя в Google или Telegram, почта (Google), идентификатор и имя пользователя Telegram, ссылка на фото профиля;</li>
+      <li>номер браузера в игре (п. 1), даты первого и последнего входа и последнего изменения.</li>
+    </ul>
+    <p>Прогресс игры (город, слова, библиотека) в список не попадает. Свою строку игрок может читать и менять только сам — из игры;
+      весь список видит только владелец сайта. Нужен он, чтобы знать, кто играет, и подготовить синхронизацию между устройствами.</p>
+
+    <h2>5. Синхронизация между устройствами</h2>
     <p>Сейчас её нет: прогресс хранится только в браузере. Когда она появится, город и учёба вошедших игроков будут храниться
       в базе данных Firebase (Google) под их учётной записью, чтобы открываться на других устройствах. Доступ к записи будет только у самого игрока
       и у владельца сайта. Перед этим мы обновим эту страницу.</p>
 
-    <h2>5. Статистика посещений</h2>
+    <h2>6. Статистика посещений</h2>
     <p>Опубликованный сайт использует <a href="https://metrika.yandex.ru/" rel="noopener">Яндекс Метрику</a>: она считает посещения
       и собирает обезличенные данные о них — страницы, клики и прокрутку, в том числе запись действий на странице (Вебвизор), тип устройства
       и браузера, примерное местоположение по IP. Метрика ставит свои cookie. Это нужно, чтобы понимать, как люди играют, и делать игру удобнее.
       Отказаться можно, например, с помощью <a href="https://yandex.ru/support/metrica/general/opt-out.html" rel="noopener">блокировщика Метрики</a>
       или любого блокировщика рекламы. Обработка — по <a href="https://yandex.ru/legal/confidential/" rel="noopener">политике Яндекса</a>.</p>
 
-    <h2>6. Что ещё грузится со сторонних серверов</h2>
+    <h2>7. Что ещё грузится со сторонних серверов</h2>
     <ul>
       <li>шрифты — с Google Fonts;</li>
-      <li>библиотеки входа — с серверов Google (Firebase) и Telegram, только когда вы нажимаете «Войти»;</li>
+      <li>библиотеки входа и списка игроков — с серверов Google (Firebase) и Telegram, только когда вы входите или уже вошли;</li>
       <li>озвучка слов — встроенными голосами вашего браузера или системы.</li>
     </ul>
     <p>Эти серверы, как и любые, видят ваш IP-адрес и адрес страницы, с которой пришёл запрос.</p>
 
-    <h2>7. Ваши права</h2>
-    <p>Вы можете в любой момент выйти из аккаунта (кнопка 👤 в игре), стереть данные в браузере (п. 1), а также попросить удалить
-      учётную запись входа из Firebase или узнать, что о вас хранится, — напишите нам. Ответим и удалим.</p>
+    <h2>8. Ваши права</h2>
+    <p>Вы можете в любой момент выйти из аккаунта (кнопка 👤 в игре), поменять имя в игре, стереть данные в браузере (п. 1), а также попросить
+      удалить вашу строку из списка игроков и учётную запись входа из Firebase или узнать, что о вас хранится, — напишите нам. Ответим и удалим.</p>
 
-    <h2>8. Дети</h2>
+    <h2>9. Дети</h2>
     <p>Игра не предназначена специально для детей и не собирает сведения о возрасте. Если вы родитель и считаете, что ребёнок вошёл
       без вашего ведома, напишите — удалим учётную запись.</p>
 
-    <h2>9. Контакты</h2>
+    <h2>10. Контакты</h2>
     <p>Вопросы о данных и просьбы об удалении: <a id="contact" href="mailto:grichikandrey@gmail.com">grichikandrey@gmail.com</a>.</p>
 
     <div class="en">
       <b>Summary in English.</b> Λόγος (grecheskiy.com) is a browser game for learning Greek. Game and learning progress is stored locally
       in your browser (localStorage). Signing in is optional. With Google sign-in (Firebase Authentication) we receive your name, email address,
-      profile photo and Google account ID, used only to recognise you; Firebase keeps the sign-in record (ID, email, name, photo, sign-up and
-      last sign-in dates), visible only to the site owner. With Telegram sign-in we receive your Telegram ID, name, username and photo, stored only in
-      your browser. We do not sell data, show ads or share data with third parties beyond the services needed to run the site: Google (Firebase,
+      profile photo and Google account ID; with Telegram sign-in — your Telegram ID, name, username and photo (an anonymous Firebase account is
+      created to store it). Signed-in players are listed in a players list in Firebase Firestore: sign-in method, in-game name (editable),
+      provider name, email or Telegram ID and username, photo URL, in-game browser number and sign-in dates. Game progress is not stored there.
+      Each player can read and edit only their own entry; the full list is visible only to the site owner. We do not sell data, show ads or share data with third parties beyond the services needed to run the site: Google (Firebase,
       Google Fonts), Telegram (sign-in) and Yandex Metrica (visit statistics, including session replay, with cookies). Cross-device sync does
       not exist yet; when added, progress of signed-in players will be stored in Firebase and this page will be updated. To delete your data, use
       “Стереть всё” in the game, sign out, or contact us at <a href="mailto:grichikandrey@gmail.com">grichikandrey@gmail.com</a>.

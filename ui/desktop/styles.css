@@ -846,6 +846,12 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .acc-who img, .acc-who .acc-av { width: 44px; height: 44px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 26px; background: var(--parch-2); }
 .acc-who b { display: block; font-size: 16px; }
 .acc-who small { color: var(--ink-2); font-size: 12.5px; }
+.acc-who-t { flex: 1; min-width: 0; }
+.acc-who-t b { display: inline; overflow-wrap: anywhere; }
+.acc-who-t .link { margin-left: 4px; white-space: nowrap; }
+.acc-who-t small { display: block; overflow-wrap: anywhere; }
+.acc-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
+.acc-name input { flex: 1 1 160px; min-width: 0; font: inherit; font-size: 16px; padding: 6px 8px; border: 1px solid var(--parch-2); border-radius: 8px; background: #fff; color: var(--ink); }
 .acc-id { margin-top: 10px; font-size: 11px; }
 .acc-offer { text-align: left; background: #fff8dc; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--gold-l); padding: 10px 12px; font-size: 14px; line-height: 1.45; margin: 4px 0 14px; }
 .acc-offer .acc-btns { margin: 10px auto 2px; flex-direction: row; max-width: none; justify-content: center; }

@@ -876,6 +876,8 @@ const UI = {
     if (act === 'auth') return AccountUI.signIn(a.dataset.provider, a.dataset.ctx);
     if (act === 'auth-guest') return AccountUI.guest(a.dataset.ctx);
     if (act === 'auth-out') return AccountUI.signOut();
+    if (act === 'acc-name-edit') { AccountUI.showPanel(true); const i = $('#modalBox [data-acc-name] input'); if (i) { i.focus(); i.select(); } return; }
+    if (act === 'acc-name-cancel') return AccountUI.showPanel();
     if (act === 'welcome-tut') return Tutorial.welcome(true);
     if (act === 'welcome-skip') return Tutorial.welcome(false);
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
