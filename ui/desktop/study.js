@@ -8,6 +8,8 @@ const Study = {
   open: false,
 
   start() {
+    // вошли в аккаунт: сначала дождаться сверки с ним при запуске (ui/desktop/account.js)
+    if (typeof AccountUI !== 'undefined' && AccountUI.waitBeforeStudy(() => this.start())) return;
     // раунд из обучения «Первые шаги» — короткий (TUTORIAL_STEPS: round)
     const round = Lesson.plan(Learn.state, typeof Tutorial !== 'undefined' ? Tutorial.roundSize() : null);
     if (!round) return UI.toast('Нет активных карточек — включите или импортируйте колоду в «📚 Обучении»');

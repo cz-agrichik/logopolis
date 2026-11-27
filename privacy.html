@@ -35,7 +35,7 @@
 
     <div class="short"><b>Коротко.</b> Игра работает в вашем браузере, и прогресс хранится там же. Войти через Google или Telegram
       необязательно; если вошли, вы попадаете в список игроков: имя в игре, почта (Google) или @ник (Telegram), фото — чтобы узнавать вас.
-      Прогресс игры в список не попадает. Мы ничего не продаём,
+      Учёба вошедших хранится и в аккаунте, чтобы открываться на других устройствах. Мы ничего не продаём,
       рекламы нет, данные не передаём никому, кроме перечисленных ниже сервисов, без которых сайт не работает.</div>
 
     <h2>1. Что хранится в вашем браузере</h2>
@@ -69,13 +69,13 @@
       <li>имя в Google или Telegram, почта (Google), идентификатор и имя пользователя Telegram, ссылка на фото профиля;</li>
       <li>номер браузера, в котором вы играете сейчас (п. 1; по нему другие ваши браузеры узнают, что устарели), даты первого и последнего входа и последнего изменения.</li>
     </ul>
-    <p>Прогресс игры (город, слова, библиотека) в список не попадает. Строку игрока записывает игра в его браузере;
-      весь список видит только владелец сайта. Нужен он, чтобы знать, кто играет, и подготовить синхронизацию между устройствами.</p>
+    <p>Строку игрока записывает игра в его браузере; весь список видит только владелец сайта.</p>
 
-    <h2>5. Синхронизация между устройствами</h2>
-    <p>Сейчас её нет: прогресс хранится только в браузере. Когда она появится, город и учёба вошедших игроков будут храниться
-      в базе данных Firebase (Google) под их учётной записью, чтобы открываться на других устройствах. Доступ к записи будет только у самого игрока
-      и у владельца сайта. Перед этим мы обновим эту страницу.</p>
+    <h2>5. Учёба в аккаунте</h2>
+    <p>У вошедших игроков учёба хранится не только в браузере, но и в аккаунте — в той же базе Firebase Firestore, рядом со строкой игрока:
+      прогресс по словам, свои колоды (в том числе «Слова из чтения»), какие колоды включены, настройки учёбы, журнал занятий по дням
+      и счётчики ответов. Так учёба открывается на других устройствах. Город, библиотека и ваши тексты в читалке пока хранятся
+      только в браузере; когда они тоже переедут в аккаунт, мы обновим эту страницу.</p>
 
     <h2>6. Статистика посещений</h2>
     <p>Опубликованный сайт использует <a href="https://metrika.yandex.ru/" rel="noopener">Яндекс Метрику</a>: она считает посещения
@@ -94,7 +94,7 @@
 
     <h2>8. Ваши права</h2>
     <p>Вы можете в любой момент выйти из аккаунта (кнопка 👤 в игре), поменять имя в игре, стереть данные в браузере (п. 1), а также попросить
-      удалить вашу строку из списка игроков и учётную запись входа из Firebase или узнать, что о вас хранится, — напишите нам. Ответим и удалим.</p>
+      удалить вашу строку из списка игроков, учёбу из аккаунта и учётную запись входа из Firebase или узнать, что о вас хранится, — напишите нам. Ответим и удалим.</p>
 
     <h2>9. Дети</h2>
     <p>Игра не предназначена специально для детей и не собирает сведения о возрасте. Если вы родитель и считаете, что ребёнок вошёл
@@ -113,10 +113,12 @@
       in your browser (localStorage). Signing in is optional. With Google sign-in (Firebase Authentication) we receive your name, email address,
       profile photo and Google account ID; with Telegram sign-in — your Telegram ID, name, username and photo (an anonymous Firebase account is
       created to store it). Signed-in players are listed in a players list in Firebase Firestore: sign-in method, in-game name (editable),
-      provider name, email or Telegram ID and username, photo URL, in-game browser number and sign-in dates. Game progress is not stored there.
+      provider name, email or Telegram ID and username, photo URL, in-game browser number and sign-in dates. Signed-in players' learning progress
+      (word progress, own decks, enabled decks, learning settings, daily log and answer counters) is also stored in Firestore so it is available
+      on other devices; the city, library and reader texts stay in the browser for now.
       Entries are written by the game in the player's browser; the full list is visible only to the site owner. We do not sell data, show ads or share data with third parties beyond the services needed to run the site: Google (Firebase,
-      Google Fonts), Telegram (sign-in) and Yandex Metrica (visit statistics, including session replay, with cookies). Cross-device sync does
-      not exist yet; when added, progress of signed-in players will be stored in Firebase and this page will be updated. To delete your data, use
+      Google Fonts), Telegram (sign-in) and Yandex Metrica (visit statistics, including session replay, with cookies). When the city or reader texts move to the account,
+      this page will be updated. To delete your data, use
       “Стереть всё” in the game, sign out, or contact us at <a href="mailto:grichikandrey@gmail.com">grichikandrey@gmail.com</a>.
       The game, library and website are provided free of charge “AS IS”, without warranties of any kind, express or implied, including
       availability, preservation of progress or data, accuracy and fitness for a particular purpose; we are not liable for any damages

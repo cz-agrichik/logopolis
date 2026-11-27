@@ -827,6 +827,8 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 /* вход (ui/desktop/account.js): кнопка 👤 в шапке, окно «Вход и прогресс», шаг на старте, блок в финале обучения */
 .acc-btn { position: relative; }
 .acc-btn.on::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 9px; height: 9px; border-radius: 50%; background: #6fd36f; box-shadow: 0 0 0 2px #6e2d14; }
+.acc-btn.on.pending::after { background: #f0b429; }   /* есть изменения, ещё не записанные в аккаунт */
+.acc-sync h2 { margin: 6px 0 4px; }
 .modal-box:has(.acc-modal) { width: min(500px, 100%); }
 .acc-modal { text-align: center; }
 .acc-modal h2 { font-size: 24px; color: var(--accent); margin: 2px 0 8px; }

@@ -1,6 +1,7 @@
 // Правила доступа к Firestore проекта logos-cyprus — список игроков (platform/account.js).
 // Куда вставлять: консоль Firebase → Databases & Storage → Firestore Database → вкладка «Rules» → заменить всё этим → Publish.
 // Строка — users/<главный id аккаунта>: 'google:<uid в Firebase>' или 'telegram:<номер в Telegram>'.
+// Данные аккаунта — users/<id>/data/<часть>: сейчас learn (обучение — сжатое gzip в gz или JSON строкой в json).
 // Удалять строки, писать что-то ещё и лишние поля нельзя.
 // Владелец проекта видит всё в консоли — правила на консоль не действуют.
 rules_version = '2';
@@ -29,6 +30,23 @@ service cloud.firestore {
       allow create: if mine() && valid();
       allow update: if mine() && valid() && request.resource.data.createdAt == resource.data.createdAt;   // дату регистрации не переписать
       allow delete: if false;
+
+      // данные аккаунта по частям: learn — обучение (дальше — city и др.)
+      match /data/{part} {
+        function validPart() {
+          let d = request.resource.data;
+          return part in ['learn']
+            && d.keys().hasOnly(['gz', 'json', 'size', 'browserId', 'updatedAt'])
+            && (d.gz is bytes || d.json is string)
+            && (!('gz' in d) || d.gz.size() <= 1000000)
+            && (!('json' in d) || d.json.size() <= 1000000)
+            && d.size is int
+            && d.browserId is string && d.browserId.size() <= 60;
+        }
+        allow read: if mine();
+        allow create, update: if mine() && validPart();
+        allow delete: if false;
+      }
     }
     // всё остальное — закрыто
     match /{document=**} {

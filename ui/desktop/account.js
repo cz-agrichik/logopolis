@@ -19,7 +19,39 @@ const AccountUI = {
     this.renderBtn();
     // вошли раньше: этот браузер главный — дописать незаписанное; под аккаунтом зашли в другом браузере — этот устарел
     Account.onStale = () => this.showStale();
-    if (Account.signedIn()) Account.sync().then(r => this.synced(r, 'start'));
+    Account.onBusy = on => { if (on) this.showSyncing(); };   // сверка при входе: ждём (следующий экран сменит это окно)
+    Account.onChange = () => this.renderBtn();
+    this.startSync = Account.signedIn() ? Account.sync().then(r => { this.startSyncDone = true; this.synced(r, 'start'); }) : null;
+    // обучение уходит в аккаунт раз в несколько секунд; вкладку прячут или закрывают, появилась сеть — дописать сразу
+    document.addEventListener('visibilitychange', () => { if (document.hidden) Account.flush(); });
+    window.addEventListener('pagehide', () => Account.flush());
+    window.addEventListener('online', () => Account.flush());
+  },
+  /** Окно «Сверяемся с аккаунтом…» — пока идёт обмен с аккаунтом; закрыть нельзя. */
+  showSyncing() {
+    this.syncing = true;
+    UI.showModal(`<div class="epoch-modal acc-sync"><h2>☁️ Сверяемся с аккаунтом…</h2><p class="dim">Это несколько секунд.</p></div>`, { small: true, noX: true, sticky: true });
+  },
+  /** Раунд карточек — только после первой сверки с аккаунтом при запуске (этот браузер мог устареть, учёба могла поменяться).
+   *  true — подождём (не дольше 10 секунд: без сети играем как есть) и запустим сами. */
+  waitBeforeStudy(go) {
+    if (!this.startSync || this.startSyncDone) return false;
+    this.showSyncing();
+    Promise.race([this.startSync, new Promise(r => setTimeout(r, 10000))]).then(() => {
+      this.syncing = false;
+      if (Account.stale || Account.reloadNeeded) return;   // своё окно уже на экране
+      this.startSyncDone = true;
+      UI.closeModal();   // спросить «Что оставить?», если нужно, — тут же (synced ждёт, пока закроют окно)
+      if (!Account.held) go();
+    });
+    return true;
+  },
+  /** В браузер легло обучение из аккаунта — перезагрузить страницу (окно на мгновение, чтобы было понятно, что происходит). */
+  reloadIfNeeded(text = 'Загружаем ваш прогресс из аккаунта…') {
+    if (!Account.reloadNeeded) return false;
+    UI.lockWith(`<div class="epoch-modal"><h2>☁️ ${esc(text)}</h2></div>`);
+    setTimeout(() => BrowserIO.restart(), 600);
+    return true;
   },
 
   /** Кнопка 👤: вошёл — зелёная точка и имя в подсказке. */
@@ -27,7 +59,8 @@ const AccountUI = {
     const s = Account.state, on = Account.signedIn();
     const b = $('#accountBtn');
     b.classList.toggle('on', on);
-    b.title = on ? `Вход: ${this.NAMES[s.provider]} — ${s.name || s.username || s.email}. Нажмите, чтобы посмотреть или выйти`
+    b.classList.toggle('pending', on && !!s.profilePending);   // жёлтая точка: есть изменения, ещё не записанные в аккаунт
+    b.title = on ? `Вход: ${this.NAMES[s.provider]} — ${s.name || s.username || s.email}.${s.profilePending ? ' Есть изменения, ещё не записанные в аккаунт.' : ''} Нажмите, чтобы посмотреть или выйти`
       : `Вход и прогресс: ${s.name ? s.name + ', в' : 'с'}ейчас вы играете без входа — всё хранится в этом браузере`;
     const rail = $('#rail [data-open="account"] span');
     if (rail) rail.textContent = on ? 'Профиль' : 'Вход';
@@ -57,11 +90,11 @@ const AccountUI = {
   },
   /** Где кнопка входа на потом. */
   whereLater() { return 'кнопка 👤 вверху справа'; },
-  /** Что даёт вход и что значит «без входа» — честно: синхронизации ещё нет. */
+  /** Что даёт вход и что значит «без входа» — честно: слова уже в аккаунте, город — пока нет. */
   whyHtml() {
     return `<div class="acc-two">
-      <div><b>👤 Со входом</b> Игра запомнит вас. Когда появится синхронизация (она в работе), город, выученные слова и настройки учёбы
-        поедут за вами на телефон и другой компьютер.</div>
+      <div><b>👤 Со входом</b> Выученные слова, колоды и настройки учёбы хранятся в аккаунте и едут за вами на телефон
+        и другой компьютер. Город пока остаётся в этом браузере — его перенос в работе.</div>
       <div><b>💾 Без входа</b> Всё хранится только <b>в этом браузере</b> на этом устройстве. В другом браузере или на телефоне начнёте
         с нуля, а очистка данных сайта сотрёт прогресс.</div></div>
       <p class="dim">Передумаете — войти можно в любой момент: ${this.whereLater()}. Что и где хранится —
@@ -94,8 +127,8 @@ const AccountUI = {
     const who = `<div class="acc-who">${on && s.photo ? `<img src="${esc(s.photo)}" alt="" referrerpolicy="no-referrer">` : '<span class="acc-av">👤</span>'}
         <div class="acc-who-t">${nameRow}<small>${via}</small></div></div>`;
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>${on ? 'Вы вошли' : 'Вход'}</h2>
-      ${on ? `${who}<p>Вы в списке игроков под этим именем${s.profilePending ? ' (запишем, как только будет связь)' : ''}. Прогресс пока хранится в этом браузере:
-        синхронизация между устройствами — в работе; когда она появится, город и слова поедут за вами.</p>
+      ${on ? `${who}<p>Учёба — слова, колоды, настройки — хранится в аккаунте${s.profilePending ? ' (последние изменения запишем, как только будет связь)' : ''}:
+        войдите на другом устройстве — и продолжите с того же места. Город пока остаётся в этом браузере.</p>
         <div class="em-actions"><button class="btn ghost small" data-action="auth-out">Выйти</button><button class="btn gold" data-action="close">Готово</button></div>`
       : `${who}<p><b>Сейчас вы играете без входа</b> — прогресс хранится только в этом браузере.</p>${this.whyHtml()}${this.buttonsHtml('panel')}
         <div class="em-actions"><button class="btn ghost small" data-action="close">Пока без входа</button></div>`}
@@ -108,7 +141,7 @@ const AccountUI = {
     if (Account.signedIn()) return '';
     Account.markAsked('AfterTutorial');
     return `<div class="acc-offer"><b>💾 Сохраните прогресс.</b> Сейчас вы играете без входа: город и слова хранятся только в этом браузере.
-      Войдите — игра запомнит вас, а когда появится синхронизация, прогресс поедет за вами на другие устройства.${this.buttonsHtml('finish')}
+      Войдите — выученные слова будут храниться в аккаунте и поедут за вами на другие устройства.${this.buttonsHtml('finish')}
       <div class="dim">Можно и дальше без входа — войти можно в любой момент: ${this.whereLater()}.</div></div>`;
   },
 
@@ -121,15 +154,20 @@ const AccountUI = {
     if (btn) { btn.disabled = true; btn.dataset.label = btn.innerHTML; btn.textContent = 'Входим…'; }
     const r = await Account.signIn(p);
     this.busy = false;
+    const wasSyncing = this.syncing;
+    this.syncing = false;
     this.renderBtn();
     if (!r.ok) {
-      if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.label; }
+      if (wasSyncing) this.after(ctx);   // окно «Сверяемся…» — вернуть туда, откуда входили
+      else if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.label; }
       if (r.error !== 'cancelled') UI.toast(esc(this.errorText(r.error, p)));
       return;
     }
     if (r.result === 'ask') return this.showChoice(ctx);
+    if (this.reloadIfNeeded()) return;   // в этом браузере учёбы не было — взяли её из аккаунта
     const s = Account.state;
-    UI.toast(`👤 Вы вошли через ${this.NAMES[p]}${s.name ? ': <b>' + esc(s.name) + '</b>' : ''}`);
+    UI.toast(`👤 Вы вошли через ${this.NAMES[p]}${s.name ? ': <b>' + esc(s.name) + '</b>' : ''}`
+      + (r.result === 'pending' ? '. С аккаунтом сверимся, как только будет связь' : ''));
     this.after(ctx);
   },
   guest(ctx) { Account.chooseGuest(); this.after(ctx); },
@@ -142,23 +180,34 @@ const AccountUI = {
     this.renderBtn();
     if (r.result === 'ask') return this.showChoice('panel');
     if (r.result === 'stale') return;   // окно «Этот браузер устарел» уже на экране
+    if (this.reloadIfNeeded()) return;
     UI.toast(r.result === 'pending' ? '👤 Имя сохранено здесь — в аккаунт запишем, как только будет связь' : `👤 Теперь вы — <b>${esc(Account.state.name)}</b>`);
     this.showPanel();
   },
 
   // ---------- «Что оставить?» — в браузере и в аккаунте разное ----------
-  // 🚨 Только при входе. Здесь одна версия затирается навсегда (сейчас имя, потом город). Поэтому: под каждой кнопкой красным —
+  // 🚨 Только при входе. Здесь одна версия затирается навсегда (имя, учёба; потом город). Поэтому: под каждой кнопкой красным —
   // что пропадёт; второй экран «Точно заменить?» с тем же списком; кнопка «Да, заменить» оживает через 3 секунды.
   // Без второго экрана Account.choose ничего не заменит (confirmed).
-  /** Как показать части версии (Account.parts): сейчас имя; город и учёба добавятся сюда же. */
-  partsHtml(v) {
-    return `<div class="acc-ver-l">Имя в игре: <b>${v.name ? esc(v.name) : '—'}</b></div>`;
+  /** Учёба одной строкой: «выучено 120 слов · в работе 35 · своих колод 2». */
+  learnText(L) {
+    const n = Learn.summary(L), bits = [`выучено ${n.learned} ${plural(n.learned, 'слово', 'слова', 'слов')}`];
+    if (n.learning) bits.push(`в работе ${n.learning}`);
+    if (n.own) bits.push(`${n.own} ${plural(n.own, 'своя колода', 'свои колоды', 'своих колод')}`);
+    return bits.join(' · ');
   },
-  /** Что пропадёт, списком — по частям версии, которые не пусты. */
-  lossList(v) {
-    const items = [];
-    if (v.name) items.push(`имя в игре «${esc(v.name)}»`);
-    return items.length ? `<ul>${items.map(x => `<li>${x}</li>`).join('')}</ul>` : '<ul><li>ничего — там пусто</li></ul>';
+  /** Как показать версию (части Account.parts): имя и учёба; город добавится сюда же. */
+  partsHtml(v) {
+    const L = v.learn, n = L ? Learn.summary(L) : null;
+    const learn = L == null ? '—' : Learn.isEmptySnap(L) ? 'ещё не начинали' : esc(this.learnText(L));
+    return `<div class="acc-ver-l">Имя в игре: <b>${v.name ? esc(v.name) : '—'}</b></div>
+      <div class="acc-ver-l">Учёба: <b>${learn}</b></div>${n && n.last ? `<small>${this.when(n.last, 'последнее занятие')}</small>` : ''}`;
+  },
+  /** Что пропадёт у victim, если взять winner (Account.losses), списком. */
+  lossList(victim, winner) {
+    const items = Account.losses(victim, winner).map(k => k === 'name' ? `имя в игре «${esc(victim.name)}»`
+      : k === 'learn' ? `учёба: ${esc(this.learnText(victim.learn))}` : esc(k));
+    return items.length ? `<ul>${items.map(x => `<li>${x}</li>`).join('')}</ul>` : '<ul><li>ничего</li></ul>';
   },
   when(ms, verb) {
     return ms ? `${verb} ${esc(new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }))}` : '';
@@ -169,17 +218,16 @@ const AccountUI = {
     if (!c) return this.after(ctx);
     this.choiceCtx = ctx;
     const prov = esc(this.NAMES[c.provider]);
-    const at = (ms, verb) => ms ? `<small>${this.when(ms, verb)}</small>` : '';
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>Что оставить?</h2>
       <p>В этом браузере и в аккаунте ${prov} сохранено разное. Выберите одно — им заменим другое.
         Смешивать по частям не будем: так ничего не перепутается.</p>
       <div class="acc-two acc-vers">
-        <div><b>💻 Этот браузер</b>${this.partsHtml(c.local)}${at(c.localAt, 'изменено')}
+        <div><b>💻 Этот браузер</b>${this.partsHtml(c.local)}
           <button class="btn gold" data-action="acc-pick" data-pick="local">Оставить это</button>
-          <small>в аккаунте станет так же</small><div class="acc-lost">⚠️ Пропадёт из аккаунта: ${this.lossList(c.remote)}</div></div>
-        <div><b>☁️ Аккаунт ${prov}</b>${this.partsHtml(c.remote)}${at(c.savedAt, 'сохранено')}
+          <small>в аккаунте станет так же</small><div class="acc-lost">⚠️ Пропадёт из аккаунта: ${this.lossList(c.remote, c.local)}</div></div>
+        <div><b>☁️ Аккаунт ${prov}</b>${this.partsHtml(c.remote)}
           <button class="btn gold" data-action="acc-pick" data-pick="remote">Взять из аккаунта</button>
-          <small>в этом браузере станет так же</small><div class="acc-lost">⚠️ Пропадёт из этого браузера: ${this.lossList(c.local)}</div></div>
+          <small>в этом браузере станет так же</small><div class="acc-lost">⚠️ Пропадёт из этого браузера: ${this.lossList(c.local, c.remote)}</div></div>
       </div>
       <div class="em-actions"><button class="btn ghost small" data-action="acc-pick" data-pick="">${c.login ? 'Не входить — ничего не менять' : 'Решить потом'}</button></div></div>`,
       { noX: true, sticky: true });
@@ -203,10 +251,9 @@ const AccountUI = {
     const prov = esc(this.NAMES[c.provider]);
     const keepLocal = which === 'local';
     const lostWhere = keepLocal ? `в аккаунте ${prov}` : 'в этом браузере';
-    const lostAt = keepLocal ? this.when(c.savedAt, 'сохранена') : this.when(c.localAt, 'изменена');
     this.confirming = { which };
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>⚠️ Точно заменить?</h2>
-      <div class="acc-loss"><b>Пропадёт навсегда</b> — версия ${lostWhere}${lostAt ? ` (${lostAt})` : ''}:${this.lossList(keepLocal ? c.remote : c.local)}</div>
+      <div class="acc-loss"><b>Пропадёт навсегда</b> — ${lostWhere}:${keepLocal ? this.lossList(c.remote, c.local) : this.lossList(c.local, c.remote)}</div>
       <p>Останется версия ${keepLocal ? 'этого браузера' : `из аккаунта ${prov}`}:</p>${this.partsHtml(keepLocal ? c.local : c.remote)}
       <p>Её получат и этот браузер, и аккаунт. <b>Отменить это будет нельзя.</b></p>
       ${this.confirmButtons('Да, заменить')}</div>`, { noX: true, sticky: true });
@@ -248,6 +295,7 @@ const AccountUI = {
     this.confirming = null;
     this.renderBtn();
     if (!r.ok) { UI.toast('Не получилось — попробуйте ещё раз'); return this.showChoice(); }
+    if (this.reloadIfNeeded()) return;   // взяли учёбу из аккаунта
     const s = Account.state;
     UI.toast((c && c.login ? `👤 Вы вошли через ${this.NAMES[s.provider]}: <b>${esc(s.name)}</b>. ` : '👤 ')
       + (f.which === 'local' ? 'В аккаунте теперь — как в этом браузере' : 'В этом браузере теперь — как в аккаунте')
@@ -258,6 +306,7 @@ const AccountUI = {
   /** Запуск: сверка при входе не прошла (не было связи), а в браузере и в аккаунте разное — спросить, когда освободится экран. */
   synced(r, ctx) {
     this.renderBtn();
+    if (this.reloadIfNeeded()) return;   // сверка при входе прошла только сейчас и взяла учёбу из аккаунта
     if (r.result !== 'ask') return;
     if ($('#modal').classList.contains('hidden')) return this.showChoice(ctx);
     const prev = UI.afterModal;

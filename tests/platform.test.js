@@ -7,15 +7,18 @@ const path = require('path');
 const vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 
-function loadAccount({ config = {}, protocol = 'https:' } = {}) {
+function loadAccount({ config = {}, protocol = 'https:', learn = false } = {}) {
   const store = {};
   const ctx = {
     localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
     location: { protocol }, navigator: { onLine: true }, Session: { extraKeys: [] },
-    atob: s => Buffer.from(s, 'base64').toString('binary'), TextDecoder, crypto: require('crypto').webcrypto, performance, Uint8Array, JSON, Date, Math, String, Number, Promise,
+    atob: s => Buffer.from(s, 'base64').toString('binary'), TextDecoder, TextEncoder, Blob, Response, CompressionStream, DecompressionStream, crypto: require('crypto').webcrypto, performance, Uint8Array, JSON, Date, Math, String, Number, Promise,
   };
   vm.createContext(ctx);
-  for (const f of ['platform/account-config.js', 'platform/account.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+  // learn — с ядром обучения (встроенные колоды из content/ru/words.js), как в игре
+  const core = learn ? [...require('./load-core').CORE_FILES.filter(f => f.startsWith('core/util') || f.startsWith('core/defs') || f.startsWith('core/learning/')), 'content/ru/words.js'] : [];
+  if (learn) core.unshift(core.pop());   // слова — раньше ядра
+  for (const f of [...core, 'platform/account-config.js', 'platform/account.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
   vm.runInContext(`Object.assign(ACCOUNT_CONFIG, ${JSON.stringify(config)}); this.Account = Account;`, ctx);
   return { A: ctx.Account, store, ctx };
 }
@@ -87,22 +90,28 @@ function fakeFirebase(db = fakeDb(), anonPrefix = 'anon-') {
       cb(snap(path));
       return () => { db.subs[path] = db.subs[path].filter(x => x !== cb); };
     },
+    collection: c => ({ doc: id => ref(`${path}/${c}/${id}`) }),
   });
   const store = {
     collection: c => ({ doc: id => ref(`${c}/${id}`) }),
-    runTransaction: async fn => { if (!db.online) return down(); return fn({ get: r => r.get(), set: (r, d, o) => { r.set(d, o); } }); },
+    runTransaction: async fn => {
+      if (!db.online) return down();
+      const r = await fn({ get: r => r.get(), set: (r, d, o) => { r.set(d, o); } });
+      if (db.beforeCommit) { const f = db.beforeCommit; db.beforeCommit = null; f(); }   // что-то случилось, пока запись шла на сервер
+      return r;
+    },
   };
   const fb = {
     apps: [],
     initializeApp() { fb.apps.push({}); },
     auth: Object.assign(() => auth, { GoogleAuthProvider: function () {} }),
-    firestore: Object.assign(() => store, { FieldValue: { serverTimestamp: () => TS } }),
+    firestore: Object.assign(() => store, { FieldValue: { serverTimestamp: () => TS }, Blob: { fromUint8Array: u8 => ({ toUint8Array: () => u8 }) } }),
   };
   return { fb, db, docs: db.docs, writes: db.writes, auth, TS, setOnline: v => { db.online = v; } };
 }
 /** Браузер с игрой: свой localStorage и вход, база — общая (передать db второго браузера, чтобы играть под тем же аккаунтом). */
-function loadWithFirebase(store0, db, anonPrefix) {
-  const r = loadAccount({ config: { firebase: { apiKey: 'x', projectId: 'p' }, telegram: { clientId: 123 } } });
+function loadWithFirebase(store0, db, anonPrefix, learn = false) {
+  const r = loadAccount({ config: { firebase: { apiKey: 'x', projectId: 'p' }, telegram: { clientId: 123 } }, learn });
   if (store0) Object.assign(r.store, store0);
   const F = fakeFirebase(db, anonPrefix);
   Object.assign(r.ctx, { window: r.ctx, firebase: F.fb, console: { warn() {} }, setTimeout });
@@ -175,7 +184,7 @@ test('имя без входа; вход в аккаунт, где имя дру
   assert.equal(r.result, 'ask');
   assert.equal(typeof r.choice.localAt, 'number', 'когда имя поменяли здесь');
   delete r.choice.localAt;
-  assert.deepEqual(plain(r.choice), { local: { name: 'Андрей' }, remote: { name: 'Ανδρέας' }, savedAt: 1700000000000, provider: 'google', login: true });
+  assert.deepEqual(plain(r.choice), { local: { name: 'Андрей', learn: null }, remote: { name: 'Ανδρέας', learn: null }, savedAt: 1700000000000, provider: 'google', login: true });
   assert.equal(A.signedIn(), false, 'пока не выбрали — не вошли');
   assert.deepEqual(plain(await A.choose(null)), { ok: true, cancelled: true });
   assert.equal(A.signedIn(), false);
@@ -263,7 +272,7 @@ test('Telegram: строка по номеру Telegram — одна на все
   await two.A.setName('Andreas');
   const r = await two.A.signIn('telegram');
   assert.equal(r.result, 'ask');
-  assert.deepEqual(plain(r.choice.remote), { name: 'Андрей' }, 'увидел строку первого');
+  assert.deepEqual(plain(r.choice.remote), { name: 'Андрей', learn: null }, 'увидел строку первого');
   await two.A.choose('remote', true);
   assert.equal(two.A.state.name, 'Андрей');
   assert.equal(db.docs['users/telegram:42'].browserId, two.A.state.id, 'главный — второй');
@@ -320,4 +329,131 @@ test('🚨 ловушка: затереть непустую другую вер
   F.docs['users/google:g-1'].name = 'Из консоли';
   assert.equal((await A.setName('Моё')).result, 'push');
   assert.equal(F.docs['users/google:g-1'].name, 'Моё');
+});
+
+// ---------- обучение в аккаунте ----------
+/** Браузер с ядром обучения: Learn пишет в localStorage этого браузера через Account.wrapIO (как в игре). */
+function browserWithLearn(db, anonPrefix) {
+  const r = loadWithFirebase(null, db, anonPrefix, true);
+  r.run = code => vm.runInContext(code, r.ctx);
+  r.run(`Learn.io = Account.wrapIO({ load: k => localStorage.getItem(k), save: (k, v) => localStorage.setItem(k, v), remove: k => localStorage.removeItem(k) });
+         Learn.state = Learn.newState(); Learn.save();`);
+  r.A.load();
+  r.A.PUSH_EVERY = 10;
+  /** Выучить n новых слов. */
+  r.study = (n, last = Date.parse('2026-11-20T10:00:00Z')) => r.run(`(() => { const c = Learn.state.decks.flatMap(d => d.cards);
+    let k = 0; for (const card of c) { const key = Decks.pkey(card); if (Learn.state.progress[key]) continue;
+      Learn.state.progress[key] = { step: 3, rev: 1, due: ${last} + 864e5, right: 3, wrong: 0, built: true, last: ${last} }; if (++k >= ${n}) break; }
+    Learn.save(); })()`);
+  r.words = () => r.run('Object.keys(Learn.state.progress).length');
+  return r;
+}
+/** Документ обучения в «базе»: поле json — уже распакованный JSON (в базе он сжат: gz). */
+const learnDoc = (db, id) => {
+  const d = db.docs[`users/${id}/data/learn`];
+  return d && { ...d, json: d.gz ? require('zlib').gunzipSync(Buffer.from(d.gz.toUint8Array())).toString() : d.json };
+};
+const tick = ms => new Promise(res => setTimeout(res, ms));
+
+test('обучение в аккаунте: компактно (без слов встроенных колод); вход — пишем; главный дописывает изменения сам', async () => {
+  const db = fakeDb();
+  const b = browserWithLearn(db);
+  const full = b.store['greekgame.learn.v1'].length;
+  b.study(30);
+  assert.equal((await b.A.signIn('google')).result, 'push');
+  const doc = learnDoc(db, 'google:g-1');
+  assert.ok(doc, 'обучение — отдельным документом users/<id>/data/learn');
+  const snap = JSON.parse(doc.json);
+  assert.ok(doc.json.length < full / 10, `снимок ${doc.json.length} байт против ${full} у полного сохранения`);
+  assert.equal(Object.keys(snap.progress).length, 30);
+  assert.ok(snap.decks.filter(d => d.builtin).every(d => !d.cards), 'у встроенных колод — без слов');
+  assert.equal(doc.browserId, b.A.state.id);
+
+  // занимаемся дальше — главный сам пишет в аккаунт (не чаще раза в PUSH_EVERY) и только если поменялось
+  const writes = db.writes.length;
+  b.run('Learn.save()');   // сохранение без изменений
+  await tick(30);
+  assert.equal(db.writes.length, writes, 'ничего не поменялось — не пишем');
+  b.study(5);
+  assert.equal(b.A.state.profilePending, true);
+  await tick(30);
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 35, 'дописали');
+  assert.equal(b.A.state.profilePending, undefined);
+  assert.equal(db.writes.at(-1).path, 'users/google:g-1/data/learn', 'строку игрока не трогали — в ней ничего не поменялось');
+  for (const w of db.writes.filter(w => w.path.endsWith('/data/learn'))) assert.deepEqual(Object.keys(w.data).sort(), ['browserId', 'gz', 'size', 'updatedAt'], 'сжато');
+});
+
+test('обучение в аккаунте: второй браузер — пусто → взяли из аккаунта; оба с прогрессом → спросить; устаревший загружает из аккаунта', async () => {
+  const db = fakeDb();
+  const one = browserWithLearn(db), two = browserWithLearn(db);
+  one.study(20);
+  await one.A.signIn('google');
+
+  // во втором учёбы нет — молча взяли из аккаунта, страницу надо перезагрузить
+  assert.equal((await two.A.signIn('google')).result, 'pull');
+  assert.equal(two.words(), 20);
+  assert.equal(two.A.reloadNeeded, true);
+  assert.equal(JSON.parse(two.store['greekgame.learn.v1']).progress && Object.keys(JSON.parse(two.store['greekgame.learn.v1']).progress).length, 20, 'и сохранили');
+  assert.ok(JSON.parse(two.store['greekgame.learn.v1']).decks.some(d => d.builtin && d.cards.length > 10), 'слова встроенных колод — из игры');
+  assert.equal(one.A.stale, true, 'первый устарел');
+
+  // первый «перезагрузился» — взял из аккаунта (там то же) и снова главный
+  two.study(7);
+  await tick(30);
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 27);
+  assert.deepEqual(plain(await one.A.adopt()), { ok: true });
+  assert.equal(one.words(), 27, 'устаревший взял версию из аккаунта');
+  assert.equal(two.A.stale, true);
+
+  // третий браузер со своим прогрессом — спросить; «Пропадёт» — учёба
+  const three = browserWithLearn(db);
+  three.study(3);
+  const r = await three.A.signIn('google');
+  assert.equal(r.result, 'ask');
+  assert.deepEqual(plain(three.A.losses(r.choice.local, r.choice.remote)), ['learn']);
+  assert.deepEqual(plain(three.A.losses(r.choice.remote, r.choice.local)), ['learn']);
+  assert.deepEqual(plain(three.run('Learn.summary(Account.choice().remote.learn)')), { learned: 27, learning: 0, own: 0, last: Date.parse('2026-11-20T10:00:00Z') });
+  assert.deepEqual(plain(await three.A.choose('local')), { ok: false, error: 'notConfirmed' });
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 27, 'без подтверждения — не тронули');
+  await three.A.choose('local', true);
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 3, 'выбрали браузер — в аккаунте как в нём');
+});
+
+test('обучение в аккаунте: аккаунт заведён до этого (обучения в нём нет) — главный при запуске дописывает; при входе это не потеря', async () => {
+  const db = fakeDb();
+  const b = browserWithLearn(db);
+  db.docs['users/google:g-1'] = { accountId: 'google:g-1', provider: 'google', name: 'Andrey G', browserId: b.A.state.id, createdAt: 1 };
+  b.study(4);
+  assert.equal((await b.A.signIn('google')).result, 'pull', 'здесь нет имени, а в аккаунте нет учёбы — терять нечего: имя оттуда, учёба отсюда');
+  assert.equal(b.A.state.name, 'Andrey G');
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 4);
+  // при запуске (вошли раньше), обучения в аккаунте нет — главный дописывает
+  delete db.docs['users/google:g-1/data/learn'];
+  b.A.load();
+  assert.equal((await b.A.sync()).result, 'ok');
+  assert.ok(learnDoc(db, 'google:g-1'));
+});
+
+test('обучение в аккаунте: сжато; вход ждёт сверки (onBusy); поменяли, пока шла запись, — не теряем, дописываем', async () => {
+  const db = fakeDb();
+  const b = browserWithLearn(db);
+  b.study(200);
+  const busy = [];
+  b.A.onBusy = v => busy.push(v);
+  await b.A.signIn('google');
+  assert.deepEqual(busy, [true, false], 'интерфейс ждал сверки и дождался');
+  const raw = db.docs['users/google:g-1/data/learn'];
+  const json = learnDoc(db, 'google:g-1').json;
+  assert.ok(raw.gz.toUint8Array().length < json.length / 4, `сжато: ${raw.gz.toUint8Array().length} байт из ${json.length}`);
+  assert.equal(raw.size, json.length);
+
+  // запись в аккаунт идёт, а игрок как раз ответил ещё на одно слово
+  b.study(1);
+  db.beforeCommit = () => b.study(1);
+  assert.equal((await b.A.saveToAccount()).result, 'push');
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 201);
+  assert.equal(b.A.state.profilePending, true, 'второе слово записаться не успело — помним');
+  await tick(40);
+  assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 202, 'дописали');
+  assert.equal(b.A.state.profilePending, undefined);
 });

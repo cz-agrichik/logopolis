@@ -12,7 +12,7 @@
     history.replaceState(null, '', location.pathname);
   }
   // город и обучение хранятся отдельно; старое общее сохранение переносится само
-  const boot = Session.start(BrowserIO);
+  const boot = Session.start(Account.wrapIO(BrowserIO));   // обучение поменялось — вошедшим оно уходит и в аккаунт
   Session.onLost = () => UI.showTakenOver();   // игру перезаписала другая вкладка — эту останавливаем
   const saved = boot.cityLoaded;
   if (saved && boot.decksAdded) Game.state.log.unshift({ t: Date.now(), k: 'decksAdded', p: { n: boot.decksAdded } });

@@ -1,7 +1,7 @@
 'use strict';
 // ============================================================
 //  Обучение как отдельный мир: своё состояние и своё сохранение.
-//  Город может начаться заново — обучение остаётся.
+//  Город может начаться заново — обучение остаётся. Вошедшие хранят обучение и в аккаунте (snapshot / fromSnapshot).
 // ============================================================
 
 const Learn = {
@@ -52,5 +52,43 @@ const Learn = {
   save() {
     if (this.resetting || !this.state) return;
     if (this.io) this.io.save(this.KEY, JSON.stringify(this.state));
+  },
+
+  // ---------- обучение в аккаунте (platform/account.js) ----------
+  // В аккаунт идёт всё обучение целиком: прогресс по словам, свои колоды, какие колоды включены, настройки, журнал, счётчики.
+  // Кроме слов встроенных колод: они есть в самой игре (у встроенной колоды в снимке — только id и «включена ли»).
+  /** Снимок обучения для аккаунта. */
+  snapshot(s = this.state) {
+    return {
+      v: s.v, spread: s.spread,
+      decks: s.decks.map(d => d.builtin ? { id: d.id, builtin: true, active: !!d.active } : d),
+      progress: s.progress, settings: s.settings, learnLog: s.learnLog, stats: s.stats,
+    };
+  },
+  /** Состояние обучения из снимка: слова встроенных колод — из игры, дальше — обычная миграция. */
+  fromSnapshot(snap) {
+    const s = JSON.parse(JSON.stringify(snap));
+    const fresh = new Map(Decks.builtinDecks().map(d => [d.id, d]));
+    s.decks = (s.decks || []).map(d => {
+      if (!d.builtin) return d;
+      const nd = fresh.get(d.id);
+      return nd ? Object.assign(nd, { active: !!d.active }) : { ...d, cards: [] };   // колоды больше нет в игре — migrate уберёт
+    });
+    this.migrate(s);
+    return s;
+  },
+  /** В снимке ничего нет: ни одного слова в работе и ни одной своей колоды со словами. */
+  isEmptySnap(snap) {
+    return !snap || (!Object.keys(snap.progress || {}).length && !(snap.decks || []).some(d => !d.builtin && d.cards && d.cards.length));
+  },
+  /** Сводка снимка: сколько слов выучено и в работе, своих колод, когда занимались последний раз (мс или null). */
+  summary(snap) {
+    let learned = 0, learning = 0, last = 0;
+    for (const p of Object.values((snap && snap.progress) || {})) {
+      if (Decks.isLearned(p)) learned++; else learning++;
+      if (p && p.last > last) last = p.last;
+    }
+    const own = ((snap && snap.decks) || []).filter(d => !d.builtin && d.cards && d.cards.length).length;
+    return { learned, learning, own, last: last || null };
   },
 };

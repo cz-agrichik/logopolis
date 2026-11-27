@@ -22,6 +22,15 @@
 //  Ловушка на ошибки в коде: takeRemote и claim без подтверждения такую замену не делают — кричат в консоль (alarm) и бросают
 //  'unconfirmedOverwrite'. Вход не запоминается, пока игрок не выбрал (held — только в памяти); отказаться можно без потерь.
 //
+//  Что лежит в аккаунте (Firestore): users/<accountId> — строка в списке игроков (кто, имя, главный браузер, даты);
+//  users/<accountId>/data/learn — обучение (core/learning/learn.js, snapshot: прогресс по словам, свои колоды, настройки, журнал;
+//  без слов встроенных колод — они есть в игре). Дальше по той же схеме: data/city — город, свои тексты читалки — по документу на текст.
+//  Главный браузер пишет обучение не чаще раза в PUSH_EVERY (и сразу, когда вкладку прячут) — только если оно поменялось.
+//  Обучение в аккаунте сжато (gzip, поле gz): ~50 КБ на все 2700 слов вместо ~330 КБ.
+//  Каждый обмен с аккаунтом — транзакция Firestore: прочитали строку и обучение — одну и ту же версию; записали — значит, сервер
+//  принял (без сети запись не «висит» в очереди, а падает — и изменения ждут, profilePending). Пока идёт сверка при входе,
+//  интерфейс ждёт (onBusy); при запуске раунд карточек ждёт первой сверки (AccountUI.waitBeforeStudy).
+//
 //  Локально (ключ KEY в localStorage) — кто вошёл и имя; «Стереть всё» стирает и его (Session.extraKeys).
 //  Библиотеки Firebase и Telegram грузятся только для входа и для тех, кто вошёл, — без входа игра ничего не тянет из сети.
 //  Ошибки — кодами (тексты — в интерфейсе): notConfigured, offline, fileProtocol, cancelled, popupBlocked, domain, failed, emptyName.
@@ -35,7 +44,7 @@ const Account = {
    *    fbUid — пользователь Firebase (Google), accountId — главный id аккаунта (ключ строки в списке игроков),
    *    linked — accountId, с которым этот браузер сверился при входе и стал главным
    *    (нет — сверка при входе ещё не прошла: пройдёт при следующем запуске); profilePending — изменения ещё не дошли до аккаунта;
-   *    localAt — когда версия этого браузера менялась (показать при выборе на входе);
+   *    localAt — когда менялось имя в этом браузере (показать при выборе на входе);
    *    guest: когда выбрали «без входа»; askedAfterTutorial }. */
   state: null,
   /** Расхождение, ждущее выбора игрока (только в памяти): { acc — вход, который ещё не завершён (или null), remote — строка аккаунта, login }. */
@@ -44,6 +53,17 @@ const Account = {
   stale: false,
   onStale: null,
   unwatch: null,
+  /** Обучение из аккаунта легло в браузер — интерфейс перезагружает страницу. */
+  reloadNeeded: false,
+  /** Что сейчас лежит в аккаунте (по последнему чтению или записи): { row — ключ полей строки, learn — JSON обучения } — чтобы не писать то же. */
+  sent: null,
+  PUSH_EVERY: 20000,
+  /** Счётчик изменений: запись в аккаунт снимает «есть незаписанное», только если пока она шла, ничего не поменялось. */
+  rev: 0,
+  /** Интерфейс: onBusy(true/false) — идёт сверка при входе (ждать); onChange() — поменялось «записано / есть незаписанное». */
+  onBusy: null,
+  onChange: null,
+  MAX_DOC: 1000000,   // байт: документ Firestore — до 1 МиБ (и firestore.rules — до 1 000 000 знаков)
 
   load() {
     let s = null;
@@ -58,7 +78,8 @@ const Account = {
     if (s.provider && !s.accountId) s.accountId = this.accountIdOf(s);
     delete s.nameEdited; delete s.synced; delete s.lastPushed;   // от прежних сборок
     this.state = s;
-    this.held = null; this.stale = false; this.unwatch = null;
+    this.held = null; this.stale = false; this.unwatch = null; this.reloadNeeded = false; this.sent = null;
+    this.lastLearnText = typeof Learn !== 'undefined' ? (() => { try { return localStorage.getItem(Learn.KEY); } catch (e) { return null; } })() : null;
     this.save();
     return s;
   },
@@ -78,27 +99,54 @@ const Account = {
   markAsked(what) { this.state['asked' + what] = Date.now(); this.save(); },
 
   // ---------- что переносится между браузером и аккаунтом ----------
-  /** Части — каждая целиком: get — значение в этом браузере, set — заменить его значением из аккаунта, row — значение из строки аккаунта,
-   *  empty — «здесь ничего нет». Город и учёба добавятся сюда же, по записи на часть. */
+  /** Части — каждая целиком: get — значение в этом браузере (null — части здесь нет), set — заменить его значением из аккаунта,
+   *  row — значение из аккаунта (null — в аккаунте этой части ещё нет: тогда её и не берём, а пишем туда здешнюю),
+   *  empty — «здесь ничего нет». Город добавится сюда же, по записи на часть. */
   parts: {
     name: {
-      get: () => Account.state.name || '',
+      get: () => Account.state.name || null,
       set: v => { Account.state.name = String(v || '').slice(0, 40); },
-      row: r => r.name || '',
+      row: r => r.name || null,
       empty: v => !v,
     },
+    learn: {
+      get: () => Account.hasLearn() ? Learn.snapshot() : null,
+      set: v => Account.applyLearn(v),
+      row: r => r._learn || null,
+      empty: v => !v || Learn.isEmptySnap(v),
+    },
+  },
+  hasLearn() { return typeof Learn !== 'undefined' && !!Learn.state; },
+  /** Обучение из аккаунта — в этот браузер (через обычное сохранение обучения); интерфейс потом перезагружает страницу. */
+  applyLearn(v) {
+    if (!v || !this.hasLearn() || this.same(v, Learn.snapshot())) return;
+    this.applying = true;
+    try { Learn.state = Learn.fromSnapshot(v); Learn.save(); } finally { this.applying = false; }
+    this.reloadNeeded = true;
   },
   snapshot() { const o = {}; for (const k in this.parts) o[k] = this.parts[k].get(); return o; },
   fromRow(row) { const o = {}; for (const k in this.parts) o[k] = this.parts[k].row(row); return o; },
   same(a, b) { return JSON.stringify(a) === JSON.stringify(b); },
-  isEmpty(snap) { return Object.keys(this.parts).every(k => this.parts[k].empty(snap[k])); },
+  /** Что пропадёт у victim, если взять версию winner: части, где у victim что-то есть, а winner (если у него эта часть есть) — другое. */
+  losses(victim, winner) {
+    return Object.keys(this.parts).filter(k => !this.parts[k].empty(victim[k]) && winner[k] != null && !this.same(victim[k], winner[k]));
+  },
   /** Чью версию взять при входе. local — браузер, remote — аккаунт (null — в аккаунте ещё ничего нет).
-   *  'push' — браузер → аккаунт, 'pull' — аккаунт → браузер, 'same' — одинаково, 'ask' — спросить игрока. */
+   *  'push' — браузер → аккаунт, 'pull' — аккаунт → браузер, 'same' — одинаково, 'ask' — спросить игрока.
+   *  Не спрашиваем, только когда одной из сторон терять нечего («в браузере пусто», «в аккаунте пусто»). */
   decide(local, remote) {
     if (!remote) return 'push';
     if (this.same(local, remote)) return 'same';
-    if (this.isEmpty(local)) return 'pull';
+    if (!this.losses(local, remote).length) return 'pull';
+    if (!this.losses(remote, local).length) return 'push';
     return 'ask';
+  },
+  /** Части, которых в браузере нет (например, имени), — взять из аккаунта: терять тут нечего. */
+  fillMissing(row) {
+    if (!row) return;
+    const local = this.snapshot(), v = this.fromRow(row);
+    for (const k in this.parts) if (local[k] == null && v[k] != null) this.parts[k].set(v[k]);
+    this.save();
   },
   /** Главный id аккаунта — ключ строки в списке игроков: один для любого способа входа и одинаковый на всех устройствах. */
   accountIdOf(who) {
@@ -119,7 +167,8 @@ const Account = {
       const acc = { provider: p, uid: String(u.uid), providerName: (u.name || u.username || u.email || '').trim(), email: u.email || '',
         username: u.username || '', photo: u.photo || '', fbUid: u.fbUid || null };
       acc.accountId = this.accountIdOf(acc);
-      return { ok: true, ...(await this.link(acc)) };
+      if (this.onBusy) this.onBusy(true);   // окно входа закрылось — дальше сверка с аккаунтом, интерфейс ждёт
+      try { return { ok: true, ...(await this.link(acc)) }; } finally { if (this.onBusy) this.onBusy(false); }
     } catch (e) {
       return { ok: false, error: typeof e === 'string' ? e : 'failed', detail: String(e && (e.code || e.message) || e) };
     }
@@ -148,6 +197,7 @@ const Account = {
     if (!name) return { ok: false, error: 'emptyName' };
     this.state.name = name;
     this.state.localAt = Date.now();
+    this.rev++;
     this.save();
     if (!this.signedIn()) return { ok: true };
     return { ok: true, ...(await this.saveToAccount()) };
@@ -167,7 +217,7 @@ const Account = {
     }
     const d = this.decide(this.snapshot(), remote && this.fromRow(remote));
     if (d === 'ask') { this.held = { acc, remote, login: !!acc }; return { result: 'ask', choice: this.choice() }; }
-    if (d === 'pull') this.takeRemote(remote);   // до finish: тот подставит имя у поставщика, если здесь имени нет
+    if (d === 'pull') this.takeRemote(remote); else this.fillMissing(remote);   // до finish: тот подставит имя у поставщика, если имени нет нигде
     if (acc) this.finish(acc);
     return { result: await this.claim(remote, !!acc).then(() => d, e => this.failed(e)) };
   },
@@ -193,16 +243,17 @@ const Account = {
     }
     if (confirmed !== true) return { ok: false, error: 'notConfirmed' };
     this.held = null;
-    if (which === 'remote') this.takeRemote(h.remote, true);
+    if (which === 'remote') this.takeRemote(h.remote, true); else this.fillMissing(h.remote);
     if (h.acc) this.finish(h.acc);
     const r = await this.claim(h.remote, h.login, which === 'local').then(() => true, e => this.failed(e));
     return { ok: true, pending: r !== true };
   },
-  /** 🚨 Заменить версию браузера версией аккаунта. Молча — только если здесь пусто или то же самое; иначе нужен confirmed. */
+  /** 🚨 Заменить версию браузера версией аккаунта (части, которых в аккаунте нет, остаются). Молча — только если здесь ничего
+   *  не пропадёт; иначе нужен confirmed. */
   takeRemote(row, confirmed = false) {
     const local = this.snapshot(), v = this.fromRow(row);
-    if (!confirmed && !this.isEmpty(local) && !this.same(local, v)) throw this.alarm('версия браузера чуть не заменилась без подтверждения', local, v);
-    for (const k in this.parts) this.parts[k].set(v[k]);
+    if (!confirmed && this.losses(local, v).length) throw this.alarm('версия браузера чуть не заменилась без подтверждения', local, v);
+    for (const k in this.parts) if (v[k] != null) this.parts[k].set(v[k]);
     this.state.localAt = this.millis(row.updatedAt) || Date.now();
     this.save();
   },
@@ -221,14 +272,15 @@ const Account = {
     try {
       const remote = await this.readRow(s);
       if (remote && remote.browserId !== s.id) return { result: this.goStale() };
-      if (!remote || s.profilePending) await this.push();   // строки нет (удалили в консоли) или здесь есть незаписанное
+      // строки нет (удалили в консоли), здесь есть незаписанное или в аккаунте не то (например, обучения там ещё нет) — главный пишет
+      if (!remote || s.profilePending || !this.same(this.snapshot(), this.fromRow(remote))) await this.push();
       this.watch();
       return { result: 'ok' };
     } catch (e) {
       return { result: e === 'stale' ? 'stale' : this.failed(e) };
     }
   },
-  /** Записать изменения этого браузера в аккаунт (смена имени). */
+  /** Записать изменения этого браузера в аккаунт (смена имени, обучение). */
   async saveToAccount() {
     if (this.stale) return { result: 'stale' };
     if (!this.linked()) return this.link();   // сверка при входе ещё не прошла — сначала она
@@ -253,11 +305,42 @@ const Account = {
     return 'stale';
   },
   failed(e) {
-    if (this.signedIn()) { this.state.profilePending = true; this.save(); }
+    if (this.signedIn()) { this.state.profilePending = true; this.save(); this.changed(); }
     this.warn(e);
     return 'pending';
   },
   warn(e) { try { console.warn('Аккаунт: не сверили —', (e && (e.code || e.message)) || e); } catch (x) { /* консоли нет */ } },
+
+  // ---------- обучение поменялось — в аккаунт ----------
+  /** Хранилище игры с «глазком»: обучение сохранилось — отметить и записать в аккаунт (main.js: Session.start(Account.wrapIO(BrowserIO))). */
+  wrapIO(io) {
+    const self = this;
+    return Object.assign(Object.create(io), {
+      save(k, text) { io.save(k, text); if (typeof Learn !== 'undefined' && k === Learn.KEY) self.learnSaved(text); },
+    });
+  },
+  /** Обучение сохраняется раз в несколько секунд — в аккаунт идёт, только если поменялось, и не чаще раза в PUSH_EVERY. */
+  learnSaved(text) {
+    if (text === this.lastLearnText) return;
+    this.lastLearnText = text;
+    this.rev++;
+    if (this.applying || !this.state || !this.signedIn() || !this.linked() || this.stale) return;
+    if (!this.state.profilePending) { this.state.profilePending = true; this.save(); this.changed(); }
+    this.later();
+  },
+  /** Записать в аккаунт через PUSH_EVERY (если запись уже назначена — она и запишет). */
+  later() {
+    if (this.pushTimer) return;
+    this.pushTimer = setTimeout(() => { this.pushTimer = null; this.flush(); }, this.PUSH_EVERY);
+    if (this.pushTimer && this.pushTimer.unref) this.pushTimer.unref();   // в тестах (Node) не держать процесс
+  },
+  changed() { if (this.onChange) try { this.onChange(); } catch (e) { /* интерфейс */ } },
+  /** Записать незаписанное сейчас (вкладку прячут или закрывают, появилась сеть). */
+  flush() {
+    const s = this.state;
+    if (!s || !s.profilePending || !this.signedIn() || !this.linked() || this.stale || location.protocol === 'file:') return Promise.resolve({ result: 'none' });
+    return this.saveToAccount();
+  },
 
   /** Firebase: приложение и вход; библиотеки — по требованию. */
   async fbAuth() {
@@ -288,13 +371,54 @@ const Account = {
     if (who.provider === 'google') { if (!u || u.uid !== who.fbUid) throw 'sessionLost'; return; }
     if (!u) await this.within(auth.signInAnonymously());
   },
-  /** Строка аккаунта в списке игроков (null — ещё нет). */
+  userRef(db, id) { return db.collection('users').doc(id); },
+  learnRef(db, id) { return this.userRef(db, id).collection('data').doc('learn'); },
+  /** Строка аккаунта в списке игроков (null — ещё нет) и его обучение — в row._learn (null — обучения в аккаунте ещё нет). */
   async readRow(who) {
     if (!who.accountId) throw 'noAccountId';
     await this.session(who);
     const db = await this.fbDb();
-    const snap = await this.within(db.collection('users').doc(who.accountId).get());
-    return snap.exists ? snap.data() : null;
+    let snap = null, ls = null;
+    // строка и обучение — в одной транзакции: одна и та же версия аккаунта, даже если в этот момент пишет другой браузер
+    await this.within(db.runTransaction(async t => {
+      snap = await t.get(this.userRef(db, who.accountId));
+      ls = snap.exists ? await t.get(this.learnRef(db, who.accountId)) : null;
+    }));
+    if (!snap.exists) { this.sent = { row: null, learn: null }; return null; }
+    const row = snap.data();
+    const json = ls && ls.exists ? await this.unpack(ls.data()) : null;
+    row._learn = json ? JSON.parse(json) : null;
+    this.sent = { row: this.rowKey(row), learn: json };
+    return row;
+  },
+  /** Поля строки, по которым видно, поменялась ли она (без дат). */
+  rowKey(r) { return JSON.stringify(['accountId', 'provider', 'name', 'providerName', 'email', 'tgId', 'tgUsername', 'photo', 'browserId'].map(k => r[k] == null ? null : r[k])); },
+  /** Обучение для записи в аккаунт: JSON (null — обучения здесь нет). */
+  learnJson() {
+    const v = this.parts.learn.get();
+    return v == null ? null : JSON.stringify(v);
+  },
+  /** Документ обучения: сжатый gzip (Firestore Bytes, поле gz); браузер без CompressionStream — JSON строкой (поле json).
+   *  Больше документа Firestore — не пишем (throw 'tooBig'; когда понадобится — делить на несколько документов). */
+  async learnDoc(json) {
+    const doc = { size: json.length, browserId: this.state.id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if (typeof CompressionStream !== 'undefined' && firebase.firestore.Blob) {
+      const bytes = new Uint8Array(await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+      if (bytes.length > this.MAX_DOC) throw 'tooBig';
+      doc.gz = firebase.firestore.Blob.fromUint8Array(bytes);
+    } else {
+      if ((typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(json).length : json.length * 2) > this.MAX_DOC) throw 'tooBig';
+      doc.json = json;
+    }
+    return doc;
+  },
+  /** JSON обучения из документа (сжатого или нет). */
+  async unpack(d) {
+    if (d.gz) {
+      const bytes = d.gz.toUint8Array ? d.gz.toUint8Array() : d.gz;
+      return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    }
+    return d.json || null;
   },
   /** Своя строка: аккаунт, части браузера, номер этого браузера (главный — он), даты. remote — строка до записи (null — новая). */
   rowData(remote, login) {
@@ -313,29 +437,44 @@ const Account = {
     const s = this.state;
     if (remote && !confirmed) {
       const v = this.fromRow(remote);
-      if (!this.isEmpty(v) && !this.same(v, this.snapshot())) throw this.alarm('версия аккаунта чуть не заменилась без подтверждения', v, this.snapshot());
+      if (this.losses(v, this.snapshot()).length) throw this.alarm('версия аккаунта чуть не заменилась без подтверждения', v, this.snapshot());
     }
-    const db = await this.fbDb();
-    await this.within(db.collection('users').doc(s.accountId).set(this.rowData(remote, login), { merge: true }));
+    const rev = this.rev, db = await this.fbDb(), data = this.rowData(remote, login), json = this.learnJson();
+    const doc = json != null && json !== (this.sent && this.sent.learn) ? await this.learnDoc(json) : null;   // то же — не пишем
+    // строка и обучение — одной транзакцией: либо записалось всё, либо ничего
+    await this.within(db.runTransaction(async t => {
+      t.set(this.userRef(db, s.accountId), data, { merge: true });
+      if (doc) t.set(this.learnRef(db, s.accountId), doc);
+    }));
+    this.sent = { row: this.rowKey(data), learn: json != null ? json : this.sent && this.sent.learn };
     s.linked = s.accountId; this.stale = false;
-    delete s.profilePending;
+    if (rev === this.rev) delete s.profilePending; else { s.profilePending = true; this.later(); }   // пока писали, здесь что-то поменялось — допишем
     this.save();
+    this.changed();
     this.watch();
   },
   /** Записать изменения, только если этот браузер всё ещё главный; нет — он устарел (throw 'stale') и ничего не пишет. */
   async push() {
     const s = this.state;
     await this.session(s);
-    const db = await this.fbDb(), ref = db.collection('users').doc(s.accountId);
-    let other = false;
+    const rev = this.rev, db = await this.fbDb(), ref = this.userRef(db, s.accountId), json = this.learnJson();
+    const sent = this.sent || {};
+    const doc = json != null && json !== sent.learn ? await this.learnDoc(json) : null;
+    let other = false, rowKey = sent.row;
     await this.within(db.runTransaction(async t => {
       const snap = await t.get(ref), row = snap.exists ? snap.data() : null;
       other = !!(row && row.browserId !== s.id);
-      if (!other) t.set(ref, this.rowData(row, false), { merge: true });
+      if (other) return;
+      const data = this.rowData(row, false);
+      rowKey = this.rowKey(data);
+      if (!row || rowKey !== this.rowKey(row)) t.set(ref, data, { merge: true });   // строка — только если что-то в ней поменялось
+      if (doc) t.set(this.learnRef(db, s.accountId), doc);
     }));
     if (other) { this.goStale(); throw 'stale'; }
-    delete s.profilePending;
+    this.sent = { row: rowKey, learn: json != null ? json : sent.learn };
+    if (rev === this.rev) delete s.profilePending; else { s.profilePending = true; this.later(); }   // пока писали, здесь что-то поменялось — допишем
     this.save();
+    this.changed();
   },
   /** Пока игра открыта — следить за своей строкой: главным стал другой браузер — этот устарел. */
   watch() {
