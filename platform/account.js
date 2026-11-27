@@ -61,16 +61,27 @@ const Account = {
     try { if (was === 'google' && window.firebase && firebase.apps.length) await firebase.auth().signOut(); } catch (e) { /* и так вышли */ }
   },
 
+  /** Заранее загрузить библиотеку входа (когда показали кнопки): тогда окно входа откроется прямо по нажатию —
+   *  браузеры охотнее пропускают всплывающее окно, если между нажатием и окном ничего не грузится. */
+  preload(p) {
+    if (!this.configured(p) || location.protocol === 'file:') return;
+    const C = ACCOUNT_CONFIG;
+    const srcs = p === 'telegram' ? [C.telegramSdk] : [C.firebaseSdk + 'firebase-app-compat.js', C.firebaseSdk + 'firebase-auth-compat.js'];
+    srcs.reduce((pr, src) => pr.then(() => this.loadScript(src)), Promise.resolve()).catch(() => {});
+  },
+
   // ---------- поставщики ----------
+  /** Загрузить скрипт один раз: повторный вызов ждёт ту же загрузку (заранее начатую — тоже); не загрузился — можно попробовать снова. */
+  scripts: {},
   loadScript(src) {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    if (this.scripts[src]) return this.scripts[src];
+    return (this.scripts[src] = new Promise((resolve, reject) => {
       const el = document.createElement('script');
       el.src = src; el.async = true;
       el.onload = () => resolve();
-      el.onerror = () => { el.remove(); reject('offline'); };
+      el.onerror = () => { el.remove(); delete this.scripts[src]; reject('offline'); };
       document.head.appendChild(el);
-    });
+    }));
   },
   /** Google через Firebase Authentication (всплывающее окно). */
   async google() {

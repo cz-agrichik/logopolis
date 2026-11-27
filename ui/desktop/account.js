@@ -40,6 +40,7 @@ const AccountUI = {
    *  guest — подпись кнопки «без входа» или null (без неё). */
   buttonsHtml(ctx, guest = null) {
     const list = Account.PROVIDERS.slice().sort((a, b) => Account.configured(b) - Account.configured(a));
+    for (const p of list) Account.preload(p);   // библиотеки входа — заранее: окно входа откроется прямо по нажатию
     return `<div class="acc-btns">${list.map(p => {
       const ok = Account.configured(p);
       return `<button class="btn acc-${p} ${ok ? '' : 'acc-off'}" data-action="auth" data-provider="${p}" data-ctx="${ctx}">Войти через ${this.NAMES[p]}${ok ? '' : '<small>скоро</small>'}</button>`;

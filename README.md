@@ -860,7 +860,11 @@ tools/       ИНСТРУМЕНТЫ (не часть игры): проверка
     (`apiKey, authDomain, projectId, appId`) в `ACCOUNT_CONFIG.firebase`; Authentication → Sign-in method → Google → Enable;
     Authentication → Settings → Authorized domains → добавить `grecheskiy.com`. Вход — всплывающим окном (`signInWithPopup`), с диска не работает.
   - **Telegram:** бот @grecheskiycombot, `ACCOUNT_CONFIG.telegram = { clientId: 9008068124 }` (id бота). В @BotFather → бот → Bot Settings →
-    Login Widget → Allowed URLs: `https://grecheskiy.com`. Какие данные просить (scope), задаёт сайт при входе, а не BotFather: мы просим только профиль
+    Login Widget → Allowed URLs: `https://grecheskiy.com` и `https://grecheskiy.com/`. Библиотека Telegram берёт адрес возврата из адреса
+    страницы (`location.origin + location.pathname`), и он должен быть среди Allowed URLs — иначе окно Telegram пишет «origin required».
+    Поэтому `main.js` на сайте убирает из адреса `index.html` (адрес у игры один — `https://grecheskiy.com/`), а `index.html` задаёт
+    `<meta name="referrer" content="strict-origin-when-cross-origin">`, чтобы заголовки хостинга не срезали адрес сайта у окна входа.
+    Библиотеки входа грузятся заранее, когда показаны кнопки (`Account.preload`): окно входа открывается прямо по нажатию. Какие данные просить (scope), задаёт сайт при входе, а не BotFather: мы просим только профиль
     (имя, @ник, фото) — без телефона и без права писать. Токен бота и Client Secret в репозиторий не кладём. Подпись `id_token`
     без сервера честно не проверить — пока только запоминаем id; для синхронизации понадобится проверка на сервере.
   - Instagram не подключить: Meta закрыла вход через Instagram для сторонних сайтов (Basic Display API — с декабря 2024).

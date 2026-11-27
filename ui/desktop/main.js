@@ -2,6 +2,10 @@
 // Запуск игры
 (function () {
   Game.genMap();
+  // на сайте у игры один адрес — без «index.html»: от адреса страницы зависит вход через Telegram (адрес возврата
+  // должен совпадать с Allowed URLs бота), а grecheskiy.com/ и grecheskiy.com/index.html — для него разные адреса. С диска не трогаем.
+  if (/^https?:$/.test(location.protocol) && /\/index\.html$/.test(location.pathname))
+    history.replaceState(null, '', location.pathname.replace(/index\.html$/, '') + location.search + location.hash);
   // index.html?reset — аварийный сброс сохранения
   if (/[?&]reset\b/.test(location.search)) {
     Session.clear(BrowserIO);
