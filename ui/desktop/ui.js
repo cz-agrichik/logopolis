@@ -77,8 +77,8 @@ const UI = {
     this.lastPanel = null;
     this.renderPanel();
   },
-  /** Телефон в альбомной ориентации: карта на весь экран, панель — выдвижная. */
-  compact() { return matchMedia('(orientation: landscape) and (max-height: 520px)').matches; },
+  /** Телефон (вертикально): карта во всю высоту, вкладки — внизу, панель — листом снизу (ui/desktop/phone.css). */
+  compact() { return matchMedia('(max-width: 600px)').matches; },
   drawerOpen() { return document.body.classList.contains('drawer-open'); },
   drawer(open) { document.body.classList.toggle('drawer-open', !!open); },
   /** Сенсорный экран (телефон, планшет): нет наведения мыши и Shift. */
@@ -739,19 +739,6 @@ const UI = {
       и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
       <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`, { small: true, noX: true });
     this.modalLocked = true;
-  },
-
-  showMobileWarning(next) {
-    // нажатие «Всё равно играть» — подходящий момент попросить полный экран и альбомную ориентацию
-    this.afterModal = () => { BrowserIO.preferLandscape(); next(); };
-    this.showModal(`<div class="epoch-modal"><h2>📱 Похоже, вы с телефона</h2>
-      <p>Простите: пока «Λόγος» сделан под компьютер — большой экран, мышь и клавиатура. На телефоне карта и панели
-      будут тесными, а набирать слова неудобно.</p>
-      <p>Играть можно, но на свой страх и риск — мы пока не советуем. Мобильная версия — в работе.</p>
-      <p><b>Держите телефон горизонтально</b> — в альбомной ориентации помещается вся игра.
-      <b>Удерживайте палец</b> на значке или здании — появится подсказка. ⏫ у правого края — улучшать здания касанием.</p>
-      ${BrowserIO.isIOS() && !BrowserIO.standalone() ? '<p>📲 <b>На весь экран:</b> «Поделиться» → «На экран „Домой“» — и открывайте игру оттуда.</p>' : ''}
-      <div class="em-actions"><button class="btn gold" data-action="close">Всё равно играть</button></div></div>`);
   },
 
   showAway(a) {

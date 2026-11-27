@@ -46,14 +46,7 @@
       Tutorial.showWelcome();
     } else if (away) UI.showAway(away);
   };
-  // Телефоны и планшеты: честно предупреждаем, что игра сделана под компьютер (раз за сеанс)
-  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
-    (window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900);
-  const warned = BrowserIO.sessionGet('greekgame.mobileWarned') === '1';
-  if (isMobile && !warned) {
-    BrowserIO.sessionSet('greekgame.mobileWarned', '1');
-    UI.showMobileWarning(firstScreen);
-  } else firstScreen();
+  firstScreen();
 
   let last = performance.now(), sinceRender = 0, sinceSave = 0;
   setInterval(() => {

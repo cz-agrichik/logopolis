@@ -1,21 +1,20 @@
 'use strict';
 // ============================================================
-//  Телефон и сенсорный экран — то, чего на компьютере нет или что там делает мышь:
+//  Телефон (вертикально) и сенсорный экран — то, чего на компьютере нет или что там делает мышь:
 //   • подсказка по долгому нажатию (вместо всплывающего title под курсором);
-//   • полный экран: заслонка «Играть на весь экран» — как просьба повернуть телефон;
+//   • карта шире экрана — листается вбок; при запуске в середине экрана — город;
 //   • режим улучшения ⏫ — замена Shift+клику: каждое касание здания — +1 уровень;
-//   • выдвижная панель, оглавление Кипропедии — по кнопке, а не постоянной колонкой.
+//   • вкладка — листом снизу, оглавление Кипропедии — по кнопке, а не постоянной колонкой.
 //  Раскладка — ui/desktop/phone.css. Правил игры здесь нет: только Game.* из ядра, как и в ui.js.
 // ============================================================
 
 const Phone = {
-  /** Телефон в альбомной ориентации с сенсорным экраном — то, под что сделана телефонная раскладка. */
+  /** Телефон (вертикально) с сенсорным экраном — то, под что сделана телефонная раскладка. */
   active() { return UI.touch && UI.compact(); },
 
   init() {
     this.bindTips();
-    this.bindFullscreen();
-    // полоса справа: режим улучшения, библиотека, учёба, справка
+    // нижняя панель: вкладки и режим улучшения (кнопки библиотеки, учёбы, справки и входа на телефоне — в шапке)
     $('#rail').addEventListener('click', e => {
       const b = e.target.closest('button');
       if (!b) return;
@@ -25,9 +24,10 @@ const Phone = {
       if (b.dataset.tab) this.upMode(false);   // открыли вкладку — режим улучшения выключаем
     });
     $('#upHint').addEventListener('click', e => { if (e.target.closest('[data-up-done]')) this.upMode(false); });
-    // карта на всю ширину: север и юг — пальцем; сначала в середине экрана — город
+    // карта во всю высоту: запад и восток — пальцем; сначала в середине экрана — город
     $('#mapScroll').addEventListener('scroll', () => this.mapEdges(), { passive: true });
-    window.addEventListener('resize', () => this.mapEdges());
+    window.addEventListener('resize', () => { this.measureRail(); this.mapEdges(); });
+    this.measureRail();
     requestAnimationFrame(() => { this.centerMap(); this.mapEdges(); });
     $('#side').addEventListener('click', e => { if (e.target.closest('[data-close-drawer]')) UI.drawer(false); });
     // Кипропедия: оглавление — по ☰; выбрали статью — оглавление убирается
@@ -41,20 +41,22 @@ const Phone = {
   /** Раз в секунду из игрового цикла. */
   tick() { if (UI.upMode) this.markUps(); },
 
-  // ---------------- карта: листается вверх-вниз ----------------
-  /** Тени у верхнего и нижнего края — там ещё есть карта. */
+  // ---------------- карта: листается вбок ----------------
+  /** Высота нижней панели — до неё опускается лист вкладки (--rail-h в phone.css). */
+  measureRail() { const r = $('#rail'); document.documentElement.style.setProperty('--rail-h', (r.offsetHeight || 58) + 'px'); },
+  /** Тени у левого и правого края — там ещё есть карта. */
   mapEdges() {
-    const sc = $('#mapScroll'), w = $('#mapWrap'), can = sc.scrollHeight > sc.clientHeight + 2;
-    w.classList.toggle('more-n', can && sc.scrollTop > 2);
-    w.classList.toggle('more-s', can && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 2);
+    const sc = $('#mapScroll'), w = $('#mapWrap'), can = this.active() && sc.scrollWidth > sc.clientWidth + 2;
+    w.classList.toggle('more-w', can && sc.scrollLeft > 2);
+    w.classList.toggle('more-e', can && sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2);
   },
   /** Город — посередине экрана (по постройкам; если их нет — середина карты). */
   centerMap() {
     const sc = $('#mapScroll');
-    if (!this.active() || sc.scrollHeight <= sc.clientHeight) return;
-    const ys = Game.state.buildings.map(b => b.y), rows = Game.map.reduce((m, t) => Math.max(m, t.y), 0) + 1;
-    const mid = ys.length ? (Math.min(...ys) + Math.max(...ys) + 1) / 2 : rows / 2;
-    sc.scrollTop = mid * sc.scrollHeight / rows - sc.clientHeight / 2;
+    if (!UI.compact() || sc.scrollWidth <= sc.clientWidth) return;
+    const xs = Game.state.buildings.map(b => b.x), cols = Game.map.reduce((m, t) => Math.max(m, t.x), 0) + 1;
+    const mid = xs.length ? (Math.min(...xs) + Math.max(...xs) + 1) / 2 : cols / 2;
+    sc.scrollLeft = mid * sc.scrollWidth / cols - sc.clientWidth / 2;
   },
 
   // ---------------- подсказка по долгому нажатию ----------------
@@ -101,29 +103,6 @@ const Phone = {
     if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
   },
   hideTip() { const t = $('#touchTip'); if (t) t.classList.add('hidden'); },
-
-  // ---------------- полный экран ----------------
-  bindFullscreen() {
-    this.fsSkip = BrowserIO.sessionGet('greekgame.fsSkip') === '1';
-    const check = () => this.fsCheck();
-    ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, check));
-    window.addEventListener('resize', check);
-    window.addEventListener('orientationchange', check);
-    $('#fsGate').addEventListener('click', e => {
-      if (e.target.closest('[data-fs-skip]')) { this.fsSkip = true; BrowserIO.sessionSet('greekgame.fsSkip', '1'); return check(); }
-      if (e.target.closest('[data-fs-go]')) BrowserIO.requestFullscreen().then(ok => {
-        if (!ok) { this.fsSkip = true; UI.toast('Браузер не дал открыть игру на весь экран — играем в окне.'); }
-        check();
-      });
-    });
-    check();
-  },
-  /** Телефон без полного экрана — заслонка с одной кнопкой (браузер разрешает полный экран только по нажатию). */
-  fsCheck() {
-    const need = this.active() && BrowserIO.canFullscreen() && !BrowserIO.isFullscreen() && !this.fsSkip;
-    document.body.classList.toggle('fs-need', need);
-    UI.measureTop && UI.measureTop();
-  },
 
   // ---------------- режим улучшения: замена Shift+клику ----------------
   upMode(on) {

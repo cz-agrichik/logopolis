@@ -3,10 +3,10 @@
   "short_name": "Λόγος",
   "description": "Строите город древнего Кипра — и учите греческий: Логос дают только карточки.",
   "lang": "ru",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "background_color": "#f4ead3",
   "theme_color": "#6e2d14",
   "icons": [

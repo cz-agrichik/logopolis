@@ -1,18 +1,19 @@
 'use strict';
-// Телефон: снимки всех экранов и проверка касаний — в альбомной ориентации, как на настоящем телефоне.
-//   1) снимки: заслонка «на весь экран», карта, четыре вкладки, окно здания, Кипропедия, «Обучение», раунд, окна эпохи и плана;
+// Телефон: снимки всех экранов и проверка касаний — вертикально, как на настоящем телефоне.
+//   1) снимки: карта, четыре вкладки (листом снизу), окно здания, Кипропедия, «Обучение», раунд, окна эпохи и плана, вход;
 //   2) касания: подсказка по долгому нажатию (и что она не нажимает), оглавление ☰, режим ⏫ (+1 уровень за касание),
-//      «Строить» касанием карточки и 🔁 «ещё», крестики окна и панели; страница не шире экрана.
+//      «Строить» касанием карточки и 🔁 «ещё», крестики окна и панели; карта листается вбок; страница не шире экрана;
+//   3) новая игра с обучением: первый экран, вход, выбор колод, стрелка ведёт до первого поля.
 // Код выхода 1, если что-то не так.
 //
 //   node tools/phone/check.js <папка> [устройство Playwright | ширинаxвысота] [эпоха 0|1|2]
-//   например: node tools/phone/check.js phone-out "iPhone SE landscape" 1     (нужен playwright: npm i)
+//   например: node tools/phone/check.js phone-out "iPhone SE" 1     (нужен playwright: npm i)
 const path = require('path');
 const fs = require('fs');
 const { chromium, devices } = require('playwright');
 const ROOT = path.join(__dirname, '..', '..');
 const OUT = path.resolve(process.argv[2] || 'phone-out');
-const DEV = process.argv[3] || 'Pixel 7 landscape', EP = +(process.argv[4] || 1);
+const DEV = process.argv[3] || 'Pixel 7', EP = +(process.argv[4] || 1);
 
 /** Город для снимков: эпоха ep, здания разных уровней на подходящих клетках, знания, благословение, срок набега. */
 function setupCity(ep) {
@@ -41,7 +42,7 @@ function setupCity(ep) {
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const m = DEV.match(/^(\d+)x(\d+)$/);
-  const dev = m ? { ...devices['Pixel 7 landscape'], viewport: { width: +m[1], height: +m[2] }, screen: { width: +m[1], height: +m[2] } } : devices[DEV];
+  const dev = m ? { ...devices['Pixel 7'], viewport: { width: +m[1], height: +m[2] }, screen: { width: +m[1], height: +m[2] } } : devices[DEV];
   if (!dev) { console.log('нет такого устройства в Playwright:', DEV); process.exit(1); }
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ ...dev, deviceScaleFactor: 1 });
@@ -55,7 +56,7 @@ function setupCity(ep) {
   const shot = async n => { await page.waitForTimeout(250); await page.screenshot({ path: path.join(OUT, n + '.png') }); };
   const center = async sel => { const b = await (await page.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
   // клетка карты: на телефоне карта листается — сначала прокрутить к ней, как сделал бы игрок
-  const tile = async (tx, ty) => { const sel = `#map .tile[data-x="${tx}"][data-y="${ty}"]`; await page.$eval(sel, el => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(60); return center(sel); };
+  const tile = async (tx, ty) => { const sel = `#map .tile[data-x="${tx}"][data-y="${ty}"]`; await page.$eval(sel, el => el.scrollIntoView({ block: 'nearest', inline: 'center' })); await page.waitForTimeout(60); return center(sel); };
   const cdp = await ctx.newCDPSession(page);
   const longPress = async (x, y) => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
@@ -64,15 +65,11 @@ function setupCity(ep) {
     await page.waitForTimeout(100);
   };
 
-  await page.addInitScript(() => { try { sessionStorage.setItem('greekgame.mobileWarned', '1'); } catch (e) {} });
   await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset'); await page.waitForTimeout(500);
   await page.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
   console.log(DEV, await ev(() => innerWidth + '×' + innerHeight));
-  // заслонка «на весь экран» — одно касание
-  const gate = await ev(() => document.body.classList.contains('fs-need'));
-  ok(gate === await ev(() => BrowserIO.canFullscreen()), 'заслонка «на весь экран» — там, где браузер это умеет');
-  if (gate) { await shot('00_gate'); await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
-  ok(!(await ev(() => document.body.classList.contains('fs-need'))), 'после касания заслонки её нет');
+  ok(await ev(() => !!$('#modal:not(.hidden) [data-action=welcome-tut]')), 'новый игрок: первый экран — в чём игра и обучение');
+  await shot('00_welcome');
   await ev(() => { Game.paused = true; Math.random = () => 0.5; delete Game.state.planPending; if (Game.tutorialSkip) Game.tutorialSkip(); UI.closeModal(); });
   await ev(`(${setupCity})(${EP})`);
   await ev(() => Phone.centerMap());
@@ -81,7 +78,7 @@ function setupCity(ep) {
   await shot('01_map');
   for (const t of ['build', 'tech', 'rites', 'epoch']) { await page.tap(`#rail button[data-tab=${t}]`); await shot('02_' + t); }
   await page.tap('[data-close-drawer]'); await page.waitForTimeout(250);
-  ok(!(await ev(() => document.body.classList.contains('drawer-open'))), 'крестик убирает выдвижную панель');
+  ok(!(await ev(() => document.body.classList.contains('drawer-open'))), 'крестик убирает лист вкладки');
   await ev(() => UI.showBuilding(Game.state.buildings.find(b => b.type === 'field') || Game.state.buildings[0])); await shot('03_building');
   await page.tap('#modal .m-x'); await page.waitForTimeout(200);
   ok(await ev(() => $('#modal').classList.contains('hidden')), 'крестик закрывает окно здания');
@@ -96,15 +93,21 @@ function setupCity(ep) {
   await ev(() => Study.close()); await ev(() => UI.showEpoch(false)); await shot('07_epoch');
   await ev(() => UI.closeModal()); await ev(() => UI.showLearnPlan()); await shot('08_plan');
   await ev(() => UI.closeModal());
-  await page.tap('#rail [data-open="account"]'); await page.waitForTimeout(200); await shot('08b_account');
-  ok(await ev(() => !!$('#modal:not(.hidden) .acc-modal')), '«Вход» в полосе справа — окно «Вход и прогресс»');
+  await page.tap('#accountBtn'); await page.waitForTimeout(200); await shot('08b_account');
+  ok(await ev(() => !!$('#modal:not(.hidden) .acc-modal')), '👤 в шапке — окно «Вход и прогресс»');
   await ev(() => UI.closeModal());
   if (await ev(() => Phone.active())) {
-    const mp = await ev(() => { const sc = $('#mapScroll'), m = $('#map').getBoundingClientRect(), w = $('#mapWrap').getBoundingClientRect(); return [Math.round(m.width), Math.round(w.width), sc.scrollHeight > sc.clientHeight]; });
-    ok(mp[0] >= mp[1] - 2, `карта на всю ширину (${mp[0]} из ${mp[1]})` + (mp[2] ? ', север и юг — листаются' : ''));
+    const mp = await ev(() => { const sc = $('#mapScroll'), m = $('#map').getBoundingClientRect(); return [Math.round(m.height), sc.clientHeight, sc.scrollWidth > sc.clientWidth, Math.round(m.height / 11)]; });
+    ok(mp[0] >= Math.min(mp[1], 660) - 2, `карта во всю высоту (${mp[0]} из ${mp[1]}, клетка ${mp[3]} px)` + (mp[2] ? ', запад и восток — листаются' : ''));
+    ok(mp[3] >= 28, `клетка карты не мельче 28 px (${mp[3]})`);
+    const bars = await ev(() => { const r = $('#rail').getBoundingClientRect(); return [Math.round(r.bottom), innerHeight, $('#rail').querySelectorAll('button:not([data-open])').length]; });
+    ok(Math.abs(bars[0] - bars[1]) <= 1, `нижняя панель — у нижнего края (${bars[0]} из ${bars[1]}), кнопок ${bars[2]}`);
     const fit = await ev(() => { const b = $('#resources'); return [b.scrollWidth <= b.clientWidth + 1 || b.dataset.fit === '3', b.dataset.fit, [...b.querySelectorAll('.rs-v small')].some(e => e.offsetWidth > 0)]; });
     ok(fit[0] && fit[2], `ресурсы в шапке помещаются (плотность ${fit[1]}), прирост виден`);
   }
+  const out = await ev(() => [...document.querySelectorAll('#topbar button, #topbar a, #logosMedal, #resources, #rail button')]
+    .filter(e => e.offsetWidth).filter(e => { const r = e.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).map(e => e.id || e.className));
+  ok(!out.length, 'шапка и нижняя панель — в пределах экрана' + (out.length ? ': за краем ' + out.join(', ') : ''));
   const wide = await ev(() => [document.documentElement.scrollWidth, innerWidth]);
   ok(wide[0] <= wide[1], `страница не шире экрана (${wide[0]} ≤ ${wide[1]})`);
 
@@ -132,7 +135,7 @@ function setupCity(ep) {
   await page.tap('#rail button[data-tab=build]'); await page.waitForTimeout(300);
   await page.tap('#panel .item:not(.sp):not(.disabled) .item-ic'); await page.waitForTimeout(300);
   const placing = await ev(() => UI.placing);
-  ok(!!placing && !(await ev(() => document.body.classList.contains('drawer-open'))), 'касание карточки — выбор клетки, панель уехала');
+  ok(!!placing && !(await ev(() => document.body.classList.contains('drawer-open'))), 'касание карточки — выбор клетки, лист уехал');
   await page.tap('[data-place-repeat]'); await shot('11_place');
   const n0 = await ev(() => Game.state.buildings.length);
   for (let i = 0; i < 2; i++) {
@@ -143,10 +146,18 @@ function setupCity(ep) {
   ok(await ev(() => Game.state.buildings.length) - n0 === 2, '🔁 ещё: два здания подряд');
   await page.tap('[data-cancel-place]');
 
-  // 3. обучение «Первые шаги» в новой игре: стрелка ведёт к рельсу вкладок, к кнопке в выдвижной панели и к клетке
-  await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset&auth'); await page.waitForTimeout(500);   // ?auth — шаг входа, даже если вход не настроен
+  // карта листается вбок пальцем
+  const sx0 = await ev(() => $('#mapScroll').scrollLeft), toEast = await ev(() => { const sc = $('#mapScroll'); return sc.scrollLeft < (sc.scrollWidth - sc.clientWidth) / 2; });
+  const mb = await (await page.$('#mapScroll')).boundingBox(), fx = k => mb.x + mb.width * (toEast ? .8 - k * .1 : .2 + k * .1);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fx(0), y: mb.y + mb.height / 2 }] });
+  for (let i = 1; i <= 6; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: fx(i), y: mb.y + mb.height / 2 }] }); await page.waitForTimeout(16); }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(400);
+  const sx1 = await ev(() => $('#mapScroll').scrollLeft);
+  ok(sx1 !== sx0 || !(await ev(() => $('#mapScroll').scrollWidth > $('#mapScroll').clientWidth)), `карта листается пальцем вбок (${Math.round(sx0)} → ${Math.round(sx1)})`);
+
+  // 3. обучение «Первые шаги» в новой игре: стрелка ведёт к вкладке внизу, к карточке в листе и к клетке
+  await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset'); await page.waitForTimeout(500);
   await page.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
-  if (await ev(() => document.body.classList.contains('fs-need'))) { await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
   await ev(() => { Game.paused = true; });
   await shot('12_welcome');
   ok(await ev(() => !!$('#modal:not(.hidden) [data-action=welcome-tut]')), 'новый игрок: первый экран — в чём игра и обучение');

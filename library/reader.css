@@ -1061,3 +1061,16 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
 }
 .game-link:hover { filter: brightness(1.05); }
 @media (max-width: 760px) { .game-link span { display: none; } .game-link { padding: 7px 10px; } }
+
+/* ───────── Телефон вертикально: шапка читалки не вылезает за край ─────────
+   ✎ «Править текст» и 🏛️ «В игру» — значками, название книги — сколько влезет (многоточием), строка с числами — мельче. */
+@media (max-width: 600px) {
+  .topbar__inner { gap: 8px; padding: 8px 10px; }
+  .own-again { padding: 6px 10px; font-size: 16px; }
+  .own-again span { display: none; }
+  .topbar__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+  .deck-button { padding-left: 10px; padding-right: 10px; }
+  .chapter-select { flex: 0 1 110px; min-width: 0; }
+}
+@media (max-width: 360px) { .topbar__meta { display: none; } .game-link { padding: 6px 8px; } }

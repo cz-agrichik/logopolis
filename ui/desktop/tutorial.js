@@ -251,8 +251,8 @@ const Tutorial = {
       return { el: this.tileEl('gather:' + ter, t => t.t === ter), say: `${Cat.terrain[ter].name} — жми сюда`, key: 'gather:' + ter };
     }
     if (S.id === 'flow') { const r = Game.rates[S.res] || 0; return { el: this.resCell(S.res), say: r > 0.05 ? `${fmtRate(r)} в секунду — само!` : 'Смотри сюда', key: 'flow' }; }
-    if (S.id === 'pedia') return { el: $(phone ? '#rail [data-open="pedia"]' : '#pediaBtn'), say: 'Жми «?»', key: 'pedia' };
-    if (S.id === 'library') return { el: $(phone ? '#rail [data-open="library"]' : '#libBtn'), say: 'Библиотека — на потом', key: 'library' };
+    if (S.id === 'pedia') return { el: $('#pediaBtn'), say: 'Жми «?»', key: 'pedia' };
+    if (S.id === 'library') return { el: $('#libBtn'), say: 'Библиотека — на потом', key: 'library' };
     if (S.info) return { el: $('#resources'), say: 'Ваши запасы', key: 'res' };
     if (S.build) {
       if (UI.placing === S.build) return { el: this.tileEl('place:' + S.build, t => Game.canPlaceOn(S.build, t)), say: 'Ставь сюда', key: 'place' };
@@ -293,7 +293,8 @@ const Tutorial = {
     this.ring.classList.remove('hidden');
     // стрелка: к панели справа (вкладки, кнопки, полоска вкладок на телефоне) — слева, остриём вправо, чтобы не закрывать
     // соседние кнопки; у верхнего края экрана — снизу, остриём вверх; иначе — сверху, остриём вниз
-    const dir = el.closest('#side, #rail') && r.left > 120 ? 'left' : r.top < 110 && r.bottom + 100 < H ? 'up' : 'down';
+    // (на телефоне вкладки — внизу экрана: к ним стрелка сверху)
+    const dir = el.closest('#side, #rail') && r.left > 120 && !UI.compact() ? 'left' : r.top < 110 && r.bottom + 100 < H ? 'up' : 'down';
     const say = this.arrow.firstChild;
     if (say.textContent !== tg.say) say.textContent = tg.say;
     this.arrow.classList.toggle('up', dir === 'up');

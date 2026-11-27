@@ -39,29 +39,4 @@ const BrowserIO = {
   remove(key) { try { localStorage.removeItem(key); } catch (e) {} },
   /** Перезагрузка без ?параметров — для новой игры и сброса. */
   restart() { location.replace(location.pathname + '?fresh=' + Date.now()); },
-  /** Пометки на время сеанса (например, «уже предупредили про телефон»). */
-  sessionGet(key) { try { return sessionStorage.getItem(key); } catch (e) { return null; } },
-  sessionSet(key, v) { try { sessionStorage.setItem(key, v); } catch (e) {} },
-  /** Телефон: попробовать во весь экран и в альбомную ориентацию (работает не везде — только по нажатию). */
-  preferLandscape() { this.requestFullscreen(); },
-
-  // ---------- полный экран (Fullscreen API; на iPhone его нет — там «На экран „Домой“») ----------
-  /** Открыта как приложение с главного экрана — панелей браузера и так нет. */
-  standalone() {
-    try { return matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone === true; } catch (e) { return false; }
-  },
-  /** Можно ли попросить полный экран (на iPhone — нельзя). */
-  canFullscreen() { return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !this.standalone(); },
-  isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement) || this.standalone(); },
-  /** Во весь экран и в альбомную ориентацию — только из обработчика нажатия. Обещание: true, если получилось. */
-  requestFullscreen() {
-    const lock = () => { try { const o = screen.orientation; if (o && o.lock) o.lock('landscape').catch(() => {}); } catch (e) {} };
-    try {
-      const el = document.documentElement, go = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (!go || this.isFullscreen()) { lock(); return Promise.resolve(this.isFullscreen()); }
-      return Promise.resolve(go.call(el, { navigationUI: 'hide' })).then(() => { lock(); return true; }, () => false);
-    } catch (e) { return Promise.resolve(false); }
-  },
-  /** iPhone / iPad: полный экран — только через «На экран „Домой“». */
-  isIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); },
 };

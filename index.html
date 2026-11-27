@@ -20,7 +20,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <!-- Версия файлов для сброса кэша браузера: после любого изменения кода поднимите ОДНО число — ASSET_V ниже.
        Скрипты и стили подключаются с ?v=ASSET_V; список скриптов — ASSETS в конце страницы (порядок важен). -->
-  <script>var ASSET_V = 145;</script>
+  <script>var ASSET_V = 146;</script>
   <script>
     document.write('<link rel="stylesheet" href="ui/desktop/styles.css?v=' + ASSET_V + '">');
     document.write('<link rel="stylesheet" href="ui/desktop/phone.css?v=' + ASSET_V + '">');   // телефон — поверх компьютерной раскладки
@@ -91,10 +91,7 @@
     </nav>
   </main>
 
-  <div class="rotate-hint" aria-live="polite"><div class="rh-ic">📱</div><b>Поверните телефон горизонтально</b><small>Λόγος раскладывается в альбомной ориентации</small></div>
-  <!-- телефон без полного экрана: одно касание — и игра на весь экран (ui/desktop/phone.js) -->
-  <div id="fsGate" class="fs-gate" aria-live="polite"><button class="fs-go" data-fs-go><span class="fs-ic">⛶</span><b>Играть на весь экран</b></button>
-    <small>Λόγος задуман на весь экран телефона — без панелей браузера</small><button class="link" data-fs-skip>остаться в окне браузера</button></div>
+  <div class="rotate-hint" aria-live="polite"><div class="rh-ic">📱</div><b>Поверните телефон вертикально</b><small>На телефоне Λόγος — в вертикальной ориентации</small></div>
 
   <div id="modal" class="modal hidden"><div class="modal-box" id="modalBox"></div></div>
 

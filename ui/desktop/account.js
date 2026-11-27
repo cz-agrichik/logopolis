@@ -47,7 +47,7 @@ const AccountUI = {
     }).join('')}${guest ? `<button class="btn acc-guest" data-action="auth-guest" data-ctx="${ctx}">${guest}<small>💾 всё хранится только в этом браузере</small></button>` : ''}</div>`;
   },
   /** Где кнопка входа на потом. */
-  whereLater() { return UI.compact() ? 'кнопка 👤 «Вход» в полосе справа' : 'кнопка 👤 вверху справа'; },
+  whereLater() { return 'кнопка 👤 вверху справа'; },
   /** Что даёт вход и что значит «без входа» — честно: синхронизации ещё нет. */
   whyHtml() {
     return `<div class="acc-two">
