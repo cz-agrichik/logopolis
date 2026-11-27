@@ -21,7 +21,7 @@ const Phone = {
       if (!b) return;
       if (b.hasAttribute('data-up-mode')) return this.upMode(!UI.upMode);
       if (b.dataset.open === 'library') { Session.saveAll(); location.href = 'library/index.html'; return; }
-      if (b.dataset.open) { UI.drawer(false); this.upMode(false); return b.dataset.open === 'pedia' ? Pedia.open() : School.open(); }
+      if (b.dataset.open) { UI.drawer(false); this.upMode(false); return b.dataset.open === 'pedia' ? Pedia.open() : b.dataset.open === 'account' ? AccountUI.showPanel() : School.open(); }
       if (b.dataset.tab) this.upMode(false);   // открыли вкладку — режим улучшения выключаем
     });
     $('#upHint').addEventListener('click', e => { if (e.target.closest('[data-up-done]')) this.upMode(false); });

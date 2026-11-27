@@ -178,7 +178,7 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .fs-gate .link { color: #fbf3e2; opacity: .65; font-size: 12px; }
 
   /* шапка: Кипропедия и «Обучение» уехали в полосу справа; ресурсы — значок над числом */
-  #pediaBtn, #schoolBtn, #libBtn { display: none; }
+  #pediaBtn, #schoolBtn, #libBtn, #accountBtn { display: none; }
   .wide-only { display: none; }
   /* ресурсы тянутся на свободное место (ячейка — не шире 110), но соседей не давят: не помещаются — ячейки плотнее (UI.fitRes) */
   .rs { gap: 3px; padding: 2px 5px 5px; max-width: 110px; }
@@ -338,9 +338,18 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
 @media (orientation: landscape) and (max-height: 520px) {
   .welcome .tut-hello { font-size: 22px; }
   .welcome h2 { font-size: 19px; }
+  .wc-tag { font-size: 12px; margin-bottom: 6px; }
+  .wc-lead { font-size: 12.5px; line-height: 1.45; }
   .welcome .story { font-size: 12.5px; margin: 4px 0 8px; }
   .wc-points li { font-size: 12.5px; gap: 9px; }
   .wc-ic, .wc-ic svg { width: 30px; height: 30px; }
   .wc-offer { font-size: 12.5px; padding: 8px 10px; margin-bottom: 8px; }
   .em-vignette svg { width: 40px; height: 40px; }
+}
+
+/* совсем низкий экран (iPhone SE в альбомной: ~320 px): девять кнопок полосы справа — плотнее */
+@media (orientation: landscape) and (max-height: 340px) {
+  .rail { gap: 3px; }
+  .rail button { min-height: 26px; padding: 2px 0; }
+  .rail button i { font-size: 17px; }
 }

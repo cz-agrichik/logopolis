@@ -886,6 +886,9 @@ const UI = {
     if (act === 'confirm-yes') { const f = this.pendingConfirm; this.pendingConfirm = null; this.closeModal(); if (f) f(); return; }
     if (act === 'close') return this.closeModal();
     if (act === 'plan') return this.showLearnPlan();
+    if (act === 'auth') return AccountUI.signIn(a.dataset.provider, a.dataset.ctx);
+    if (act === 'auth-guest') return AccountUI.guest(a.dataset.ctx);
+    if (act === 'auth-out') return AccountUI.signOut();
     if (act === 'welcome-tut') return Tutorial.welcome(true);
     if (act === 'welcome-skip') return Tutorial.welcome(false);
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);

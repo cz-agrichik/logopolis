@@ -158,6 +158,12 @@ const SOLVE = `((wrongAt) => {
     await text(page, 'intro', '#modalBox');
     await startGame(page, true);
     await shot(page, '02_start');
+    if (await page.$('#accountBtn')) {   // окно «Вход и прогресс» (с версии 143)
+      await page.click('#accountBtn');
+      await page.evaluate(() => document.querySelectorAll('.acc-id').forEach(e => { e.textContent = 'Номер этого браузера в игре: b-…'; }));   // номер — случайный
+      await shot(page, '02b_account'); await text(page, 'account', '#modalBox');
+      await page.evaluate(() => UI.closeModal());
+    }
     for (const tab of panelTabs) { await page.click(`[data-tab=${tab}]`); await shot(page, '03_tab_' + tab); await text(page, 'tab_' + tab, '#panel'); }
     await page.click('[data-tab=build]');
     await page.evaluate(RICH_STATE);
@@ -363,11 +369,15 @@ const SOLVE = `((wrongAt) => {
   // ---------- 8. Обучение «Первые шаги»: приветствие, каждый шаг (карточка и стрелка), финал ----------
   {
     const { ctx, page } = await newPage(browser);
-    await page.goto(URL + '?reset');
+    await page.goto(URL + '?reset&auth');   // ?auth — показать шаги входа, даже если вход не настроен (с версии 143)
     if (await page.evaluate(() => typeof Tutorial !== 'undefined')) {
       const clearToasts = () => page.evaluate(() => { const t = document.querySelector('#toasts'); if (t) t.innerHTML = ''; });
       if (await page.$('[data-action=welcome-tut]')) {   // с версии 142: «Начать с обучением» на первом экране → выбор колод
         await page.click('[data-action=welcome-tut]');
+        if (await page.$('[data-action=auth-guest]')) {   // «Где хранить прогресс?» — пока без входа
+          await shot(page, '50a_tut_auth'); await text(page, 'tut_auth', '#modalBox');
+          await page.click('[data-action=auth-guest]');
+        }
         await shot(page, '50_tut_plan'); await text(page, 'tut_plan', '#modalBox');
         await page.click('[data-plan=a1]');
         await clearToasts();

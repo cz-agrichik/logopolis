@@ -806,10 +806,12 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .tut-modal h2 { margin: 2px 0 10px; color: var(--accent); }
 .tut-modal p { text-align: left; line-height: 1.5; }
 /* первый экран нового игрока (Tutorial.showWelcome) и рассказ о начале пути для новой игры поверх прежней (UI.showEpoch(true)) */
-.modal-box:has(.welcome) { width: min(580px, 100%); }
+.modal-box:has(.welcome) { width: min(620px, 100%); }
 .welcome { text-align: center; }
 .welcome .tut-hello { font-size: 30px; color: var(--gold); font-weight: 700; }
-.welcome h2 { font-size: 24px; color: var(--accent); margin: 0 0 8px; }
+.welcome h2 { font-size: 24px; color: var(--accent); margin: 0; }
+.wc-tag { color: var(--ink-2); font-size: 14px; margin: 2px 0 10px; }
+.wc-lead { text-align: left; font-size: 14.5px; line-height: 1.55; margin: 0 0 8px; }
 .welcome .story, .epoch-modal .story { text-align: left; font-style: italic; color: #5a4632; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; margin: 8px 0 12px; line-height: 1.5; font-size: 14px; }
 .wc-points { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 9px; text-align: left; }
 .wc-points li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.45; }
@@ -822,3 +824,25 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .em-vignette { display: flex; justify-content: center; gap: 14px; margin: 10px 0 4px; }
 .em-vignette svg { width: 54px; height: 54px; }
 .plan-modal > p.plan-help { font-size: 13px; color: var(--ink-2); margin: -4px 0 6px; }
+/* вход (ui/desktop/account.js): кнопка 👤 в шапке, окно «Вход и прогресс», шаг на старте, блок в финале обучения */
+.acc-btn { position: relative; }
+.acc-btn.on::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 9px; height: 9px; border-radius: 50%; background: #6fd36f; box-shadow: 0 0 0 2px #6e2d14; }
+.modal-box:has(.acc-modal) { width: min(500px, 100%); }
+.acc-modal { text-align: center; }
+.acc-modal h2 { font-size: 24px; color: var(--accent); margin: 2px 0 8px; }
+.acc-modal p { text-align: left; line-height: 1.5; font-size: 14px; }
+.acc-btns { display: flex; flex-direction: column; gap: 8px; margin: 12px auto 12px; max-width: 320px; }
+.acc-btns .btn { padding: 10px 14px; font-size: 15px; display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.acc-btns .btn small { font-size: 11px; font-weight: 400; opacity: .85; }
+.acc-google { background: #fff; color: #2a2017; box-shadow: inset 0 0 0 1.5px var(--parch-3), 0 2px 0 rgba(0,0,0,.12); }
+.acc-telegram { background: #2a8bd0; color: #fff; box-shadow: 0 2px 0 #1d6aa1; }
+.acc-btns .acc-off { opacity: .55; filter: grayscale(.6); }
+.acc-who { display: flex; gap: 12px; align-items: center; text-align: left; background: #fff8; border-radius: 10px; padding: 10px 12px; margin: 6px 0 4px; }
+.acc-who img, .acc-who .acc-av { width: 44px; height: 44px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 26px; background: var(--parch-2); }
+.acc-who b { display: block; font-size: 16px; }
+.acc-who small { color: var(--ink-2); font-size: 12.5px; }
+.acc-id { margin-top: 10px; font-size: 11px; }
+.acc-offer { text-align: left; background: #fff8dc; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--gold-l); padding: 10px 12px; font-size: 14px; line-height: 1.45; margin: 4px 0 14px; }
+.acc-offer .acc-btns { margin: 10px auto 2px; flex-direction: row; max-width: none; justify-content: center; }
+/* длинный первый экран на невысоком окне: кнопки — всегда видны внизу */
+.welcome .em-actions { position: sticky; bottom: -20px; margin: 0 -22px -20px; padding: 12px 22px 16px; background: linear-gradient(rgba(244,234,211,0), var(--parch) 35%); }

@@ -8,6 +8,7 @@
 const Session = {
   io: null,
   LEGACY: ['greekgame.save.v2', 'greekgame.save.v1'],   // общее сохранение до разделения
+  extraKeys: [],   // ключи платформы, которые тоже стираются при «Стереть всё» и аварийном сбросе (вход — platform/account.js)
 
   // Вторая вкладка. У каждого сохранения рядом лежит штамп «какая вкладка записала последней» (KEY + STAMP).
   // Вкладка пишет, только пока штамп в хранилище — её собственный. Если поверх записала другая вкладка
@@ -73,9 +74,9 @@ const Session = {
   wipe() {
     Game.resetting = Learn.resetting = true;   // больше ничего не сохраняем
     if (!this.io) return;
-    for (const k of [Game.KEY, Learn.KEY, ...this.LEGACY, this.LEGACY[0] + '.bak']) this.io.remove(k);
+    for (const k of [Game.KEY, Learn.KEY, ...this.LEGACY, this.LEGACY[0] + '.bak', ...this.extraKeys]) this.io.remove(k);
     this.io.restart();
   },
   /** Аварийный сброс (index.html?reset): то же, но без перезагрузки. */
-  clear(io) { for (const k of [Game.KEY, Learn.KEY, ...this.LEGACY]) { io.remove(k); io.remove(k + this.STAMP); } },
+  clear(io) { for (const k of [Game.KEY, Learn.KEY, ...this.LEGACY]) { io.remove(k); io.remove(k + this.STAMP); } for (const k of this.extraKeys) io.remove(k); },
 };

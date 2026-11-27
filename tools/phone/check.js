@@ -96,6 +96,9 @@ function setupCity(ep) {
   await ev(() => Study.close()); await ev(() => UI.showEpoch(false)); await shot('07_epoch');
   await ev(() => UI.closeModal()); await ev(() => UI.showLearnPlan()); await shot('08_plan');
   await ev(() => UI.closeModal());
+  await page.tap('#rail [data-open="account"]'); await page.waitForTimeout(200); await shot('08b_account');
+  ok(await ev(() => !!$('#modal:not(.hidden) .acc-modal')), '«Вход» в полосе справа — окно «Вход и прогресс»');
+  await ev(() => UI.closeModal());
   if (await ev(() => Phone.active())) {
     const mp = await ev(() => { const sc = $('#mapScroll'), m = $('#map').getBoundingClientRect(), w = $('#mapWrap').getBoundingClientRect(); return [Math.round(m.width), Math.round(w.width), sc.scrollHeight > sc.clientHeight]; });
     ok(mp[0] >= mp[1] - 2, `карта на всю ширину (${mp[0]} из ${mp[1]})` + (mp[2] ? ', север и юг — листаются' : ''));
@@ -141,13 +144,16 @@ function setupCity(ep) {
   await page.tap('[data-cancel-place]');
 
   // 3. обучение «Первые шаги» в новой игре: стрелка ведёт к рельсу вкладок, к кнопке в выдвижной панели и к клетке
-  await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset'); await page.waitForTimeout(500);
+  await page.goto('file://' + path.join(ROOT, 'index.html') + '?reset&auth'); await page.waitForTimeout(500);   // ?auth — шаг входа, даже если вход не настроен
   await page.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
   if (await ev(() => document.body.classList.contains('fs-need'))) { await page.tap('[data-fs-go]'); await page.waitForTimeout(400); }
   await ev(() => { Game.paused = true; });
   await shot('12_welcome');
   ok(await ev(() => !!$('#modal:not(.hidden) [data-action=welcome-tut]')), 'новый игрок: первый экран — в чём игра и обучение');
   await page.tap('[data-action=welcome-tut]'); await page.waitForTimeout(200);
+  await shot('12a_auth');
+  ok(await ev(() => !!$('#modal:not(.hidden) [data-action=auth-guest]')), 'новый игрок: потом — «Где хранить прогресс?»');
+  await page.tap('[data-action=auth-guest]'); await page.waitForTimeout(200);
   await shot('12b_plan');
   await page.tap('[data-plan=a1start]'); await page.waitForTimeout(200);
   const arrow = () => ev(() => { Tutorial.update(); const r = $('#tutRing'), b = r.getBoundingClientRect(); return { on: !r.classList.contains('hidden'), x: b.left + b.width / 2, y: b.top + b.height / 2, in: b.left >= -2 && b.right <= innerWidth + 2 && b.top >= -2 && b.bottom <= innerHeight + 2, step: (Game.tutorialCurrent() || {}).id, say: $('.tut-say').textContent }; });

@@ -37,20 +37,26 @@ const Tutorial = {
   /** Первый экран совсем нового игрока: в чём игра — и предложение обучения. Дальше — «Что будем учить?», потом игра.
    *  (Новая игра поверх прежней — другой экран: рассказ об эпохе, UI.showEpoch(true).) Закрыть мимо кнопок нельзя. */
   showWelcome() {
-    const T = Cat.tutorial, ic = [Art.svg(Looks.icons('house', 1)[0]), '<b class="wc-l">λ</b>', '<span class="wc-e">📜</span>'];
+    const T = Cat.tutorial;
+    const words = Math.floor(new Set(WORD_DECKS.flatMap(d => d.cards.map(c => c[0]))).size / 100) * 100;
+    const ic = {
+      city: Art.svg(Looks.icons('house', 1)[0]), logos: '<b class="wc-l">λ</b>', words: '<span class="wc-e">📜</span>',
+      books: '<span class="wc-e">📖</span>', history: Art.svg('shrine1'),
+    };
     UI.showModal(`<div class="welcome"><div class="meander"></div>
-      <div class="tut-hello">Χαίρετε!</div><h2>Λόγος · Кипр сквозь эпохи</h2>
+      <div class="tut-hello">Χαίρετε!</div><h2>Λόγος · Кипр сквозь эпохи</h2><div class="wc-tag">${esc(T.tagline)}</div>
+      <p class="wc-lead">${esc(T.lead)}</p>
       <p class="story">${esc(T.story)}</p>
-      <ul class="wc-points">${T.points.map(([b, t], i) => `<li><span class="wc-ic">${ic[i]}</span><span><b>${esc(b)}</b> — ${esc(t)}</span></li>`).join('')}</ul>
+      <ul class="wc-points">${T.points.map(([k, b, t]) => `<li><span class="wc-ic">${ic[k]}</span><span><b>${esc(b.replace('{words}', words))}</b> — ${esc(t)}</span></li>`).join('')}</ul>
       <div class="wc-offer"><b>🎓 ${esc(T.name)}.</b> ${esc(T.offer.replace('{r}', BALANCE.tutorialReward))}</div>
       <div class="em-actions"><button class="btn ghost" data-action="welcome-skip">Пропустить обучение</button>
       <button class="btn gold" data-action="welcome-tut">Начать с обучением →</button></div></div>`, { noX: true, sticky: true });
     this.update();   // карточка «Показать первые шаги?» под окном не нужна
   },
-  /** Ответ на первом экране: с обучением или без — и к выбору колод (если его ещё не было). */
+  /** Ответ на первом экране: с обучением или без — дальше вход и выбор колод (если их ещё не было). */
   welcome(go) {
     if (go) { Game.tutorialStart(this.rounds()); this.folded = false; } else Game.tutorialSkip();
-    if (Game.state.planPending) UI.showLearnPlan(); else UI.closeModal();
+    AccountUI.startNext();   // дальше — вход (если ещё не решали), «Что будем учить?», игра
     UI.lastPanel = null; UI.renderPanel();
     this.update();
   },
@@ -79,6 +85,7 @@ const Tutorial = {
     UI.showModal(`<div class="tut-modal"><div class="tut-hello">Εύγε!</div><h2>${esc(Cat.tutorial.name)} пройдены</h2>
       <p>За обучение — <b>λ +${sum}</b>. Дальше — сами: улучшайте здания (клик по зданию покажет, что даст новый уровень),
       ловите беглых коз, копите Логос на знания и чудеса. Что нужно для бронзового века — во вкладке «Эпоха».</p>
+      ${AccountUI.finishOfferHtml()}
       <div class="em-actions"><button class="btn ghost" data-pedia="a:basics">? Кипропедия</button>
       <button class="btn gold" data-action="close">Играть дальше →</button></div></div>`, { small: true });
   },
