@@ -17,6 +17,9 @@ const AccountUI = {
       if (f) { e.preventDefault(); this.saveName(f); }
     });
     this.renderBtn();
+    // вошли раньше: этот браузер главный — дописать незаписанное; под аккаунтом зашли в другом браузере — этот устарел
+    Account.onStale = () => this.showStale();
+    if (Account.signedIn()) Account.sync().then(r => this.synced(r, 'start'));
   },
 
   /** Кнопка 👤: вошёл — зелёная точка и имя в подсказке. */
@@ -24,7 +27,8 @@ const AccountUI = {
     const s = Account.state, on = Account.signedIn();
     const b = $('#accountBtn');
     b.classList.toggle('on', on);
-    b.title = on ? `Вход: ${this.NAMES[s.provider]} — ${s.name || s.username || s.email}. Нажмите, чтобы посмотреть или выйти` : 'Вход и прогресс: сейчас вы играете без входа — всё хранится в этом браузере';
+    b.title = on ? `Вход: ${this.NAMES[s.provider]} — ${s.name || s.username || s.email}. Нажмите, чтобы посмотреть или выйти`
+      : `Вход и прогресс: ${s.name ? s.name + ', в' : 'с'}ейчас вы играете без входа — всё хранится в этом браузере`;
     const rail = $('#rail [data-open="account"] span');
     if (rail) rail.textContent = on ? 'Профиль' : 'Вход';
   },
@@ -81,18 +85,19 @@ const AccountUI = {
   /** Окно «Вход и прогресс». editName — сразу открыть поле «Имя в игре». */
   showPanel(editName = false) {
     const s = Account.state, on = Account.signedIn();
-    const via = `${esc(this.NAMES[s.provider])}${s.email ? ' · ' + esc(s.email) : s.username ? ' · @' + esc(s.username) : ''}`;
+    const via = on ? `${esc(this.NAMES[s.provider])}${s.email ? ' · ' + esc(s.email) : s.username ? ' · @' + esc(s.username) : ''}` : 'без входа · только в этом браузере';
     const nameRow = editName
       ? `<form class="acc-name" data-acc-name><input name="n" maxlength="40" value="${esc(s.name || '')}" placeholder="Как вас называть в игре" autocomplete="nickname">
           <button class="btn small gold" type="submit">Сохранить</button><button class="btn small ghost" type="button" data-action="acc-name-cancel">Отмена</button></form>`
-      : `<b>${esc(s.name || s.username || s.email || 'Без имени')}</b> <button class="link" data-action="acc-name-edit">✎ изменить имя</button>`;
-    const who = on ? `<div class="acc-who">${s.photo ? `<img src="${esc(s.photo)}" alt="" referrerpolicy="no-referrer">` : '<span class="acc-av">👤</span>'}
-        <div class="acc-who-t">${nameRow}<small>${via}</small></div></div>` : '';
+      : s.name ? `<b>${esc(s.name)}</b> <button class="link" data-action="acc-name-edit">✎ изменить имя</button>`
+      : `<b class="dim">Имя не задано</b> <button class="link" data-action="acc-name-edit">✎ задать имя</button>`;
+    const who = `<div class="acc-who">${on && s.photo ? `<img src="${esc(s.photo)}" alt="" referrerpolicy="no-referrer">` : '<span class="acc-av">👤</span>'}
+        <div class="acc-who-t">${nameRow}<small>${via}</small></div></div>`;
     UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>${on ? 'Вы вошли' : 'Вход'}</h2>
       ${on ? `${who}<p>Вы в списке игроков под этим именем${s.profilePending ? ' (запишем, как только будет связь)' : ''}. Прогресс пока хранится в этом браузере:
         синхронизация между устройствами — в работе; когда она появится, город и слова поедут за вами.</p>
         <div class="em-actions"><button class="btn ghost small" data-action="auth-out">Выйти</button><button class="btn gold" data-action="close">Готово</button></div>`
-      : `<p><b>Сейчас вы играете без входа</b> — прогресс хранится только в этом браузере.</p>${this.whyHtml()}${this.buttonsHtml('panel')}
+      : `${who}<p><b>Сейчас вы играете без входа</b> — прогресс хранится только в этом браузере.</p>${this.whyHtml()}${this.buttonsHtml('panel')}
         <div class="em-actions"><button class="btn ghost small" data-action="close">Пока без входа</button></div>`}
       <div class="acc-id dim">Номер этого браузера в игре: ${esc(s.id)}</div></div>`, { small: true });
   },
@@ -122,6 +127,7 @@ const AccountUI = {
       if (r.error !== 'cancelled') UI.toast(esc(this.errorText(r.error, p)));
       return;
     }
+    if (r.result === 'ask') return this.showChoice(ctx);
     const s = Account.state;
     UI.toast(`👤 Вы вошли через ${this.NAMES[p]}${s.name ? ': <b>' + esc(s.name) + '</b>' : ''}`);
     this.after(ctx);
@@ -132,10 +138,169 @@ const AccountUI = {
     const btn = form.querySelector('[type=submit]');
     btn.disabled = true; btn.textContent = 'Сохраняем…';
     const r = await Account.setName(form.elements.n.value);
-    if (!r.ok) { btn.disabled = false; btn.textContent = 'Сохранить'; return UI.toast(r.error === 'emptyName' ? 'Имя не может быть пустым' : 'Сначала войдите'); }
+    if (!r.ok) { btn.disabled = false; btn.textContent = 'Сохранить'; return UI.toast('Имя не может быть пустым'); }
     this.renderBtn();
-    UI.toast(r.pending ? '👤 Имя сохранено здесь — в список игроков запишем, как только будет связь' : `👤 Теперь вы — <b>${esc(Account.state.name)}</b>`);
+    if (r.result === 'ask') return this.showChoice('panel');
+    if (r.result === 'stale') return;   // окно «Этот браузер устарел» уже на экране
+    UI.toast(r.result === 'pending' ? '👤 Имя сохранено здесь — в аккаунт запишем, как только будет связь' : `👤 Теперь вы — <b>${esc(Account.state.name)}</b>`);
     this.showPanel();
+  },
+
+  // ---------- «Что оставить?» — в браузере и в аккаунте разное ----------
+  // 🚨 Здесь что-то затирается навсегда (сейчас имя, потом город). Поэтому: под каждой кнопкой красным — что пропадёт;
+  // второй экран «Точно заменить?» с тем же списком; кнопка «Да, заменить» оживает через 3 секунды. Без второго экрана
+  // Account.choose / Account.adopt ничего не заменят (confirmed).
+  /** Как показать части версии (Account.parts): сейчас имя; город и учёба добавятся сюда же. */
+  partsHtml(v) {
+    return `<div class="acc-ver-l">Имя в игре: <b>${v.name ? esc(v.name) : '—'}</b></div>`;
+  },
+  /** Что пропадёт, списком — по частям версии, которые не пусты. */
+  lossList(v) {
+    const items = [];
+    if (v.name) items.push(`имя в игре «${esc(v.name)}»`);
+    return items.length ? `<ul>${items.map(x => `<li>${x}</li>`).join('')}</ul>` : '<ul><li>ничего — там пусто</li></ul>';
+  },
+  when(ms, verb) {
+    return ms ? `${verb} ${esc(new Date(ms).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }))}` : '';
+  },
+  /** Окно выбора версии. ctx — откуда пришли (welcome / panel / finish / start): туда и вернёмся. */
+  showChoice(ctx = this.choiceCtx) {
+    const c = Account.choice();
+    if (!c) return this.after(ctx);
+    this.choiceCtx = ctx;
+    const prov = esc(this.NAMES[c.provider]);
+    const at = (ms, verb) => ms ? `<small>${this.when(ms, verb)}</small>` : '';
+    UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>Что оставить?</h2>
+      <p>В этом браузере и в аккаунте ${prov} сохранено разное. Выберите одно — им заменим другое.
+        Смешивать по частям не будем: так ничего не перепутается.</p>
+      <div class="acc-two acc-vers">
+        <div><b>💻 Этот браузер</b>${this.partsHtml(c.local)}${at(c.localAt, 'изменено')}
+          <button class="btn gold" data-action="acc-pick" data-pick="local">Оставить это</button>
+          <small>в аккаунте станет так же</small><div class="acc-lost">⚠️ Пропадёт из аккаунта: ${this.lossList(c.remote)}</div></div>
+        <div><b>☁️ Аккаунт ${prov}</b>${this.partsHtml(c.remote)}${at(c.savedAt, 'сохранено')}
+          <button class="btn gold" data-action="acc-pick" data-pick="remote">Взять из аккаунта</button>
+          <small>в этом браузере станет так же</small><div class="acc-lost">⚠️ Пропадёт из этого браузера: ${this.lossList(c.local)}</div></div>
+      </div>
+      <div class="em-actions"><button class="btn ghost small" data-action="acc-pick" data-pick="">${c.login ? 'Не входить — ничего не менять' : 'Решить потом'}</button></div></div>`,
+      { noX: true, sticky: true });
+  },
+  /** Первый выбор: «не входить» — сразу; заменить — только через второй экран. */
+  async pick(which) {
+    if (this.busy) return;
+    if (which) return this.showConfirmChoice(which);
+    this.busy = true;
+    const c = Account.choice(), ctx = this.choiceCtx;
+    await Account.choose(null);
+    this.busy = false;
+    this.renderBtn();
+    UI.toast(c && c.login ? '👤 Вход отменён — всё осталось как было' : '👤 Хорошо, спросим в следующий раз');
+    return ctx === 'start' ? UI.closeModal() : this.after(ctx);
+  },
+  /** Второй экран: «Точно заменить?» — что пропадёт навсегда и что останется. */
+  showConfirmChoice(which) {
+    const c = Account.choice();
+    if (!c) return this.after(this.choiceCtx);
+    const prov = esc(this.NAMES[c.provider]);
+    const keepLocal = which === 'local';
+    const lostWhere = keepLocal ? `в аккаунте ${prov}` : 'в этом браузере';
+    const lostAt = keepLocal ? this.when(c.savedAt, 'сохранена') : this.when(c.localAt, 'изменена');
+    this.confirming = { kind: 'choice', which };
+    UI.showModal(`<div class="acc-modal"><div class="dim">Прогресс</div><h2>⚠️ Точно заменить?</h2>
+      <div class="acc-loss"><b>Пропадёт навсегда</b> — версия ${lostWhere}${lostAt ? ` (${lostAt})` : ''}:${this.lossList(keepLocal ? c.remote : c.local)}</div>
+      <p>Останется версия ${keepLocal ? 'этого браузера' : `из аккаунта ${prov}`}:</p>${this.partsHtml(keepLocal ? c.local : c.remote)}
+      <p>Её получат и этот браузер, и аккаунт. <b>Отменить это будет нельзя.</b></p>
+      ${this.confirmButtons('Да, заменить')}</div>`, { noX: true, sticky: true });
+    this.armConfirm();
+  },
+  /** «← Назад» и «Да, …»: опасная кнопка справа, другого цвета и оживает не сразу. */
+  confirmButtons(yes) {
+    return `<div class="em-actions acc-confirm"><button class="btn gold" data-action="acc-back">← Назад</button>
+      <button class="btn danger-fill" data-action="acc-confirm" data-label="${esc(yes)}" disabled>${esc(yes)}</button></div>`;
+  },
+  /** Кнопка «Да, …» оживает через 3 секунды — чтобы не проскочить её двойным щелчком или по привычке. */
+  armConfirm(sec = 3) {
+    clearInterval(this.armTimer);
+    let left = sec;
+    const tick = () => {
+      const b = $('#modalBox [data-action="acc-confirm"]');
+      if (!b) return clearInterval(this.armTimer);
+      if (left <= 0) { clearInterval(this.armTimer); b.disabled = false; b.textContent = b.dataset.label; return; }
+      b.disabled = true; b.textContent = `${b.dataset.label} (${left})`; left--;
+    };
+    tick();
+    this.armTimer = setInterval(tick, 1000);
+  },
+  back() {
+    clearInterval(this.armTimer);
+    const k = this.confirming && this.confirming.kind;
+    this.confirming = null;
+    return k === 'stale' ? this.showStale() : this.showChoice();
+  },
+  async confirm() {
+    const f = this.confirming;
+    if (!f || this.busy) return;
+    const b = $('#modalBox [data-action="acc-confirm"]');
+    if (!b || b.disabled) return;
+    b.disabled = true; b.textContent = 'Заменяем…';
+    if (f.kind === 'stale') return this.adopt(true);
+    this.busy = true;
+    const c = Account.choice(), ctx = this.choiceCtx;
+    const r = await Account.choose(f.which, true);
+    this.busy = false;
+    this.confirming = null;
+    this.renderBtn();
+    if (!r.ok) { UI.toast('Не получилось — попробуйте ещё раз'); return this.showChoice(); }
+    const s = Account.state;
+    UI.toast((c && c.login ? `👤 Вы вошли через ${this.NAMES[s.provider]}: <b>${esc(s.name)}</b>. ` : '👤 ')
+      + (f.which === 'local' ? 'В аккаунте теперь — как в этом браузере' : 'В этом браузере теперь — как в аккаунте')
+      + (r.pending ? ' (в аккаунт запишем, как только будет связь)' : ''));
+    if (ctx === 'start') return UI.closeModal();
+    this.after(ctx);
+  },
+  /** Запуск: сверка при входе не прошла (не было связи), а в браузере и в аккаунте разное — спросить, когда освободится экран. */
+  synced(r, ctx) {
+    this.renderBtn();
+    if (r.result !== 'ask') return;
+    if ($('#modal').classList.contains('hidden')) return this.showChoice(ctx);
+    const prev = UI.afterModal;
+    UI.afterModal = () => { if (prev) prev(); this.synced(r, ctx); };
+  },
+
+  // ---------- «Этот браузер устарел» — под аккаунтом играют в другом браузере ----------
+  // 🚨 Перезагрузка заменяет версию этого браузера версией аккаунта. Здесь есть то, чего нет в аккаунте, — показать красным
+  // и спросить второй раз («Точно перезагрузить?»); нет — перезагрузить сразу, ничего не теряется.
+  showStale() {
+    const l = Account.staleLoss();
+    const lossHtml = l.lost
+      ? `<div class="acc-loss"><b>Здесь есть то, чего нет в аккаунте</b>${l.localAt ? ` (${this.when(l.localAt, 'изменено')})` : ''}:${this.lossList(l.local)}
+          При перезагрузке это пропадёт: останется версия из аккаунта${l.remote ? '' : ' (какая — узнаем при перезагрузке)'}.</div>
+        ${l.remote ? this.partsHtml(l.remote) : ''}`
+      : '<p class="dim">Здесь ничего не потеряется: в аккаунте то же самое.</p>';
+    UI.lockWith(`<div class="epoch-modal"><h2>🔄 Этот браузер устарел</h2>
+      <p>Под вашим аккаунтом зашли в игру на другом устройстве или в другом браузере — теперь главная версия там.
+        Здесь продолжать с устаревшей нельзя: она затёрла бы новую.</p>
+      <p>Перезагрузите страницу — возьмём версию из аккаунта, и главным снова станет этот браузер (а устаревшим — тот).</p>
+      ${lossHtml}
+      <div class="em-actions"><button class="btn gold" data-action="acc-adopt">${l.lost ? 'Перезагрузить…' : 'Перезагрузить'}</button></div></div>`, 'account');
+  },
+  /** «Перезагрузить»: здесь есть то, чего нет в аккаунте, — второй экран; иначе — сразу. */
+  async adopt(confirmed = false) {
+    if (!confirmed && Account.staleLoss().lost) return this.showConfirmStale();
+    const btn = $('#modalBox [data-action="acc-adopt"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Загружаем…'; }
+    const r = await Account.adopt(confirmed);
+    if (r.error === 'notConfirmed') { this.confirming = null; return this.showStale(); }   // в аккаунте уже другое — показать заново
+    BrowserIO.restart();   // не вышло (нет связи) — после перезагрузки попробуем снова; здесь ничего не заменили
+  },
+  showConfirmStale() {
+    const l = Account.staleLoss();
+    this.confirming = { kind: 'stale' };
+    UI.lockWith(`<div class="epoch-modal"><h2>⚠️ Точно перезагрузить?</h2>
+      <div class="acc-loss"><b>Пропадёт навсегда</b> — версия этого браузера${l.localAt ? ` (${this.when(l.localAt, 'изменена')})` : ''}:${this.lossList(l.local)}</div>
+      ${l.remote ? `<p>Останется версия из аккаунта:</p>${this.partsHtml(l.remote)}` : '<p>Останется версия из аккаунта.</p>'}
+      <p><b>Отменить это будет нельзя.</b></p>
+      ${this.confirmButtons('Да, перезагрузить')}</div>`, 'account');
+    this.armConfirm();
   },
   async signOut() { await Account.signOut(); this.renderBtn(); UI.toast('👤 Вы вышли. Город и слова остались в этом браузере.'); this.showPanel(); },
   /** Куда дальше после входа или «без входа». */

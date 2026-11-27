@@ -207,6 +207,9 @@ body.up-mode .tile.up-max::before { content: '★'; position: absolute; left: 2p
   .plans { grid-template-columns: 1fr; }
   .plan:last-child:nth-child(odd) { grid-column: auto; }
   .acc-two { grid-template-columns: 1fr; font-size: 13px; }
+  /* «Точно заменить?»: кнопки в столбик, «Да, …» сверху, «Назад» внизу — там, куда пришёлся бы второй тап по прошлой кнопке */
+  .acc-confirm { flex-direction: column-reverse; align-items: stretch; }
+  .acc-confirm .btn { white-space: nowrap; }
   .welcome .tut-hello { font-size: 26px; }
   .welcome h2 { font-size: 21px; }
   .wc-lead, .wc-points li { font-size: 13.5px; }

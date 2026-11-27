@@ -851,6 +851,17 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .acc-who-t .link { margin-left: 4px; white-space: nowrap; }
 .acc-who-t small { display: block; overflow-wrap: anywhere; }
 .acc-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
+.acc-vers > div { display: flex; flex-direction: column; gap: 6px; }
+.acc-vers .acc-ver-l { font-size: 15px; }
+.acc-vers .btn { margin-top: auto; }
+.acc-vers small { color: var(--ink-2); font-size: 12.5px; }
+.acc-lost { color: var(--bad); font-size: 12.5px; line-height: 1.4; }
+.acc-lost ul, .acc-loss ul { margin: 2px 0 0; padding-left: 18px; }
+.acc-loss { text-align: left; color: var(--bad); background: #f6d8cf; border: 2px solid var(--bad); border-radius: 10px; padding: 8px 12px; margin: 8px 0; font-size: 14px; line-height: 1.45; }
+.acc-loss b { color: var(--bad); }
+.acc-confirm { justify-content: space-between; }
+.acc-confirm .btn.danger-fill { color: #fff; }
+.acc-confirm .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .acc-name input { flex: 1 1 160px; min-width: 0; font: inherit; font-size: 16px; padding: 6px 8px; border: 1px solid var(--parch-2); border-radius: 8px; background: #fff; color: var(--ink); }
 .acc-id { margin-top: 10px; font-size: 11px; }
 .acc-offer { text-align: left; background: #fff8dc; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--gold-l); padding: 10px 12px; font-size: 14px; line-height: 1.45; margin: 4px 0 14px; }

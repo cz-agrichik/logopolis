@@ -731,14 +731,21 @@ const UI = {
 
   /** Игру в этом браузере перезаписала другая вкладка: здесь всё остановлено, осталась одна кнопка — загрузить свежую. */
   showTakenOver() {
+    this.lockWith(`<div class="epoch-modal"><h2>🗂️ Игра открыта в другой вкладке</h2>
+      <p>В другой вкладке этого браузера игра ушла вперёд — или там начали новую. Эта вкладка остановлена
+      и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
+      <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`);
+  },
+  /** Окно, которое не закрыть: поверх всего, учёба закрыта, остаются только его кнопки. owner — чьё окно: 'tab' (другая вкладка)
+   *  главнее всех; своё окно можно сменить (шаги «браузер устарел» → «точно перезагрузить?»). */
+  lockWith(html, owner = 'tab') {
+    if (this.modalLocked && (this.lockOwner === 'tab' || owner !== this.lockOwner) && owner !== 'tab') return;
+    this.modalLocked = false;
     if (Study.open) { Study.open = false; clearTimeout(Study.timer); $('#study').classList.add('hidden'); }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     this.modalBuilding = null; this.afterModal = null;
-    this.showModal(`<div class="epoch-modal"><h2>🗂️ Игра открыта в другой вкладке</h2>
-      <p>В другой вкладке этого браузера игра ушла вперёд — или там начали новую. Эта вкладка остановлена
-      и больше ничего не сохраняет, чтобы не затереть свежую игру старой.</p>
-      <div class="em-actions"><button class="btn gold" data-action="reload">Загрузить свежую игру</button></div></div>`, { small: true, noX: true });
-    this.modalLocked = true;
+    this.showModal(html, { small: true, noX: true });
+    this.modalLocked = true; this.lockOwner = owner;
   },
 
   showAway(a) {
@@ -878,6 +885,10 @@ const UI = {
     if (act === 'auth-out') return AccountUI.signOut();
     if (act === 'acc-name-edit') { AccountUI.showPanel(true); const i = $('#modalBox [data-acc-name] input'); if (i) { i.focus(); i.select(); } return; }
     if (act === 'acc-name-cancel') return AccountUI.showPanel();
+    if (act === 'acc-pick') return AccountUI.pick(a.dataset.pick);
+    if (act === 'acc-adopt') return AccountUI.adopt();
+    if (act === 'acc-back') return AccountUI.back();
+    if (act === 'acc-confirm') return AccountUI.confirm();
     if (act === 'welcome-tut') return Tutorial.welcome(true);
     if (act === 'welcome-skip') return Tutorial.welcome(false);
     if (act === 'plan-pick') return this.pickPlan(a.dataset.plan);
