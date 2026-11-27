@@ -84,8 +84,8 @@ tools/       ИНСТРУМЕНТЫ (не часть игры): проверка
 | `assets/art.js` | `Art` — все SVG: здания по обликам, чудеса, ресурсы, местность, медальоны знаний и обрядов. |
 | **platform/** | |
 | `platform/browser.js` | `BrowserIO` (localStorage, перезапуск, sessionStorage) и `Speech` (озвучка). |
-| `platform/account.js` | `Account`: вход — гость этого браузера (свой номер `b-…`), Google (Firebase Authentication) или Telegram («Log In With Telegram», OpenID Connect). Имя в игре — и без входа (`setName`). Вошедшие — в списке игроков (Firestore, `users/<uid>`); при входе браузер сверяется с аккаунтом (`link`, `decide`, `choose`), дальше главный — один браузер (`claim`, `push`, `watch`, `adopt`). Хранится отдельно (`greekgame.account.v1`), «Стереть всё» стирает и его (`Session.extraKeys`). Библиотеки входа грузятся только по нажатию «Войти». |
-| `firestore.rules` | Правила доступа к Firestore: игрок читает и пишет только свою строку `users/<uid>` с разрешёнными полями; вставляются в консоли Firebase. |
+| `platform/account.js` | `Account`: вход — гость этого браузера (свой номер `b-…`), Google (Firebase Authentication) или Telegram («Log In With Telegram», OpenID Connect). Имя в игре — и без входа (`setName`). Вошедшие — в списке игроков (Firestore, `users/<главный id>`: `google:<uid>` / `telegram:<номер>`); при входе браузер сверяется с аккаунтом (`link`, `decide`, `choose`), дальше главный — один браузер (`claim`, `push`, `watch`, `adopt`). Хранится отдельно (`greekgame.account.v1`), «Стереть всё» стирает и его (`Session.extraKeys`). Библиотеки входа грузятся только по нажатию «Войти». |
+| `firestore.rules` | Правила доступа к Firestore для списка игроков (`users/<главный id>`): только разрешённые поля, удалять нельзя; вставляются в консоли Firebase. |
 | `platform/account-config.js` | `ACCOUNT_CONFIG`: ключи Firebase для сайта и Client ID бота Telegram (не секреты); `null` — способ входа не настроен. |
 | **ui/common/** | |
 | `ui/common/catalog.js` | `Cat`: числа из ядра + тексты из словаря — то, что рисует интерфейс (`Cat.bld.house.name`, `Cat.form(type)`). |
@@ -868,13 +868,14 @@ tools/       ИНСТРУМЕНТЫ (не часть игры): проверка
     Поэтому `main.js` на сайте убирает из адреса `index.html` (адрес у игры один — `https://grecheskiy.com/`), а `index.html` задаёт
     `<meta name="referrer" content="strict-origin-when-cross-origin">`, чтобы заголовки хостинга не срезали адрес сайта у окна входа.
     Библиотеки входа грузятся заранее, когда показаны кнопки (`Account.preload`): окно входа открывается прямо по нажатию. Какие данные просить (scope), задаёт сайт при входе, а не BotFather: мы просим только профиль
-    (имя, @ник, фото) — без телефона и без права писать. Токен бота и Client Secret в репозиторий не кладём. Подпись `id_token`
-    без сервера честно не проверить — пока только записываем id в список игроков; для синхронизации понадобится проверка на сервере.
+    (имя, @ник, фото) — без телефона и без права писать. Токен бота и Client Secret в репозиторий не кладём. Аккаунт — номер Telegram
+    (см. «Список игроков» ниже).
   - **Политика конфиденциальности** — `privacy.html` (https://grecheskiy.com/privacy.html): на неё ссылаются экран входа Google
     (Google Cloud → Google Auth Platform → Branding → Privacy policy link), окно входа и статья «Вход и прогресс». Меняются данные
     (синхронизация, новые сервисы) — обновить текст и дату. Контакт — grichikandrey@gmail.com (автор разрешил его публиковать).
-  - **Список игроков** — Firestore проекта `logos-cyprus`, коллекция `users`, документ на пользователя Firebase (`Account.saveProfile`):
-    `provider` (`google`/`telegram`), `name` — имя в игре (до 40 знаков, меняется в окне «Вход и прогресс» → «✎ изменить имя»),
+  - **Список игроков** — Firestore проекта `logos-cyprus`, коллекция `users`, документ на аккаунт. Ключ — **главный id аккаунта**
+    (`accountId`, `Account.accountIdOf`), один для любого способа входа и одинаковый на всех устройствах: `google:<uid в Firebase>`
+    или `telegram:<номер в Telegram>`. Поля: `accountId`, `provider` (`google`/`telegram`), `name` — имя в игре (до 40 знаков, меняется в окне «Вход и прогресс» → «✎ изменить имя»),
     `providerName` — имя у Google/Telegram, `email` (Google), `tgId` и `tgUsername` (Telegram), `photo`, `browserId` (номер браузера `b-…`),
     `createdAt`, `lastLoginAt`, `updatedAt` (время сервера). Прогресс игры туда пока не пишем.
   - **Браузер и аккаунт: аккаунт главнее, пишет в него один браузер** (решение автора; пока только на имени). Главная версия — в аккаунте;
@@ -904,11 +905,10 @@ tools/       ИНСТРУМЕНТЫ (не часть игры): проверка
     - **Когда в аккаунт пойдёт город:** добавить часть в `Account.parts` (с `empty` — «новая игра») и строку в `AccountUI.partsHtml` /
       `lossList` (эпоха, постройки, слова, Логос — чтобы было видно, что пропадёт); устаревший браузер должен останавливать игру
       полностью, как «Игра открыта в другой вкладке» (`Session.lost`), а «взять из аккаунта» — перезагружать страницу.
-    Google — строка у пользователя Firebase Authentication (тот же на всех устройствах); Telegram — у анонимного пользователя Firebase
-    этого браузера (Authentication → Sign-in method → Anonymous должен быть включён): другой браузер — другая строка с тем же `tgId`.
-    Подпись Telegram без сервера не проверить, поэтому строка Telegram — «со слов браузера».
-    Права — `firestore.rules` (игрок читает и пишет только свою строку и только разрешённые поля, удалить нельзя; тест сверяет поля
-    записи со списком в правилах). Как включали: консоль → Databases & Storage → Firestore Database → Create database (production mode)
+    Google — вход Firebase Authentication, строка `google:<uid>`. Telegram — строка `telegram:<номер>`; для доступа к базе браузер
+    входит в Firebase анонимно (Authentication → Sign-in method → Anonymous должен быть включён).
+    Права — `firestore.rules` (только разрешённые поля, `accountId` совпадает с ключом, у Telegram `tgId` — с номером в ключе; удалить
+    нельзя; тест сверяет поля записи со списком в правилах). Как включали: консоль → Databases & Storage → Firestore Database → Create database (production mode)
     → вкладка Rules → вставить `firestore.rules` → Publish. Смотреть: Firestore Database → Data → `users`.
   - Instagram не подключить: Meta закрыла вход через Instagram для сторонних сайтов (Basic Display API — с декабря 2024).
 - **Обучение «Первые шаги»** (`ui/desktop/tutorial.js`, шаги и награды — `core/city/tutorial.js`, тексты — `Lex.tutorial`).

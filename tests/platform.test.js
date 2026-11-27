@@ -128,7 +128,8 @@ test('список игроков: вход через Google — строка u
   const { A, F } = loadWithFirebase();
   A.load();
   assert.deepEqual(plain(await A.signIn('google')), { ok: true, result: 'push' });
-  const row = F.docs['users/g-1'];
+  const row = F.docs['users/google:g-1'];
+  assert.equal(row.accountId, 'google:g-1', 'главный id — по пользователю Firebase');
   assert.ok(row, 'строка у пользователя Firebase');
   assert.equal(row.provider, 'google');
   assert.equal(row.name, 'Andrey G', 'имени не было — взяли имя у Google');
@@ -141,11 +142,11 @@ test('список игроков: вход через Google — строка u
 
   assert.deepEqual(plain(await A.setName('   ')), { ok: false, error: 'emptyName' });
   assert.deepEqual(plain(await A.setName('  Ανδρέας   Γ. ')), { ok: true, result: 'push' });
-  assert.equal(F.docs['users/g-1'].name, 'Ανδρέας Γ.');
-  assert.equal(F.docs['users/g-1'].providerName, 'Andrey G', 'имя у Google — отдельно');
+  assert.equal(F.docs['users/google:g-1'].name, 'Ανδρέας Γ.');
+  assert.equal(F.docs['users/google:g-1'].providerName, 'Andrey G', 'имя у Google — отдельно');
   assert.equal('createdAt' in F.writes.at(-1).data, false, 'дату регистрации не переписываем');
   await A.setName('x'.repeat(60));
-  assert.equal(F.docs['users/g-1'].name.length, 40);
+  assert.equal(F.docs['users/google:g-1'].name.length, 40);
   await A.setName('Ανδρέας Γ.');
 
   await A.signOut();
@@ -158,7 +159,7 @@ test('список игроков: вход через Google — строка u
   assert.equal(A.state.profilePending, true);
   F.setOnline(true);
   assert.equal((await A.sync()).result, 'ok', 'при запуске дописали');
-  assert.equal(F.docs['users/g-1'].name, 'Новое имя');
+  assert.equal(F.docs['users/google:g-1'].name, 'Новое имя');
   assert.equal(A.state.profilePending, undefined);
   for (const w of F.writes) for (const k of Object.keys(w.data)) assert.ok(RULE_KEYS.includes(k), `поле ${k} есть в firestore.rules`);
 });
@@ -168,7 +169,7 @@ test('имя без входа; вход в аккаунт, где имя дру
   A.load();
   assert.deepEqual(plain(await A.setName('Андрей')), { ok: true }, 'без входа — только здесь');
   assert.equal(F.writes.length, 0);
-  F.docs['users/g-1'] = { provider: 'google', name: 'Ανδρέας', browserId: 'b-other', updatedAt: 1700000000000, createdAt: 1 };
+  F.docs['users/google:g-1'] = { provider: 'google', name: 'Ανδρέας', browserId: 'b-other', updatedAt: 1700000000000, createdAt: 1 };
 
   let r = await A.signIn('google');
   assert.equal(r.result, 'ask');
@@ -189,16 +190,16 @@ test('имя без входа; вход в аккаунт, где имя дру
   assert.deepEqual(plain(await A.choose('remote', true)), { ok: true, pending: false }, 'выбор ждал и дождался подтверждения');
   assert.equal(A.signedIn(), true);
   assert.equal(A.state.name, 'Ανδρέας');
-  assert.equal(F.docs['users/g-1'].browserId, A.state.id, 'выбрали — этот браузер стал главным');
-  assert.equal(F.docs['users/g-1'].createdAt, 1, 'дату регистрации не трогаем');
+  assert.equal(F.docs['users/google:g-1'].browserId, A.state.id, 'выбрали — этот браузер стал главным');
+  assert.equal(F.docs['users/google:g-1'].createdAt, 1, 'дату регистрации не трогаем');
 
   await A.signOut();
   await A.setName('Андрей');
   assert.equal((await A.signIn('google')).result, 'ask', 'новый вход — снова сверка: разное — спросить');
   assert.deepEqual(plain(await A.choose('local')), { ok: false, error: 'notConfirmed' });
-  assert.equal(F.docs['users/g-1'].name, 'Ανδρέας');
+  assert.equal(F.docs['users/google:g-1'].name, 'Ανδρέας');
   assert.deepEqual(plain(await A.choose('local', true)), { ok: true, pending: false });
-  assert.equal(F.docs['users/g-1'].name, 'Андрей', 'в аккаунте — как в браузере');
+  assert.equal(F.docs['users/google:g-1'].name, 'Андрей', 'в аккаунте — как в браузере');
 });
 
 test('один аккаунт — один главный браузер: вошли во втором — первый устарел; перезагрузился — главный снова он', async () => {
@@ -212,20 +213,20 @@ test('один аккаунт — один главный браузер: вош
 
   assert.equal((await two.A.signIn('google')).result, 'pull', 'во втором имени не было — взяли из аккаунта');
   assert.equal(two.A.state.name, 'Андрей');
-  assert.equal(db.docs['users/g-1'].browserId, two.A.state.id, 'главный — второй');
+  assert.equal(db.docs['users/google:g-1'].browserId, two.A.state.id, 'главный — второй');
   assert.equal(one.A.stale, true, 'первый узнал сразу, пока открыт');
   assert.equal(staleOne, 1);
   assert.equal((await one.A.setName('Старое')).result, 'stale', 'устаревший в аккаунт не пишет');
-  assert.equal(db.docs['users/g-1'].name, 'Андрей');
+  assert.equal(db.docs['users/google:g-1'].name, 'Андрей');
 
   await two.A.setName('С телефона');
-  assert.equal(db.docs['users/g-1'].name, 'С телефона', 'главный пишет смело');
+  assert.equal(db.docs['users/google:g-1'].name, 'С телефона', 'главный пишет смело');
 
   // первый загрузил версию из аккаунта — без вопросов, его «Старое» не в счёт — и стал главным, второй устарел
   assert.equal(one.A.state.name, 'Старое');
   assert.deepEqual(plain(await one.A.adopt()), { ok: true });
   assert.equal(one.A.state.name, 'С телефона');
-  assert.equal(db.docs['users/g-1'].browserId, one.A.state.id);
+  assert.equal(db.docs['users/google:g-1'].browserId, one.A.state.id);
   assert.equal(two.A.stale, true);
   assert.equal(staleTwo, 1);
   one.A.load();   // после перезагрузки
@@ -238,26 +239,42 @@ test('один аккаунт — один главный браузер: вош
   two.A.load();
   two.A.linked = () => true;
   assert.equal((await two.A.saveToAccount()).result, 'stale');
-  assert.equal(db.docs['users/g-1'].name, 'С телефона');
+  assert.equal(db.docs['users/google:g-1'].name, 'С телефона');
 });
 
-test('список игроков: Telegram — строка у анонимного пользователя Firebase; тот же браузер — та же строка', async () => {
-  const { A, F } = loadWithFirebase();
-  A.load();
-  assert.equal((await A.signIn('telegram')).ok, true);
-  assert.equal(A.state.fbUid, 'anon-1');
-  const row = F.docs['users/anon-1'];
+test('Telegram: строка по номеру Telegram — одна на всех устройствах; вошли во втором браузере — сверка и первый устарел', async () => {
+  const db = fakeDb();
+  const one = loadWithFirebase(null, db, 'anon-a'), two = loadWithFirebase(null, db, 'anon-b');
+  one.A.load(); two.A.load();
+  let staleOne = 0;
+  one.A.onStale = () => staleOne++;
+  assert.deepEqual(plain(await one.A.signIn('telegram')), { ok: true, result: 'push' });
+  assert.equal(one.A.state.accountId, 'telegram:42', 'главный id — по номеру Telegram');
+  const row = db.docs['users/telegram:42'];
+  assert.equal(row.accountId, 'telegram:42');
   assert.equal(row.provider, 'telegram');
   assert.equal(row.tgId, '42');
   assert.equal(row.tgUsername, 'andreas');
   assert.equal(row.email, null);
   assert.equal(row.name, 'Ανδρέας');
-  await A.setName('Андрей');
-  await A.signOut();
-  assert.equal((await A.signIn('telegram')).result, 'same');
-  assert.equal(A.state.fbUid, 'anon-1', 'анонимный пользователь остался после выхода');
-  assert.equal(A.state.name, 'Андрей');
-  assert.deepEqual(Object.keys(F.docs), ['users/anon-1']);
+  await one.A.setName('Андрей');
+
+  // второй браузер (свой анонимный пользователь Firebase): имя задали и тут — другое, значит спросить
+  await two.A.setName('Andreas');
+  const r = await two.A.signIn('telegram');
+  assert.equal(r.result, 'ask');
+  assert.deepEqual(plain(r.choice.remote), { name: 'Андрей' }, 'увидел строку первого');
+  await two.A.choose('remote', true);
+  assert.equal(two.A.state.name, 'Андрей');
+  assert.equal(db.docs['users/telegram:42'].browserId, two.A.state.id, 'главный — второй');
+  assert.equal(one.A.stale, true, 'первый устарел');
+  assert.equal(staleOne, 1);
+  assert.deepEqual(Object.keys(db.docs), ['users/telegram:42'], 'строка одна');
+
+  // вышли и вошли снова в том же браузере — та же строка
+  await two.A.signOut();
+  assert.equal((await two.A.signIn('telegram')).result, 'same');
+  assert.deepEqual(Object.keys(db.docs), ['users/telegram:42']);
 });
 
 test('список игроков: без связи вход всё равно состоялся — сверка при запуске; вошли до появления списка — тоже', async () => {
@@ -269,16 +286,17 @@ test('список игроков: без связи вход всё равно 
   assert.equal(A.linked(), false, 'сверка при входе не прошла');
   F.setOnline(true);
   assert.equal((await A.sync()).result, 'push');
-  assert.equal(F.docs['users/g-1'].name, 'Andrey G');
+  assert.equal(F.docs['users/google:g-1'].name, 'Andrey G');
   assert.equal(A.linked(), true);
 
   const old = loadWithFirebase({ 'greekgame.account.v1': JSON.stringify({ id: 'b-old', provider: 'google', uid: 'g-1', name: 'Andrey G', email: 'andrey@example.com' }) });
   await old.F.auth.signInWithPopup();   // сессия Firebase в браузере жива
   old.A.load();
   assert.equal(old.A.state.fbUid, 'g-1');
+  assert.equal(old.A.state.accountId, 'google:g-1');
   assert.equal((await old.A.sync()).result, 'push');
-  assert.equal(old.F.docs['users/g-1'].browserId, 'b-old');
-  assert.equal(old.F.docs['users/g-1'].createdAt, old.F.TS);
+  assert.equal(old.F.docs['users/google:g-1'].browserId, 'b-old');
+  assert.equal(old.F.docs['users/google:g-1'].createdAt, old.F.TS);
 });
 
 test('🚨 ловушка: затереть непустую другую версию без подтверждения нельзя', async () => {
@@ -293,13 +311,13 @@ test('🚨 ловушка: затереть непустую другую вер
   assert.throws(() => A.takeRemote({ name: 'Чужое' }), e => e === 'unconfirmedOverwrite');
   assert.equal(A.state.name, 'Андрей', 'браузер не тронут');
   await assert.rejects(A.claim({ name: 'Чужое' }, false), e => e === 'unconfirmedOverwrite');
-  assert.equal(F.docs['users/g-1'].name, 'Андрей', 'аккаунт не тронут');
+  assert.equal(F.docs['users/google:g-1'].name, 'Андрей', 'аккаунт не тронут');
   assert.equal(errors.length, 2, 'и оба раза — громко');
   // пустую или ту же — можно молча
   A.takeRemote({ name: 'Андрей' });
   await A.claim({ name: 'Андрей' }, false);
   // главный пишет, не сравнивая: что бы ни лежало в аккаунте, пока главный — он
-  F.docs['users/g-1'].name = 'Из консоли';
+  F.docs['users/google:g-1'].name = 'Из консоли';
   assert.equal((await A.setName('Моё')).result, 'push');
-  assert.equal(F.docs['users/g-1'].name, 'Моё');
+  assert.equal(F.docs['users/google:g-1'].name, 'Моё');
 });

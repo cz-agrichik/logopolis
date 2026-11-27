@@ -2,10 +2,11 @@
 // ============================================================
 //  Вход (аккаунт): кто играет — гость этого браузера или человек, вошедший через Google или Telegram.
 //  Имя в игре есть и без входа (хранится в этом браузере). Вошедшие записываются в список игроков — Firestore проекта Firebase,
-//  коллекция `users`, документ на пользователя Firebase: способ входа, имя в игре, имя у поставщика, почта или @ник Telegram,
-//  фото, номер браузера, даты. Google — пользователь Firebase Authentication; Telegram — анонимный пользователь Firebase
-//  (подпись Telegram без своего сервера не проверить: строка помечена provider: 'telegram', это «со слов браузера»).
-//  Правила доступа — firestore.rules: игрок читает и пишет только свою строку, список целиком видит владелец проекта в консоли.
+//  коллекция `users`, документ на аккаунт. Ключ — главный id аккаунта (accountId), один для любого способа входа:
+//  'google:<uid в Firebase>' или 'telegram:<номер в Telegram>' — один и тот же на всех устройствах. В строке: способ входа,
+//  имя в игре, имя у поставщика, почта или номер и @ник Telegram, фото, номер главного браузера, даты.
+//  Google — вход Firebase Authentication. Telegram — аккаунт по номеру Telegram; для доступа к базе браузер входит в Firebase
+//  анонимно. Правила — firestore.rules; список целиком видит владелец проекта в консоли.
 //
 //  Браузер и аккаунт. Главная версия — в аккаунте; пишет в неё один браузер — тот, где вошли последним («главный»,
 //  его номер — browserId в строке аккаунта). Остальные браузеры этого аккаунта заведомо устарели.
@@ -31,7 +32,8 @@ const Account = {
   PROVIDERS: ['google', 'telegram'],
   /** { id — свой номер этого браузера (есть всегда), name — имя в игре (и без входа; при выходе остаётся),
    *    provider: null | 'google' | 'telegram', uid — id у поставщика, providerName — имя у поставщика, email, username, photo, since,
-   *    fbUid — пользователь Firebase (строка в списке игроков), linked — fbUid, с которым этот браузер сверился при входе и стал главным
+   *    fbUid — пользователь Firebase (Google), accountId — главный id аккаунта (ключ строки в списке игроков),
+   *    linked — accountId, с которым этот браузер сверился при входе и стал главным
    *    (нет — сверка при входе ещё не прошла: пройдёт при следующем запуске); profilePending — изменения ещё не дошли до аккаунта;
    *    localAt — когда версия этого браузера менялась (показать при выборе на входе);
    *    guest: когда выбрали «без входа»; askedAfterTutorial }. */
@@ -52,6 +54,8 @@ const Account = {
       s.providerName = s.name || '';
       if (s.provider === 'google') s.fbUid = s.uid;
     }
+    // строки раньше лежали под uid Firebase — теперь под главным id; сверка при запуске заведёт новую
+    if (s.provider && !s.accountId) s.accountId = this.accountIdOf(s);
     delete s.nameEdited; delete s.synced; delete s.lastPushed;   // от прежних сборок
     this.state = s;
     this.held = null; this.stale = false; this.unwatch = null;
@@ -96,7 +100,13 @@ const Account = {
     if (this.isEmpty(local)) return 'pull';
     return 'ask';
   },
-  linked() { const s = this.state; return !!(s.fbUid && s.linked === s.fbUid); },
+  /** Главный id аккаунта — ключ строки в списке игроков: один для любого способа входа и одинаковый на всех устройствах. */
+  accountIdOf(who) {
+    if (who.provider === 'google') return who.fbUid ? 'google:' + who.fbUid : null;
+    if (who.provider === 'telegram') return who.uid ? 'telegram:' + who.uid : null;
+    return null;
+  },
+  linked() { const s = this.state; return !!(s.accountId && s.linked === s.accountId); },
 
   /** Войти. Обещание { ok: true } — вошли; { ok: true, choice } — вошли в аккаунт, но в нём и здесь разное: ждём choose();
    *  { ok: false, error: код }. */
@@ -108,6 +118,7 @@ const Account = {
       const u = p === 'google' ? await this.google() : await this.telegram();
       const acc = { provider: p, uid: String(u.uid), providerName: (u.name || u.username || u.email || '').trim(), email: u.email || '',
         username: u.username || '', photo: u.photo || '', fbUid: u.fbUid || null };
+      acc.accountId = this.accountIdOf(acc);
       return { ok: true, ...(await this.link(acc)) };
     } catch (e) {
       return { ok: false, error: typeof e === 'string' ? e : 'failed', detail: String(e && (e.code || e.message) || e) };
@@ -122,7 +133,7 @@ const Account = {
   /** Выйти: снова гость этого браузера. Город, слова и имя остаются здесь; войдёт снова — снова сверим при входе. */
   async signOut() {
     const was = this.state.provider;
-    for (const k of ['provider', 'uid', 'providerName', 'email', 'username', 'photo', 'since', 'fbUid', 'linked', 'profilePending']) delete this.state[k];
+    for (const k of ['provider', 'uid', 'providerName', 'email', 'username', 'photo', 'since', 'fbUid', 'accountId', 'linked', 'profilePending']) delete this.state[k];
     this.state.provider = null;
     this.state.guest = this.state.guest || Date.now();
     this.held = null; this.stale = false;
@@ -149,8 +160,7 @@ const Account = {
     const who = acc || this.state;
     let remote;
     try {
-      await this.ensureUser(who);
-      remote = await this.readRow(who.fbUid);
+      remote = await this.readRow(who);
     } catch (e) {
       if (acc) this.finish(acc);   // не прочитали (нет связи, Firebase не настроен) — вошли всё равно, сверим при следующем запуске
       return { result: this.failed(e) };
@@ -209,9 +219,7 @@ const Account = {
     if (!this.signedIn() || location.protocol === 'file:' || !ACCOUNT_CONFIG.firebase) return { result: 'pending' };
     if (!this.linked()) return this.link();
     try {
-      await this.ensureUser(s);
-      if (!this.linked()) return this.link();   // Telegram: анонимный пользователь сменился — это новая строка
-      const remote = await this.readRow(s.fbUid);
+      const remote = await this.readRow(s);
       if (remote && remote.browserId !== s.id) return { result: this.goStale() };
       if (!remote || s.profilePending) await this.push();   // строки нет (удалили в консоли) или здесь есть незаписанное
       this.watch();
@@ -230,7 +238,7 @@ const Account = {
    *  Интерфейс после этого перезагружает страницу. Обещание { ok } или { ok: false, error: 'offline' } — здесь ничего не поменяли. */
   async adopt() {
     try {
-      const remote = await this.readRow(this.state.fbUid);
+      const remote = await this.readRow(this.state);
       if (remote) this.takeRemote(remote, true);   // устаревшая версия браузера не в счёт
       await this.claim(remote, false);
       return { ok: true };
@@ -271,28 +279,29 @@ const Account = {
   },
   /** Не дольше ms: без сети Firestore ждёт сколько угодно — а нам надо ответить игроку. */
   within(promise, ms = 8000) { return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject('offline'), ms))]); },
-  /** Строка аккаунта в списке игроков (null — ещё нет). Сессия Firebase должна быть этого пользователя — иначе правила не пустят. */
-  async readRow(fbUid) {
-    if (!fbUid) throw 'noFirebaseUser';
-    const db = await this.fbDb(), u = await this.within(this.fbUser(firebase.auth()));
-    if (!u || u.uid !== fbUid) throw 'sessionLost';   // сессия Firebase потерялась — сверим после следующего входа
-    const snap = await this.within(db.collection('users').doc(fbUid).get());
-    return snap.exists ? snap.data() : null;
-  },
-  /** Telegram: строка — у анонимного пользователя Firebase этого браузера (заводим при первом входе; сменился — это новая строка). */
-  async ensureUser(who) {
+  /** Сессия Firebase, без которой правила не пустят: Google — именно этот пользователь (потерялась — сверим после следующего входа);
+   *  Telegram — любой, если нет — анонимный (в консоли должен быть включён Authentication → Anonymous). */
+  async session(who) {
     if (!ACCOUNT_CONFIG.firebase) throw 'notConfigured';
     const auth = await this.fbAuth();
-    if (who.provider !== 'telegram') return;
     const u = await this.within(this.fbUser(auth));
-    if (!u || !u.isAnonymous || u.uid !== who.fbUid) who.fbUid = await this.anonymous();
+    if (who.provider === 'google') { if (!u || u.uid !== who.fbUid) throw 'sessionLost'; return; }
+    if (!u) await this.within(auth.signInAnonymously());
+  },
+  /** Строка аккаунта в списке игроков (null — ещё нет). */
+  async readRow(who) {
+    if (!who.accountId) throw 'noAccountId';
+    await this.session(who);
+    const db = await this.fbDb();
+    const snap = await this.within(db.collection('users').doc(who.accountId).get());
+    return snap.exists ? snap.data() : null;
   },
   /** Своя строка: аккаунт, части браузера, номер этого браузера (главный — он), даты. remote — строка до записи (null — новая). */
   rowData(remote, login) {
     const s = this.state, ts = firebase.firestore.FieldValue.serverTimestamp();
     const tg = s.provider === 'telegram';
     const cut = (v, n) => v ? String(v).slice(0, n) : null;   // те же пределы, что в firestore.rules
-    const data = { provider: s.provider, name: cut(s.name || s.providerName, 40) || '', providerName: cut(s.providerName, 200) || '', email: cut(s.email, 200),
+    const data = { accountId: s.accountId, provider: s.provider, name: cut(s.name || s.providerName, 40) || '', providerName: cut(s.providerName, 200) || '', email: cut(s.email, 200),
       tgId: tg ? cut(s.uid, 40) : null, tgUsername: tg ? cut(s.username, 64) : null, photo: cut(s.photo, 1000), browserId: s.id, updatedAt: ts };
     if (login) data.lastLoginAt = ts;
     if (!remote) data.createdAt = ts;
@@ -307,18 +316,17 @@ const Account = {
       if (!this.isEmpty(v) && !this.same(v, this.snapshot())) throw this.alarm('версия аккаунта чуть не заменилась без подтверждения', v, this.snapshot());
     }
     const db = await this.fbDb();
-    await this.within(db.collection('users').doc(s.fbUid).set(this.rowData(remote, login), { merge: true }));
-    s.linked = s.fbUid; this.stale = false;
+    await this.within(db.collection('users').doc(s.accountId).set(this.rowData(remote, login), { merge: true }));
+    s.linked = s.accountId; this.stale = false;
     delete s.profilePending;
     this.save();
     this.watch();
   },
   /** Записать изменения, только если этот браузер всё ещё главный; нет — он устарел (throw 'stale') и ничего не пишет. */
   async push() {
-    const s = this.state, db = await this.fbDb();
-    const u = await this.within(this.fbUser(firebase.auth()));
-    if (!u || u.uid !== s.fbUid) throw 'sessionLost';
-    const ref = db.collection('users').doc(s.fbUid);
+    const s = this.state;
+    await this.session(s);
+    const db = await this.fbDb(), ref = db.collection('users').doc(s.accountId);
     let other = false;
     await this.within(db.runTransaction(async t => {
       const snap = await t.get(ref), row = snap.exists ? snap.data() : null;
@@ -333,7 +341,7 @@ const Account = {
   watch() {
     if (this.unwatch || this.stale) return;
     try {
-      this.unwatch = firebase.firestore().collection('users').doc(this.state.fbUid).onSnapshot(snap => {
+      this.unwatch = firebase.firestore().collection('users').doc(this.state.accountId).onSnapshot(snap => {
         const row = snap.exists ? snap.data() : null;
         if (row && row.browserId && row.browserId !== this.state.id) this.goStale();
       }, e => this.warn(e));
@@ -378,7 +386,7 @@ const Account = {
     }
   },
   /** Telegram: «Log In With Telegram» (OpenID Connect) — всплывающее окно, ответ — id_token (JWT) и данные пользователя.
-   *  Подпись токена здесь не проверяем: без своего сервера проверить её честно нельзя — пока только запоминаем, кто это. */
+   *  Аккаунт — номер Telegram. */
   async telegram() {
     const C = ACCOUNT_CONFIG;
     await this.loadScript(C.telegramSdk);
@@ -387,23 +395,9 @@ const Account = {
     const data = await new Promise(resolve => L.auth({ client_id: Number(C.telegram.clientId), lang: 'ru' }, resolve));
     if (!data || data.error) throw data && /closed|cancel/i.test(data.error) ? 'cancelled' : 'failed';
     const u = data.user || this.jwtClaims(data.id_token) || {};
-    const uid = u.id || u.sub;
+    const uid = u.id || u.sub;   // id — номер пользователя Telegram (sub — запасной)
     if (!uid) throw 'failed';
     return { uid, name: u.name || [u.given_name, u.family_name].filter(Boolean).join(' '), username: u.preferred_username, photo: u.picture };
-  },
-  /** Анонимный пользователь Firebase для игрока из Telegram — чтобы записать его в список игроков (sync). Тот же браузер — тот же пользователь.
-   *  Не вышло (анонимный вход выключен в консоли, нет сети) — null: вход через Telegram всё равно состоялся, запишем при следующем запуске. */
-  async anonymous() {
-    if (!ACCOUNT_CONFIG.firebase) return null;
-    try {
-      const auth = await this.fbAuth();
-      let u = await this.within(this.fbUser(auth));
-      if (!u || !u.isAnonymous) { if (u) await auth.signOut(); u = (await this.within(auth.signInAnonymously())).user; }
-      return u.uid;
-    } catch (e) {
-      try { console.warn('Анонимный вход Firebase не удался —', (e && (e.code || e.message)) || e); } catch (x) { /* консоли нет */ }
-      return null;
-    }
   },
   /** Данные из JWT без проверки подписи (только чтобы показать имя). */
   jwtClaims(token) {
