@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Политика конфиденциальности · Λόγος</title>
+  <meta name="theme-color" content="#6e2d14">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+  <!-- Политика конфиденциальности сайта grecheskiy.com: на неё ссылается экран входа Google (Google Cloud → Branding) и окно «Вход и прогресс».
+       Меняется что-то в данных (синхронизация, новые сервисы) — обновить этот текст и дату. Контакт для вопросов — в разделе «Контакты». -->
+  <style>
+    :root { --parch: #f4ead3; --parch-2: #eadcbc; --ink: #2a2017; --ink-2: #6b5a45; --accent: #b5532c; --head: linear-gradient(180deg, #8e3d1d, #6e2d14); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--parch); color: var(--ink); font-family: 'Noto Serif', Georgia, 'Times New Roman', serif; font-size: 16px; line-height: 1.6; }
+    header { background: var(--head); color: #fbf3e2; padding: 12px 16px; }
+    header .in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    header .logo { font-size: 22px; font-weight: 700; color: #f0d48a; text-decoration: none; }
+    header a.back { color: #fbf3e2; text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 16px; background: rgba(255,255,255,.14); }
+    main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+    h1 { font-size: 26px; color: var(--accent); margin: 8px 0 4px; line-height: 1.25; }
+    h2 { font-size: 18px; margin: 28px 0 8px; border-bottom: 2px solid var(--parch-2); padding-bottom: 4px; }
+    .dim { color: var(--ink-2); font-size: 14px; }
+    .short { background: #fff8dc; border-left: 3px solid #c08a1e; border-radius: 8px; padding: 10px 14px; margin: 16px 0; }
+    ul { padding-left: 22px; }
+    li { margin: 4px 0; }
+    a { color: var(--accent); }
+    .en { margin-top: 40px; padding-top: 8px; border-top: 1px dashed var(--ink-2); font-size: 14.5px; }
+  </style>
+</head>
+<body>
+  <header><div class="in"><a class="logo" href="./">Λόγος</a><a class="back" href="./">← В игру</a></div></header>
+  <main>
+    <h1>Политика конфиденциальности</h1>
+    <div class="dim">Игра «Λόγος · Кипр сквозь эпохи» и библиотека греческих текстов на сайте grecheskiy.com · обновлено 27 ноября 2026 г.</div>
+
+    <div class="short"><b>Коротко.</b> Игра работает в вашем браузере, и прогресс хранится там же. Войти через Google или Telegram
+      необязательно; если вошли, мы знаем ваше имя и, в случае Google, почту — только чтобы узнавать вас. Мы ничего не продаём,
+      рекламы нет, данные не передаём никому, кроме перечисленных ниже сервисов, без которых сайт не работает.</div>
+
+    <h2>1. Что хранится в вашем браузере</h2>
+    <p>Всё, что нужно для игры, лежит в хранилище браузера (localStorage) на вашем устройстве и на наш сервер не отправляется:</p>
+    <ul>
+      <li>город: постройки, ресурсы, знания, Логос, летопись;</li>
+      <li>учёба: колоды, прогресс по словам, настройки, журнал по дням;</li>
+      <li>библиотека: запомненные слова, ваши собственные тексты, настройки читалки;</li>
+      <li>вход: случайный номер этого браузера в игре и, если вы вошли, — способ входа, идентификатор, имя, почта или имя пользователя и ссылка на аватар.</li>
+    </ul>
+    <p>Другой браузер или другое устройство эти данные не видят. Удалить их можно в игре: «📚 Обучение» → «Сброс» → «Стереть всё»,
+      или очисткой данных сайта в браузере.</p>
+
+    <h2>2. Вход через Google</h2>
+    <p>Вход работает через Firebase Authentication (сервис Google). При первом входе Google спросит согласия и передаст нам ваше имя,
+      адрес почты, фото профиля и идентификатор аккаунта Google. Пароль от Google мы не видим никогда.</p>
+    <p>Firebase хранит учётную запись входа: идентификатор, почту, имя, фото, даты регистрации и последнего входа. Эти данные видит только
+      владелец сайта, и нужны они только для того, чтобы узнавать вас при следующем входе. Подробнее о том, как Google обрабатывает данные, —
+      в <a href="https://policies.google.com/privacy" rel="noopener">политике конфиденциальности Google</a> и
+      <a href="https://firebase.google.com/support/privacy" rel="noopener">документах Firebase</a>.</p>
+
+    <h2>3. Вход через Telegram</h2>
+    <p>Вход работает через официальный «Log In With Telegram». Telegram передаёт ваш идентификатор, имя, имя пользователя и фото профиля
+      (телефон и право писать вам мы не запрашиваем). Эти данные сохраняются только в вашем браузере (см. п. 1); на наш сервер они не отправляются.</p>
+
+    <h2>4. Синхронизация между устройствами</h2>
+    <p>Сейчас её нет: прогресс хранится только в браузере. Когда она появится, город и учёба вошедших игроков будут храниться
+      в базе данных Firebase (Google) под их учётной записью, чтобы открываться на других устройствах. Доступ к записи будет только у самого игрока
+      и у владельца сайта. Перед этим мы обновим эту страницу.</p>
+
+    <h2>5. Статистика посещений</h2>
+    <p>Опубликованный сайт использует <a href="https://metrika.yandex.ru/" rel="noopener">Яндекс Метрику</a>: она считает посещения
+      и собирает обезличенные данные о них — страницы, клики и прокрутку, в том числе запись действий на странице (Вебвизор), тип устройства
+      и браузера, примерное местоположение по IP. Метрика ставит свои cookie. Это нужно, чтобы понимать, как люди играют, и делать игру удобнее.
+      Отказаться можно, например, с помощью <a href="https://yandex.ru/support/metrica/general/opt-out.html" rel="noopener">блокировщика Метрики</a>
+      или любого блокировщика рекламы. Обработка — по <a href="https://yandex.ru/legal/confidential/" rel="noopener">политике Яндекса</a>.</p>
+
+    <h2>6. Что ещё грузится со сторонних серверов</h2>
+    <ul>
+      <li>шрифты — с Google Fonts;</li>
+      <li>библиотеки входа — с серверов Google (Firebase) и Telegram, только когда вы нажимаете «Войти»;</li>
+      <li>озвучка слов — встроенными голосами вашего браузера или системы.</li>
+    </ul>
+    <p>Эти серверы, как и любые, видят ваш IP-адрес и адрес страницы, с которой пришёл запрос.</p>
+
+    <h2>7. Ваши права</h2>
+    <p>Вы можете в любой момент выйти из аккаунта (кнопка 👤 в игре), стереть данные в браузере (п. 1), а также попросить удалить
+      учётную запись входа из Firebase или узнать, что о вас хранится, — напишите нам. Ответим и удалим.</p>
+
+    <h2>8. Дети</h2>
+    <p>Игра не предназначена специально для детей и не собирает сведения о возрасте. Если вы родитель и считаете, что ребёнок вошёл
+      без вашего ведома, напишите — удалим учётную запись.</p>
+
+    <h2>9. Контакты</h2>
+    <p>Вопросы о данных и просьбы об удалении: <a id="contact" href="mailto:grichikandrey@gmail.com">grichikandrey@gmail.com</a>.</p>
+
+    <div class="en">
+      <b>Summary in English.</b> Λόγος (grecheskiy.com) is a browser game for learning Greek. Game and learning progress is stored locally
+      in your browser (localStorage). Signing in is optional. With Google sign-in (Firebase Authentication) we receive your name, email address,
+      profile photo and Google account ID, used only to recognise you; Firebase keeps the sign-in record (ID, email, name, photo, sign-up and
+      last sign-in dates), visible only to the site owner. With Telegram sign-in we receive your Telegram ID, name, username and photo, stored only in
+      your browser. We do not sell data, show ads or share data with third parties beyond the services needed to run the site: Google (Firebase,
+      Google Fonts), Telegram (sign-in) and Yandex Metrica (visit statistics, including session replay, with cookies). Cross-device sync does
+      not exist yet; when added, progress of signed-in players will be stored in Firebase and this page will be updated. To delete your data, use
+      “Стереть всё” in the game, sign out, or contact us at <a href="mailto:grichikandrey@gmail.com">grichikandrey@gmail.com</a>.
+    </div>
+  </main>
+</body>
+</html>
