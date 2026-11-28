@@ -23,7 +23,10 @@ const AccountUI = {
     Account.onChange = () => this.renderBtn();
     this.startSync = Account.signedIn() ? Account.sync().then(r => { this.startSyncDone = true; this.synced(r, 'start'); }) : null;
     // обучение уходит в аккаунт раз в несколько секунд; вкладку прячут или закрывают, появилась сеть — дописать сразу
-    document.addEventListener('visibilitychange', () => { if (document.hidden) Account.flush(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { Account.libraryCheck(); Account.flush(); } });
+    // читалка пишет свои тексты и карточки сама (и на своей странице, и в соседней вкладке) — смотрим раз в 5 секунд
+    setInterval(() => Account.libraryCheck(), 5000);
+    window.addEventListener('storage', () => Account.libraryCheck());
     window.addEventListener('pagehide', () => Account.flush());
     window.addEventListener('online', () => Account.flush());
   },
@@ -93,8 +96,8 @@ const AccountUI = {
   /** Что даёт вход и что значит «без входа» — честно: слова уже в аккаунте, город — пока нет. */
   whyHtml() {
     return `<div class="acc-two">
-      <div><b>👤 Со входом</b> Выученные слова, колоды и настройки учёбы хранятся в аккаунте и едут за вами на телефон
-        и другой компьютер. Город пока остаётся в этом браузере — его перенос в работе.</div>
+      <div><b>👤 Со входом</b> Выученные слова, колоды, настройки учёбы и тексты в читалке хранятся в аккаунте и едут за вами
+        на телефон и другой компьютер. Город пока остаётся в этом браузере — его перенос в работе.</div>
       <div><b>💾 Без входа</b> Всё хранится только <b>в этом браузере</b> на этом устройстве. В другом браузере или на телефоне начнёте
         с нуля, а очистка данных сайта сотрёт прогресс.</div></div>
       <p class="dim">Передумаете — войти можно в любой момент: ${this.whereLater()}. Что и где хранится —
@@ -196,17 +199,26 @@ const AccountUI = {
     if (n.own) bits.push(`${n.own} ${plural(n.own, 'своя колода', 'свои колоды', 'своих колод')}`);
     return bits.join(' · ');
   },
-  /** Как показать версию (части Account.parts): имя и учёба; город добавится сюда же. */
+  /** Читалка одной строкой: «3 своих текста · 120 карточек слов». */
+  libraryText(v) {
+    const n = Account.librarySummary(v), bits = [];
+    if (n.texts) bits.push(`${n.texts} ${plural(n.texts, 'свой текст', 'своих текста', 'своих текстов')}`);
+    if (n.cards) bits.push(`${n.cards} ${plural(n.cards, 'карточка', 'карточки', 'карточек')} слов`);
+    return bits.join(' · ') || 'пусто';
+  },
+  /** Как показать версию (части Account.parts): имя, учёба, читалка; город добавится сюда же. */
   partsHtml(v) {
     const L = v.learn, n = L ? Learn.summary(L) : null;
     const learn = L == null ? '—' : Learn.isEmptySnap(L) ? 'ещё не начинали' : esc(this.learnText(L));
     return `<div class="acc-ver-l">Имя в игре: <b>${v.name ? esc(v.name) : '—'}</b></div>
-      <div class="acc-ver-l">Учёба: <b>${learn}</b></div>${n && n.last ? `<small>${this.when(n.last, 'последнее занятие')}</small>` : ''}`;
+      <div class="acc-ver-l">Учёба: <b>${learn}</b></div>${n && n.last ? `<small>${this.when(n.last, 'последнее занятие')}</small>` : ''}
+      <div class="acc-ver-l">Читалка: <b>${v.library == null ? '—' : esc(this.libraryText(v.library))}</b></div>`;
   },
   /** Что пропадёт у victim, если взять winner (Account.losses), списком. */
   lossList(victim, winner) {
     const items = Account.losses(victim, winner).map(k => k === 'name' ? `имя в игре «${esc(victim.name)}»`
-      : k === 'learn' ? `учёба: ${esc(this.learnText(victim.learn))}` : esc(k));
+      : k === 'learn' ? `учёба: ${esc(this.learnText(victim.learn))}`
+      : k === 'library' ? `читалка: ${esc(this.libraryText(victim.library))}` : esc(k));
     return items.length ? `<ul>${items.map(x => `<li>${x}</li>`).join('')}</ul>` : '<ul><li>ничего</li></ul>';
   },
   when(ms, verb) {

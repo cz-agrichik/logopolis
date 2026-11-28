@@ -141,12 +141,12 @@
     $("#own-import-file").addEventListener("change", async event => {
       const files = [...(event.target.files || [])];
       event.target.value = "";
-      const total = { added: 0, updated: 0, skipped: 0 };
+      const total = { added: 0, updated: 0, skipped: 0, limited: 0 };
       const errors = [];
       for (const file of files) {
         try {
           const r = store.importFile(file.name, await file.text());
-          for (const k of Object.keys(total)) total[k] += r[k];
+          for (const k of Object.keys(total)) total[k] += r[k] || 0;
         } catch (error) {
           errors.push(error.message);
         }
@@ -156,6 +156,7 @@
         total.added && `Добавлено: ${total.added}.`,
         total.updated && `Обновлено: ${total.updated}.`,
         total.skipped && `Уже были: ${total.skipped}.`,
+        total.limited && `Не поместились: ${total.limited} — своих текстов не больше ${window.OwnText.LIMITS.texts}, каждый до 100 000 знаков.`,
         ...errors,
       ].filter(Boolean).join(" ") || "Ничего не добавлено.");
     });
@@ -260,9 +261,9 @@
       try {
         item = store.put({ ...draft, stats });
         history.replaceState(null, "", `read.html?own=${encodeURIComponent(item.id)}`);
-        note = "Сохранено в «Мои тексты» (только в этом браузере).";
+        note = window.LibrarySync && window.LibrarySync.signedIn() ? "Сохранено в «Мои тексты» — и в вашем аккаунте." : "Сохранено в «Мои тексты» (только в этом браузере).";
       } catch (error) {
-        note = "Браузер не дал сохранить текст (приватный режим или нет места) — он открыт, но не сохранён.";
+        note = error && error.limit ? `${error.message} Текст открыт, но не сохранён.` : "Браузер не дал сохранить текст (приватный режим или нет места) — он открыт, но не сохранён.";
       }
       read(item || { title: data.title, text }, note);
     });

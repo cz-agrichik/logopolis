@@ -201,10 +201,14 @@
   }
 
   // ───────────── «Мои тексты»: хранилище в браузере пользователя ─────────────
-  // localStorage (на сайте — у каждого посетителя свой, на сервер ничего не уходит). storage — объект
+  // localStorage; вошедшие в игре — ещё и в аккаунте (platform/account.js, library/sync.js). storage — объект
   // с getItem/setItem/removeItem (в браузере — localStorage, в тестах — подделка). Запись может бросить
-  // исключение (приватный режим, нет места) — его ловит страница.
+  // исключение (приватный режим, нет места, предел LIMITS — у такой ошибки limit: true) — его ловит страница.
   const STORE_KEY = "greek-reader:own-texts:v1";
+  /** Пределы «Моих текстов»: сколько текстов и сколько знаков в одном (глава книги — 30–60 тысяч). */
+  const LIMITS = { texts: 30, chars: 100000 };
+  const limitError = message => Object.assign(new Error(message), { limit: true });
+  const tooLong = text => String(text).length > LIMITS.chars;
   const LEGACY_KEY = "greek-reader:own-text";   // прежняя версия: один текст без названия
   const BACKUP_APP = "logos-own-texts";
   const hasGreek = text => /[\u0370-\u03ff\u1f00-\u1fff]/.test(String(text || ""));
@@ -233,6 +237,8 @@
       put({ id, title, text, stats }) {
         const db = read();
         const old = id && db.texts[id];
+        if (tooLong(text)) throw limitError(`Текст длиннее 100 000 знаков — разбейте его на части.`);
+        if (!old && Object.keys(db.texts).length >= LIMITS.texts) throw limitError(`Своих текстов — не больше ${LIMITS.texts}: удалите ненужные.`);
         const now = new Date().toISOString();
         const item = clean({ id: old ? id : newId(), title: String(title || "").trim() || titleOf(text), text,
           created: old ? old.created : now, updated: now, stats: stats || null });
@@ -263,9 +269,10 @@
       /** Копия всех текстов одним файлом JSON. */
       exportJson: () => JSON.stringify({ app: BACKUP_APP, version: 1, exported: new Date().toISOString(), texts: api.list() }, null, 2),
       /** Загрузка файла: копия (.json) — добавляет новые тексты и обновляет те, что в копии свежее;
-       *  обычный текст (.txt) — новый текст с названием по имени файла. Возвращает { added, updated, skipped }. */
+       *  обычный текст (.txt) — новый текст с названием по имени файла. Возвращает { added, updated, skipped, limited }:
+       *  limited — сколько текстов из копии не взяли из-за пределов (LIMITS). */
       importFile(name, content) {
-        const out = { added: 0, updated: 0, skipped: 0 };
+        const out = { added: 0, updated: 0, skipped: 0, limited: 0 };
         if (/\.json$/i.test(name)) {
           let parsed;
           try { parsed = JSON.parse(content); } catch (error) { throw new Error("Это не копия «Моих текстов»: файл не читается как JSON."); }
@@ -274,6 +281,7 @@
           for (const item of parsed.texts) {
             if (!item || !item.id || !hasGreek(item.text)) { out.skipped += 1; continue; }
             const have = db.texts[item.id];
+            if (tooLong(item.text) || (!have && Object.keys(db.texts).length >= LIMITS.texts)) { out.limited += 1; continue; }
             if (!have) { db.texts[item.id] = clean(item); out.added += 1; }
             else if (String(item.updated) > String(have.updated)) { db.texts[item.id] = clean(item); out.updated += 1; }
             else out.skipped += 1;
@@ -290,7 +298,7 @@
     return api;
   }
 
-  const api = { build, fold, splitSentences, titleOf, Store, hasGreek, textLevel, levelTop, LEVELS };
+  const api = { build, fold, splitSentences, titleOf, Store, hasGreek, textLevel, levelTop, LEVELS, LIMITS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OwnText = api;
 })(typeof window !== "undefined" ? window : globalThis);

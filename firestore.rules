@@ -1,7 +1,8 @@
 // Правила доступа к Firestore проекта logos-cyprus — список игроков (platform/account.js).
 // Куда вставлять: консоль Firebase → Databases & Storage → Firestore Database → вкладка «Rules» → заменить всё этим → Publish.
 // Строка — users/<главный id аккаунта>: 'google:<uid в Firebase>' или 'telegram:<номер в Telegram>'.
-// Данные аккаунта — users/<id>/data/<часть>: сейчас learn (обучение — сжатое gzip в gz или JSON строкой в json).
+// Данные аккаунта — users/<id>/data/<часть>: learn (обучение), library (читалка) — сжатые gzip в gz или JSON строкой в json;
+// свои тексты читалки — users/<id>/texts/<id>, по документу на текст.
 // Удалять строки, писать что-то ещё и лишние поля нельзя.
 // Владелец проекта видит всё в консоли — правила на консоль не действуют.
 rules_version = '2';
@@ -31,11 +32,11 @@ service cloud.firestore {
       allow update: if mine() && valid() && request.resource.data.createdAt == resource.data.createdAt;   // дату регистрации не переписать
       allow delete: if false;
 
-      // данные аккаунта по частям: learn — обучение (дальше — city и др.)
+      // данные аккаунта по частям: learn — обучение, library — читалка (карточки слов, оглавление своих текстов); дальше — city
       match /data/{part} {
         function validPart() {
           let d = request.resource.data;
-          return part in ['learn']
+          return part in ['learn', 'library']
             && d.keys().hasOnly(['gz', 'json', 'size', 'browserId', 'updatedAt'])
             && (d.gz is bytes || d.json is string)
             && (!('gz' in d) || d.gz.size() <= 1000000)
@@ -46,6 +47,23 @@ service cloud.firestore {
         allow read: if mine();
         allow create, update: if mine() && validPart();
         allow delete: if false;
+      }
+
+      // свои тексты читалки — по документу на текст (удалили в читалке — удаляется и здесь)
+      match /texts/{textId} {
+        function validText() {
+          let d = request.resource.data;
+          return textId.size() <= 40
+            && d.keys().hasOnly(['gz', 'json', 'size', 'hash', 'browserId', 'updatedAt'])
+            && (d.gz is bytes || d.json is string)
+            && (!('gz' in d) || d.gz.size() <= 600000)
+            && (!('json' in d) || d.json.size() <= 600000)
+            && d.size is int
+            && d.hash is string && d.hash.size() <= 30
+            && d.browserId is string && d.browserId.size() <= 60;
+        }
+        allow read, delete: if mine();
+        allow create, update: if mine() && validText();
       }
     }
     // всё остальное — закрыто

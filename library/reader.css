@@ -1095,3 +1095,11 @@ body.own-mode .page, body.own-mode .margin-toggle, body.own-mode .deck-button, b
   .chapter-select { flex: 0 1 110px; min-width: 0; }
 }
 @media (max-width: 360px) { .topbar__meta { display: none; } .game-link { padding: 6px 8px; } }
+
+/* ── Аккаунт: «Этот браузер устарел» (library/sync.js) ── */
+.acc-stale { position: fixed; inset: 0; z-index: 1000; background: rgba(42, 32, 23, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.acc-stale__box { background: var(--paper); color: var(--ink); max-width: 460px; border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 10px 40px rgba(0,0,0,.35); text-align: center; }
+.acc-stale__box h2 { margin: 0 0 10px; color: var(--accent); font-size: 22px; }
+.acc-stale__box p { margin: 0 0 16px; line-height: 1.5; text-align: left; }
+.acc-stale__btn { display: inline-block; background: var(--accent); color: var(--accent-ink); text-decoration: none; padding: 10px 18px; border-radius: 10px; font-weight: 700; }
+.acc-stale__btn:hover { background: var(--accent-hover); }

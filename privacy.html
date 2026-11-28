@@ -71,11 +71,12 @@
     </ul>
     <p>Строку игрока записывает игра в его браузере; весь список видит только владелец сайта.</p>
 
-    <h2>5. Учёба в аккаунте</h2>
-    <p>У вошедших игроков учёба хранится не только в браузере, но и в аккаунте — в той же базе Firebase Firestore, рядом со строкой игрока:
+    <h2>5. Учёба и читалка в аккаунте</h2>
+    <p>У вошедших игроков учёба и читалка хранятся не только в браузере, но и в аккаунте — в той же базе Firebase Firestore, рядом со строкой игрока:
       прогресс по словам, свои колоды (в том числе «Слова из чтения»), какие колоды включены, настройки учёбы, журнал занятий по дням
-      и счётчики ответов. Так учёба открывается на других устройствах. Город, библиотека и ваши тексты в читалке пока хранятся
-      только в браузере; когда они тоже переедут в аккаунт, мы обновим эту страницу.</p>
+      и счётчики ответов; в читалке — карточки слов, выбранный уровень, настройка полей и «Мои тексты» (те тексты, что вы сами
+      вставили или загрузили). Так всё это открывается на других устройствах. Город пока хранится только в браузере;
+      когда он тоже переедет в аккаунт, мы обновим эту страницу.</p>
 
     <h2>6. Статистика посещений</h2>
     <p>Опубликованный сайт использует <a href="https://metrika.yandex.ru/" rel="noopener">Яндекс Метрику</a>: она считает посещения
@@ -115,7 +116,8 @@
       created to store it). Signed-in players are listed in a players list in Firebase Firestore: sign-in method, in-game name (editable),
       provider name, email or Telegram ID and username, photo URL, in-game browser number and sign-in dates. Signed-in players' learning progress
       (word progress, own decks, enabled decks, learning settings, daily log and answer counters) is also stored in Firestore so it is available
-      on other devices; the city, library and reader texts stay in the browser for now.
+      on other devices, as are the reader's word cards, reading level, notes setting and the player's own texts ("Мои тексты");
+      the city stays in the browser for now.
       Entries are written by the game in the player's browser; the full list is visible only to the site owner. We do not sell data, show ads or share data with third parties beyond the services needed to run the site: Google (Firebase,
       Google Fonts), Telegram (sign-in) and Yandex Metrica (visit statistics, including session replay, with cookies). When the city or reader texts move to the account,
       this page will be updated. To delete your data, use

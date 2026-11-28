@@ -77,14 +77,23 @@ test('мои тексты: хранилище в браузере — сохра
   const backup = S.exportJson();
   const mem2 = {};
   const S2 = Own.Store({ getItem: k => (k in mem2 ? mem2[k] : null), setItem: (k, v) => { mem2[k] = String(v); }, removeItem: k => { delete mem2[k]; } });
-  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 2, updated: 0, skipped: 0 });
-  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 0, updated: 0, skipped: 2 });
+  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 2, updated: 0, skipped: 0, limited: 0 });
+  assert.deepStrictEqual(S2.importFile('copy.json', backup), { added: 0, updated: 0, skipped: 2, limited: 0 });
   const newer = JSON.parse(backup); newer.texts[0].text = 'Αλλαγμένο'; newer.texts[0].updated = '2999-01-01T00:00:00.000Z';
-  assert.deepStrictEqual(S2.importFile('copy.json', JSON.stringify(newer)), { added: 0, updated: 1, skipped: 1 });
-  assert.deepStrictEqual(S2.importFile('Σημειώσεις.txt', 'Ένα κείμενο.'), { added: 1, updated: 0, skipped: 0 });
+  assert.deepStrictEqual(S2.importFile('copy.json', JSON.stringify(newer)), { added: 0, updated: 1, skipped: 1, limited: 0 });
+  assert.deepStrictEqual(S2.importFile('Σημειώσεις.txt', 'Ένα κείμενο.'), { added: 1, updated: 0, skipped: 0, limited: 0 });
   assert.ok(S2.list().some(t => t.title === 'Σημειώσεις'));
   assert.throws(() => S2.importFile('x.json', '{"texts": []}'), /не копия/);
   assert.throws(() => S2.importFile('ru.txt', 'по-русски'), /нет греческого/);
+  // пределы: не больше LIMITS.texts текстов, каждый до LIMITS.chars знаков (и при вставке, и при загрузке копии)
+  const big = 'α'.repeat(Own.LIMITS.chars + 1);
+  assert.throws(() => S2.put({ text: big }), e => e.limit && /100 000/.test(e.message));
+  assert.ok(S2.put({ text: 'α'.repeat(Own.LIMITS.chars) }), 'ровно предел — можно');
+  while (S2.list().length < Own.LIMITS.texts) S2.put({ text: 'Κείμενο ' + S2.list().length });
+  assert.throws(() => S2.put({ text: 'Ακόμα ένα' }), e => e.limit && /не больше 30/.test(e.message));
+  const one = S2.list()[0]; assert.ok(S2.put({ id: one.id, text: 'Διορθωμένο' }), 'править свой — можно и на пределе');
+  const extra = { app: 'logos-own-texts', version: 1, texts: [{ id: 'tx1', title: 'x', text: 'Νέο', created: '2026', updated: '2026' }, { id: 'tx2', title: 'y', text: big, created: '2026', updated: '2026' }] };
+  assert.deepStrictEqual(S2.importFile('copy.json', JSON.stringify(extra)), { added: 0, updated: 0, skipped: 0, limited: 2 });
   // хранилище испорчено — начинаем с пустого, а не падаем
   mem2['greek-reader:own-texts:v1'] = '{oops';
   assert.deepStrictEqual(S2.list(), []);

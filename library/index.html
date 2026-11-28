@@ -9,11 +9,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Caveat:wght@500;600&display=swap">
-  <link rel="stylesheet" href="reader.css?v=11">
+  <link rel="stylesheet" href="reader.css?v=12">
   <script src="catalog.js"></script>
   <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
-  <script src="owntext.js?v=11" defer></script>
-  <script src="library.js?v=11" defer></script>
+  <!-- вошли в игре — свои тексты и карточки слов идут и в аккаунт (library/sync.js) -->
+  <script src="../platform/account-config.js?v=12" defer></script>
+  <script src="../platform/account.js?v=12" defer></script>
+  <script src="sync.js?v=12" defer></script>
+  <script src="owntext.js?v=12" defer></script>
+  <script src="library.js?v=12" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -38,8 +42,9 @@
 
     <h2 class="library__h" id="mine">Мои тексты</h2>
     <p class="library__note">Свой греческий текст разбирается по словарю сайта — словам и оборотам из всех книг библиотеки;
-      перевода предложений нет. Тексты хранятся <b>только в этом браузере на этом компьютере</b> и никуда не отправляются —
-      чтобы не потерять их или перенести на другое устройство, скачайте копию. <span id="dict-stats"></span></p>
+      перевода предложений нет. Тексты хранятся в этом браузере, а если вы вошли в игре через Google или Telegram, — ещё и в аккаунте:
+      так они откроются и на другом устройстве. Без входа, чтобы не потерять их или перенести, скачайте копию.
+      Своих текстов — до 30, каждый до 100 000 знаков. <span id="dict-stats"></span></p>
     <div class="shelf" id="own-shelf"></div>
     <div class="own-tools">
       <button type="button" class="link-button" id="own-export">Скачать копию всех текстов</button>

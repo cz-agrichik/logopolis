@@ -24,7 +24,10 @@
 //
 //  Что лежит в аккаунте (Firestore): users/<accountId> — строка в списке игроков (кто, имя, главный браузер, даты);
 //  users/<accountId>/data/learn — обучение (core/learning/learn.js, snapshot: прогресс по словам, свои колоды, настройки, журнал;
-//  без слов встроенных колод — они есть в игре). Дальше по той же схеме: data/city — город, свои тексты читалки — по документу на текст.
+//  без слов встроенных колод — они есть в игре); users/<accountId>/data/library — читалка: карточки слов, уровень, поля,
+//  оглавление своих текстов (название, дата, отпечаток); сами тексты — users/<accountId>/texts/<id>, по документу на текст
+//  (пишутся и читаются только те, что поменялись). Дальше по той же схеме: data/city — город.
+//  Читалка — отдельная страница: там тоже работает Account (library/sync.js) — пишет в аккаунт и замечает «устарел».
 //  Главный браузер пишет обучение не чаще раза в PUSH_EVERY (и сразу, когда вкладку прячут) — только если оно поменялось.
 //  Обучение в аккаунте сжато (gzip, поле gz): ~50 КБ на все 2700 слов вместо ~330 КБ.
 //  Каждый обмен с аккаунтом — транзакция Firestore: прочитали строку и обучение — одну и ту же версию; записали — значит, сервер
@@ -64,6 +67,10 @@ const Account = {
   onBusy: null,
   onChange: null,
   MAX_DOC: 1000000,   // байт: документ Firestore — до 1 МиБ (и firestore.rules — до 1 000 000 знаков)
+  /** Ключи читалки в localStorage (library/owntext.js, library/reader.js). */
+  LIB: { texts: 'greek-reader:own-texts:v1', deck: 'greek-reader:deck:v2', level: 'greek-reader:my-level', margin: 'greek-reader:margin-notes' },
+  LIB_MAX_CHARS: 300000,   // текст длиннее (читалка и так не даёт больше 100 000) — только в этом браузере
+  MAX_TEXT_DOC: 600000,    // байт на документ текста (и firestore.rules)
 
   load() {
     let s = null;
@@ -80,6 +87,7 @@ const Account = {
     this.state = s;
     this.held = null; this.stale = false; this.unwatch = null; this.reloadNeeded = false; this.sent = null;
     this.lastLearnText = typeof Learn !== 'undefined' ? (() => { try { return localStorage.getItem(Learn.KEY); } catch (e) { return null; } })() : null;
+    this.lastLibRaw = this.libRaw();
     this.save();
     return s;
   },
@@ -115,6 +123,14 @@ const Account = {
       row: r => r._learn || null,
       empty: v => !v || Learn.isEmptySnap(v),
     },
+    // читалка: карточки слов, уровень, поля и оглавление своих текстов; prepare — до замены скачать сами тексты (все сразу)
+    library: {
+      get: () => Account.libLocal(),
+      prepare: (v, id) => Account.fetchTexts(v, id),
+      set: (v, got) => Account.applyLibrary(v, got),
+      row: r => r._library || null,
+      empty: v => !v || (!Object.keys(v.texts || {}).length && !Object.keys(v.deck || {}).length),
+    },
   },
   hasLearn() { return typeof Learn !== 'undefined' && !!Learn.state; },
   /** Обучение из аккаунта — в этот браузер (через обычное сохранение обучения); интерфейс потом перезагружает страницу. */
@@ -142,11 +158,18 @@ const Account = {
     return 'ask';
   },
   /** Части, которых в браузере нет (например, имени), — взять из аккаунта: терять тут нечего. */
-  fillMissing(row) {
+  async fillMissing(row, accountId = this.state.accountId) {
     if (!row) return;
     const local = this.snapshot(), v = this.fromRow(row);
-    for (const k in this.parts) if (local[k] == null && v[k] != null) this.parts[k].set(v[k]);
+    const ks = Object.keys(this.parts).filter(k => local[k] == null && v[k] != null);
+    await this.replaceParts(ks, v, accountId);
     this.save();
+  },
+  /** Заменить части ks значениями v: сначала всё скачать (prepare), потом разом записать — без «половины» при обрыве связи. */
+  async replaceParts(ks, v, accountId) {
+    const got = {};
+    for (const k of ks) if (this.parts[k].prepare) got[k] = await this.parts[k].prepare(v[k], accountId);
+    for (const k of ks) this.parts[k].set(v[k], got[k]);
   },
   /** Главный id аккаунта — ключ строки в списке игроков: один для любого способа входа и одинаковый на всех устройствах. */
   accountIdOf(who) {
@@ -217,7 +240,13 @@ const Account = {
     }
     const d = this.decide(this.snapshot(), remote && this.fromRow(remote));
     if (d === 'ask') { this.held = { acc, remote, login: !!acc }; return { result: 'ask', choice: this.choice() }; }
-    if (d === 'pull') this.takeRemote(remote); else this.fillMissing(remote);   // до finish: тот подставит имя у поставщика, если имени нет нигде
+    try {
+      if (d === 'pull') await this.takeRemote(remote, false, who.accountId); else await this.fillMissing(remote, who.accountId);   // до finish: тот подставит имя у поставщика, если имени нет нигде
+    } catch (e) {
+      if (e === 'unconfirmedOverwrite') throw e;
+      if (acc) this.finish(acc);   // не скачали (оборвалась связь) — здесь ничего не заменили; вошли, сверим при следующем запуске
+      return { result: this.failed(e) };
+    }
     if (acc) this.finish(acc);
     return { result: await this.claim(remote, !!acc).then(() => d, e => this.failed(e)) };
   },
@@ -243,17 +272,25 @@ const Account = {
     }
     if (confirmed !== true) return { ok: false, error: 'notConfirmed' };
     this.held = null;
-    if (which === 'remote') this.takeRemote(h.remote, true); else this.fillMissing(h.remote);
+    const id = h.acc ? h.acc.accountId : this.state.accountId;
+    try {
+      if (which === 'remote') await this.takeRemote(h.remote, true, id); else await this.fillMissing(h.remote, id);
+    } catch (e) {
+      if (e === 'unconfirmedOverwrite') throw e;
+      this.held = h;   // не скачали — здесь ничего не заменили, выбор ждёт дальше
+      this.warn(e);
+      return { ok: false, error: 'offline' };
+    }
     if (h.acc) this.finish(h.acc);
     const r = await this.claim(h.remote, h.login, which === 'local').then(() => true, e => this.failed(e));
     return { ok: true, pending: r !== true };
   },
   /** 🚨 Заменить версию браузера версией аккаунта (части, которых в аккаунте нет, остаются). Молча — только если здесь ничего
    *  не пропадёт; иначе нужен confirmed. */
-  takeRemote(row, confirmed = false) {
+  async takeRemote(row, confirmed = false, accountId = this.state.accountId) {
     const local = this.snapshot(), v = this.fromRow(row);
     if (!confirmed && this.losses(local, v).length) throw this.alarm('версия браузера чуть не заменилась без подтверждения', local, v);
-    for (const k in this.parts) if (v[k] != null) this.parts[k].set(v[k]);
+    await this.replaceParts(Object.keys(this.parts).filter(k => v[k] != null), v, accountId);
     this.state.localAt = this.millis(row.updatedAt) || Date.now();
     this.save();
   },
@@ -265,10 +302,10 @@ const Account = {
 
   /** При запуске (вошли раньше). Сверка при входе не прошла — пройти её; этот браузер главный — дописать незаписанное и следить;
    *  главный другой — устарел. Обещание { result: 'ok' | 'stale' | 'ask' | … | 'pending' }. */
-  async sync() {
+  async sync({ noLink = false } = {}) {
     const s = this.state;
     if (!this.signedIn() || location.protocol === 'file:' || !ACCOUNT_CONFIG.firebase) return { result: 'pending' };
-    if (!this.linked()) return this.link();
+    if (!this.linked()) return noLink ? { result: 'pending' } : this.link();   // читалка сверку при входе не проводит — это дело игры
     try {
       const remote = await this.readRow(s);
       if (remote && remote.browserId !== s.id) return { result: this.goStale() };
@@ -291,7 +328,7 @@ const Account = {
   async adopt() {
     try {
       const remote = await this.readRow(this.state);
-      if (remote) this.takeRemote(remote, true);   // устаревшая версия браузера не в счёт
+      if (remote) await this.takeRemote(remote, true);   // устаревшая версия браузера не в счёт
       await this.claim(remote, false);
       return { ok: true };
     } catch (e) { this.warn(e); return { ok: false, error: 'offline' }; }
@@ -323,6 +360,18 @@ const Account = {
   learnSaved(text) {
     if (text === this.lastLearnText) return;
     this.lastLearnText = text;
+    this.localChanged();
+  },
+  /** Читалка пишет в localStorage сама (и на своей странице) — раз в несколько секунд смотрим, не поменялось ли (AccountUI, library/sync.js). */
+  libraryCheck() {
+    const raw = this.libRaw();
+    if (raw === this.lastLibRaw) return false;
+    this.lastLibRaw = raw;
+    this.localChanged();
+    return true;
+  },
+  /** Здесь что-то поменялось: вошли и этот браузер главный — записать в аккаунт (не чаще раза в PUSH_EVERY). */
+  localChanged() {
     this.rev++;
     if (this.applying || !this.state || !this.signedIn() || !this.linked() || this.stale) return;
     if (!this.state.profilePending) { this.state.profilePending = true; this.save(); this.changed(); }
@@ -378,18 +427,86 @@ const Account = {
     if (!who.accountId) throw 'noAccountId';
     await this.session(who);
     const db = await this.fbDb();
-    let snap = null, ls = null;
-    // строка и обучение — в одной транзакции: одна и та же версия аккаунта, даже если в этот момент пишет другой браузер
+    let snap = null, ls = null, lb = null;
+    // строка, обучение и читалка — в одной транзакции: одна и та же версия аккаунта, даже если в этот момент пишет другой браузер
     await this.within(db.runTransaction(async t => {
       snap = await t.get(this.userRef(db, who.accountId));
       ls = snap.exists ? await t.get(this.learnRef(db, who.accountId)) : null;
+      lb = snap.exists ? await t.get(this.partRef(db, who.accountId, 'library')) : null;
     }));
-    if (!snap.exists) { this.sent = { row: null, learn: null }; return null; }
+    if (!snap.exists) { this.sent = { row: null, learn: null, lib: null, libIndex: {} }; return null; }
     const row = snap.data();
     const json = ls && ls.exists ? await this.unpack(ls.data()) : null;
+    const lib = lb && lb.exists ? await this.unpack(lb.data()) : null;
     row._learn = json ? JSON.parse(json) : null;
-    this.sent = { row: this.rowKey(row), learn: json };
+    row._library = lib ? JSON.parse(lib) : null;
+    this.sent = { row: this.rowKey(row), learn: json, lib, libIndex: (row._library && row._library.texts) || {} };
     return row;
+  },
+  partRef(db, id, part) { return this.userRef(db, id).collection('data').doc(part); },
+  textRef(db, id, tid) { return this.userRef(db, id).collection('texts').doc(tid); },
+
+  // ---------- читалка: свои тексты, карточки слов, уровень, поля ----------
+  libRaw() {
+    try { return Object.values(this.LIB).map(k => localStorage.getItem(k)).join('\u0001'); } catch (e) { return null; }
+  },
+  readJson(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } },
+  /** Свои тексты читалки: { id: текст } (как в library/owntext.js). */
+  localTexts() { const db = this.readJson(this.LIB.texts); return (db && db.texts && typeof db.texts === 'object') ? db.texts : {}; },
+  /** Отпечаток текста: по нему видно, поменялся ли он (без скачивания). Тот же JSON, что уходит в документ текста. */
+  textHash(json) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < json.length; i++) { h ^= json.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return json.length.toString(36) + '-' + h.toString(36);
+  },
+  /** Снимок читалки: { texts: { id: { title, updated, hash } }, deck, level, margin } или null (хранилища нет). */
+  libLocal() {
+    try { localStorage.getItem(this.LIB.deck); } catch (e) { return null; }
+    if (typeof localStorage === 'undefined') return null;
+    const texts = {}, cache = this.hashCache || (this.hashCache = new Map());
+    for (const [id, t] of Object.entries(this.localTexts())) {
+      if (!t || typeof t.text !== 'string' || t.text.length > this.LIB_MAX_CHARS) continue;
+      const key = `${t.updated}|${t.text.length}|${t.title}`;
+      let c = cache.get(id);
+      if (!c || c.key !== key) cache.set(id, c = { key, hash: this.textHash(JSON.stringify(t)) });
+      texts[id] = { title: String(t.title || ''), updated: String(t.updated || ''), hash: c.hash };
+    }
+    const deck = this.readJson(this.LIB.deck);
+    const get = k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+    return { texts, deck: (deck && deck.cards) || {}, level: get(this.LIB.level), margin: get(this.LIB.margin) };
+  },
+  /** Сводка для экрана выбора: сколько своих текстов и карточек слов. */
+  librarySummary(v) { return { texts: Object.keys((v && v.texts) || {}).length, cards: Object.keys((v && v.deck) || {}).length }; },
+  /** Скачать тексты, которых здесь нет или которые другие, — одной транзакцией, со сверкой отпечатков. { id: текст }. */
+  async fetchTexts(v, accountId) {
+    const local = this.libLocal() || { texts: {} };
+    const need = Object.keys(v.texts || {}).filter(id => !local.texts[id] || local.texts[id].hash !== v.texts[id].hash);
+    if (!need.length) return {};
+    const db = await this.fbDb(), docs = {};
+    await this.within(db.runTransaction(async t => { for (const id of need) docs[id] = await t.get(this.textRef(db, accountId, id)); }), 30000);
+    const got = {};
+    for (const id of need) {
+      const json = docs[id].exists ? await this.unpack(docs[id].data()) : null;
+      if (!json || this.textHash(json) !== v.texts[id].hash) throw 'remoteChanged';   // в аккаунте уже другое — сверим заново
+      got[id] = JSON.parse(json);
+    }
+    return got;
+  },
+  /** Читалку из аккаунта — в этот браузер: тексты из оглавления (скачанные — got, остальные уже здесь), карточки, уровень, поля.
+   *  Свои тексты длиннее LIB_MAX_CHARS живут только здесь — остаются. */
+  applyLibrary(v, got = {}) {
+    if (!v || typeof localStorage === 'undefined') return;
+    const have = this.localTexts(), texts = {};
+    for (const id of Object.keys(v.texts || {})) if (got[id] || have[id]) texts[id] = got[id] || have[id];
+    for (const [id, t] of Object.entries(have)) if (!(id in texts) && t && typeof t.text === 'string' && t.text.length > this.LIB_MAX_CHARS) texts[id] = t;
+    const set = (k, val) => { if (val) localStorage.setItem(k, val); else localStorage.removeItem(k); };
+    const before = this.libRaw();
+    set(this.LIB.texts, JSON.stringify({ version: 1, texts }));
+    set(this.LIB.deck, JSON.stringify({ version: 2, cards: v.deck || {} }));
+    set(this.LIB.level, v.level || '');
+    set(this.LIB.margin, v.margin || '');
+    this.lastLibRaw = this.libRaw();
+    if (this.lastLibRaw !== before) this.reloadNeeded = true;
   },
   /** Поля строки, по которым видно, поменялась ли она (без дат). */
   rowKey(r) { return JSON.stringify(['accountId', 'provider', 'name', 'providerName', 'email', 'tgId', 'tgUsername', 'photo', 'browserId'].map(k => r[k] == null ? null : r[k])); },
@@ -398,21 +515,48 @@ const Account = {
     const v = this.parts.learn.get();
     return v == null ? null : JSON.stringify(v);
   },
-  /** Документ обучения: сжатый gzip (Firestore Bytes, поле gz); браузер без CompressionStream — JSON строкой (поле json).
-   *  Больше документа Firestore — не пишем (throw 'tooBig'; когда понадобится — делить на несколько документов). */
-  async learnDoc(json) {
-    const doc = { size: json.length, browserId: this.state.id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  /** Документ данных: JSON, сжатый gzip (Firestore Bytes, поле gz); браузер без CompressionStream — JSON строкой (поле json).
+   *  extra — ещё поля (у текста — hash). Больше max байт — не пишем (throw 'tooBig'; когда понадобится — делить на несколько документов). */
+  async packDoc(json, extra = {}, max = this.MAX_DOC) {
+    const doc = Object.assign({ size: json.length, browserId: this.state.id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, extra);
     if (typeof CompressionStream !== 'undefined' && firebase.firestore.Blob) {
       const bytes = new Uint8Array(await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
-      if (bytes.length > this.MAX_DOC) throw 'tooBig';
+      if (bytes.length > max) throw 'tooBig';
       doc.gz = firebase.firestore.Blob.fromUint8Array(bytes);
     } else {
-      if ((typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(json).length : json.length * 2) > this.MAX_DOC) throw 'tooBig';
+      if ((typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(json).length : json.length * 2) > max) throw 'tooBig';
       doc.json = json;
     }
     return doc;
   },
-  /** JSON обучения из документа (сжатого или нет). */
+  /** Что записать в аккаунт помимо строки — только поменявшееся против sent (что в аккаунте сейчас):
+   *  документ обучения, документ читалки, документы своих текстов (новые и исправленные) и удалённые тексты. */
+  async plan(sent) {
+    const p = { learnJson: this.learnJson(), learn: null, libJson: null, lib: null, texts: [], gone: [] };
+    if (p.learnJson != null && p.learnJson !== sent.learn) p.learn = await this.packDoc(p.learnJson);
+    const lib = this.parts.library.get();
+    if (lib) {
+      p.libJson = JSON.stringify(lib);
+      if (p.libJson !== sent.lib) p.lib = await this.packDoc(p.libJson);
+      const was = sent.libIndex || {}, items = this.localTexts();
+      for (const [id, meta] of Object.entries(lib.texts)) if (!was[id] || was[id].hash !== meta.hash)
+        p.texts.push([id, await this.packDoc(JSON.stringify(items[id]), { hash: meta.hash }, this.MAX_TEXT_DOC)]);
+      for (const id of Object.keys(was)) if (!lib.texts[id]) p.gone.push(id);
+    }
+    return p;
+  },
+  writePlan(t, db, id, p) {
+    if (p.learn) t.set(this.learnRef(db, id), p.learn);
+    if (p.lib) t.set(this.partRef(db, id, 'library'), p.lib);
+    for (const [tid, doc] of p.texts) t.set(this.textRef(db, id, tid), doc);
+    for (const tid of p.gone) t.delete(this.textRef(db, id, tid));
+  },
+  /** Что в аккаунте после записи plan. */
+  sentAfter(sent, p, rowKey) {
+    return { row: rowKey, learn: p.learnJson != null ? p.learnJson : sent.learn, lib: p.libJson != null ? p.libJson : sent.lib,
+      libIndex: p.libJson != null ? JSON.parse(p.libJson).texts : sent.libIndex };
+  },
+  /** JSON из документа данных (сжатого или нет). */
   async unpack(d) {
     if (d.gz) {
       const bytes = d.gz.toUint8Array ? d.gz.toUint8Array() : d.gz;
@@ -439,14 +583,14 @@ const Account = {
       const v = this.fromRow(remote);
       if (this.losses(v, this.snapshot()).length) throw this.alarm('версия аккаунта чуть не заменилась без подтверждения', v, this.snapshot());
     }
-    const rev = this.rev, db = await this.fbDb(), data = this.rowData(remote, login), json = this.learnJson();
-    const doc = json != null && json !== (this.sent && this.sent.learn) ? await this.learnDoc(json) : null;   // то же — не пишем
-    // строка и обучение — одной транзакцией: либо записалось всё, либо ничего
+    const rev = this.rev, db = await this.fbDb(), data = this.rowData(remote, login), sent = this.sent || {};
+    const p = await this.plan(sent);   // то, что в аккаунте уже такое же, — не пишем
+    // строка, обучение, читалка и тексты — одной транзакцией: либо записалось всё, либо ничего
     await this.within(db.runTransaction(async t => {
       t.set(this.userRef(db, s.accountId), data, { merge: true });
-      if (doc) t.set(this.learnRef(db, s.accountId), doc);
-    }));
-    this.sent = { row: this.rowKey(data), learn: json != null ? json : this.sent && this.sent.learn };
+      this.writePlan(t, db, s.accountId, p);
+    }), 30000);
+    this.sent = this.sentAfter(sent, p, this.rowKey(data));
     s.linked = s.accountId; this.stale = false;
     if (rev === this.rev) delete s.profilePending; else { s.profilePending = true; this.later(); }   // пока писали, здесь что-то поменялось — допишем
     this.save();
@@ -457,9 +601,9 @@ const Account = {
   async push() {
     const s = this.state;
     await this.session(s);
-    const rev = this.rev, db = await this.fbDb(), ref = this.userRef(db, s.accountId), json = this.learnJson();
+    const rev = this.rev, db = await this.fbDb(), ref = this.userRef(db, s.accountId);
     const sent = this.sent || {};
-    const doc = json != null && json !== sent.learn ? await this.learnDoc(json) : null;
+    const p = await this.plan(sent);
     let other = false, rowKey = sent.row;
     await this.within(db.runTransaction(async t => {
       const snap = await t.get(ref), row = snap.exists ? snap.data() : null;
@@ -468,10 +612,10 @@ const Account = {
       const data = this.rowData(row, false);
       rowKey = this.rowKey(data);
       if (!row || rowKey !== this.rowKey(row)) t.set(ref, data, { merge: true });   // строка — только если что-то в ней поменялось
-      if (doc) t.set(this.learnRef(db, s.accountId), doc);
-    }));
+      this.writePlan(t, db, s.accountId, p);
+    }), 30000);
     if (other) { this.goStale(); throw 'stale'; }
-    this.sent = { row: rowKey, learn: json != null ? json : sent.learn };
+    this.sent = this.sentAfter(sent, p, rowKey);
     if (rev === this.rev) delete s.profilePending; else { s.profilePending = true; this.later(); }   // пока писали, здесь что-то поменялось — допишем
     this.save();
     this.changed();
@@ -549,4 +693,4 @@ const Account = {
 };
 
 // «Стереть всё» и аварийный сброс (?reset) стирают и вход — как при первом запуске
-Session.extraKeys.push(Account.KEY);
+if (typeof Session !== 'undefined') Session.extraKeys.push(Account.KEY);   // на странице читалки сеанса игры нет

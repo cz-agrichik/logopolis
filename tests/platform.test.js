@@ -85,6 +85,7 @@ function fakeFirebase(db = fakeDb(), anonPrefix = 'anon-') {
       for (const cb of db.subs[path] || []) cb(snap(path));
       return Promise.resolve();
     },
+    delete: () => { if (!db.online) return down(); db.writes.push({ path, deleted: true }); delete db.docs[path]; return Promise.resolve(); },
     onSnapshot(cb) {
       (db.subs[path] = db.subs[path] || []).push(cb);
       cb(snap(path));
@@ -96,7 +97,7 @@ function fakeFirebase(db = fakeDb(), anonPrefix = 'anon-') {
     collection: c => ({ doc: id => ref(`${c}/${id}`) }),
     runTransaction: async fn => {
       if (!db.online) return down();
-      const r = await fn({ get: r => r.get(), set: (r, d, o) => { r.set(d, o); } });
+      const r = await fn({ get: r => r.get(), set: (r, d, o) => { r.set(d, o); }, delete: r => { r.delete(); } });
       if (db.beforeCommit) { const f = db.beforeCommit; db.beforeCommit = null; f(); }   // что-то случилось, пока запись шла на сервер
       return r;
     },
@@ -170,7 +171,7 @@ test('список игроков: вход через Google — строка u
   assert.equal((await A.sync()).result, 'ok', 'при запуске дописали');
   assert.equal(F.docs['users/google:g-1'].name, 'Новое имя');
   assert.equal(A.state.profilePending, undefined);
-  for (const w of F.writes) for (const k of Object.keys(w.data)) assert.ok(RULE_KEYS.includes(k), `поле ${k} есть в firestore.rules`);
+  for (const w of F.writes.filter(w => w.path.split('/').length === 2)) for (const k of Object.keys(w.data)) assert.ok(RULE_KEYS.includes(k), `поле ${k} есть в firestore.rules`);
 });
 
 test('имя без входа; вход в аккаунт, где имя другое, — спросить; выбрать браузер, аккаунт или не входить', async () => {
@@ -184,7 +185,8 @@ test('имя без входа; вход в аккаунт, где имя дру
   assert.equal(r.result, 'ask');
   assert.equal(typeof r.choice.localAt, 'number', 'когда имя поменяли здесь');
   delete r.choice.localAt;
-  assert.deepEqual(plain(r.choice), { local: { name: 'Андрей', learn: null }, remote: { name: 'Ανδρέας', learn: null }, savedAt: 1700000000000, provider: 'google', login: true });
+  const nl = v => ({ name: v.name, learn: v.learn });
+  assert.deepEqual(plain({ ...r.choice, local: nl(r.choice.local), remote: nl(r.choice.remote) }), { local: { name: 'Андрей', learn: null }, remote: { name: 'Ανδρέας', learn: null }, savedAt: 1700000000000, provider: 'google', login: true });
   assert.equal(A.signedIn(), false, 'пока не выбрали — не вошли');
   assert.deepEqual(plain(await A.choose(null)), { ok: true, cancelled: true });
   assert.equal(A.signedIn(), false);
@@ -272,18 +274,18 @@ test('Telegram: строка по номеру Telegram — одна на все
   await two.A.setName('Andreas');
   const r = await two.A.signIn('telegram');
   assert.equal(r.result, 'ask');
-  assert.deepEqual(plain(r.choice.remote), { name: 'Андрей', learn: null }, 'увидел строку первого');
+  assert.equal(r.choice.remote.name, 'Андрей', 'увидел строку первого');
   await two.A.choose('remote', true);
   assert.equal(two.A.state.name, 'Андрей');
   assert.equal(db.docs['users/telegram:42'].browserId, two.A.state.id, 'главный — второй');
   assert.equal(one.A.stale, true, 'первый устарел');
   assert.equal(staleOne, 1);
-  assert.deepEqual(Object.keys(db.docs), ['users/telegram:42'], 'строка одна');
+  assert.deepEqual(Object.keys(db.docs).filter(k => k.split('/').length === 2), ['users/telegram:42'], 'строка одна');
 
   // вышли и вошли снова в том же браузере — та же строка
   await two.A.signOut();
   assert.equal((await two.A.signIn('telegram')).result, 'same');
-  assert.deepEqual(Object.keys(db.docs), ['users/telegram:42']);
+  assert.deepEqual(Object.keys(db.docs).filter(k => k.split('/').length === 2), ['users/telegram:42']);
 });
 
 test('список игроков: без связи вход всё равно состоялся — сверка при запуске; вошли до появления списка — тоже', async () => {
@@ -317,13 +319,13 @@ test('🚨 ловушка: затереть непустую другую вер
   const alarm = A.alarm;
   A.alarm = (...a) => { errors.push(a[0]); return alarm.call(A, ...a); };
   // в обход интерфейса: заменить версию браузера / аккаунта без подтверждения
-  assert.throws(() => A.takeRemote({ name: 'Чужое' }), e => e === 'unconfirmedOverwrite');
+  await assert.rejects(A.takeRemote({ name: 'Чужое' }), e => e === 'unconfirmedOverwrite');
   assert.equal(A.state.name, 'Андрей', 'браузер не тронут');
   await assert.rejects(A.claim({ name: 'Чужое' }, false), e => e === 'unconfirmedOverwrite');
   assert.equal(F.docs['users/google:g-1'].name, 'Андрей', 'аккаунт не тронут');
   assert.equal(errors.length, 2, 'и оба раза — громко');
   // пустую или ту же — можно молча
-  A.takeRemote({ name: 'Андрей' });
+  await A.takeRemote({ name: 'Андрей' });
   await A.claim({ name: 'Андрей' }, false);
   // главный пишет, не сравнивая: что бы ни лежало в аккаунте, пока главный — он
   F.docs['users/google:g-1'].name = 'Из консоли';
@@ -456,4 +458,97 @@ test('обучение в аккаунте: сжато; вход ждёт све
   await tick(40);
   assert.equal(Object.keys(JSON.parse(learnDoc(db, 'google:g-1').json).progress).length, 202, 'дописали');
   assert.equal(b.A.state.profilePending, undefined);
+});
+
+// ---------- читалка в аккаунте: свои тексты, карточки слов ----------
+const OWN = 'greek-reader:own-texts:v1', DECK = 'greek-reader:deck:v2';
+const textItem = (id, text, updated = '2026-11-20T10:00:00.000Z') => ({ id, title: text.slice(0, 12), text, created: updated, updated, stats: null });
+const putTexts = (b, items) => { b.store[OWN] = JSON.stringify({ version: 1, texts: Object.fromEntries(items.map(t => [t.id, t])) }); };
+const putCards = (b, keys) => { b.store[DECK] = JSON.stringify({ version: 2, cards: Object.fromEntries(keys.map(k => [k, { key: k, head: k, status: 'learning' }])) }); };
+const textDocs = (db, id) => Object.keys(db.docs).filter(k => k.startsWith(`users/${id}/texts/`)).map(k => k.split('/').pop()).sort();
+
+test('читалка в аккаунте: тексты — по документу на текст, пишутся только поменявшиеся; второй браузер скачивает', async () => {
+  const db = fakeDb();
+  const one = loadWithFirebase(null, db), two = loadWithFirebase(null, db);
+  one.A.PUSH_EVERY = 10;
+  putTexts(one, [textItem('t1', 'Πρώτο κείμενο. '.repeat(200)), textItem('t2', 'Δεύτερο.')]);
+  putCards(one, ['ρίχνω', 'ματιά']);
+  one.store['greek-reader:my-level'] = 'A2';
+  one.A.load(); two.A.load();
+  assert.equal((await one.A.signIn('google')).result, 'push');
+  assert.deepEqual(textDocs(db, 'google:g-1'), ['t1', 't2']);
+  const lib = JSON.parse(require('zlib').gunzipSync(Buffer.from(db.docs['users/google:g-1/data/library'].gz.toUint8Array())).toString());
+  assert.deepEqual(Object.keys(lib.texts).sort(), ['t1', 't2'], 'в документе читалки — только оглавление');
+  assert.ok(!JSON.stringify(lib).includes('Πρώτο κείμενο. Πρώτο'), 'самих текстов в нём нет');
+  assert.deepEqual(Object.keys(lib.deck).sort(), ['ματιά', 'ρίχνω']);
+  assert.equal(lib.level, 'A2');
+
+  // поправили карточку — тексты не трогаем; поправили один текст — пишем только его; удалили — удаляем
+  const n0 = db.writes.length;
+  putCards(one, ['ρίχνω', 'ματιά', 'φορά']);
+  assert.equal(one.A.libraryCheck(), true);
+  await tick(30);
+  assert.ok(db.writes.slice(n0).every(w => !w.path.includes('/texts/')), 'карточка — без текстов');
+  const n1 = db.writes.length;
+  putTexts(one, [textItem('t1', 'Πρώτο κείμενο. '.repeat(200)), textItem('t2', 'Δεύτερο, διορθωμένο.', '2026-11-21T10:00:00.000Z')]);
+  one.A.libraryCheck(); await tick(30);
+  assert.deepEqual(db.writes.slice(n1).filter(w => w.path.includes('/texts/')).map(w => w.path.split('/').pop()), ['t2']);
+  putTexts(one, [textItem('t2', 'Δεύτερο, διορθωμένο.', '2026-11-21T10:00:00.000Z')]);
+  one.A.libraryCheck(); await tick(30);
+  assert.deepEqual(textDocs(db, 'google:g-1'), ['t2'], 'удалённый текст ушёл и из аккаунта');
+
+  // второй браузер: читалка пустая — взяли из аккаунта, тексты скачались
+  assert.equal((await two.A.signIn('google')).result, 'pull');
+  assert.equal(two.A.reloadNeeded, true);
+  assert.deepEqual(Object.keys(JSON.parse(two.store[OWN]).texts), ['t2']);
+  assert.equal(JSON.parse(two.store[OWN]).texts.t2.text, 'Δεύτερο, διορθωμένο.');
+  assert.deepEqual(Object.keys(JSON.parse(two.store[DECK]).cards).sort(), ['ματιά', 'ρίχνω', 'φορά']);
+  assert.equal(two.store['greek-reader:my-level'], 'A2');
+  assert.equal(one.A.stale, true);
+});
+
+test('читалка в аккаунте: при входе с разными текстами — спросить; в аккаунте поменялось, пока скачивали, — ничего не заменили', async () => {
+  const db = fakeDb();
+  const one = loadWithFirebase(null, db), two = loadWithFirebase(null, db);
+  putTexts(one, [textItem('t1', 'Ένα.')]);
+  one.A.load();
+  await one.A.signIn('google');
+  putTexts(two, [textItem('t9', 'Άλλο.')]);
+  two.A.load();
+  const r = await two.A.signIn('google');
+  assert.equal(r.result, 'ask');
+  assert.deepEqual(plain(two.A.losses(r.choice.local, r.choice.remote)), ['library']);
+  assert.deepEqual(plain(two.A.librarySummary(r.choice.remote.library)), { texts: 1, cards: 0 });
+  // пока игрок думал, в аккаунте текст поменяли — скачанное не сходится с оглавлением: не заменяем, выбор ждёт
+  const doc = db.docs['users/google:g-1/texts/t1'];
+  db.docs['users/google:g-1/texts/t1'] = { ...doc, gz: { toUint8Array: () => require('zlib').gzipSync(JSON.stringify(textItem('t1', 'Αλλαγμένο.'))) } };
+  assert.deepEqual(plain(await two.A.choose('remote', true)), { ok: false, error: 'offline' });
+  assert.deepEqual(Object.keys(JSON.parse(two.store[OWN]).texts), ['t9'], 'здесь ничего не тронули');
+  assert.ok(two.A.held, 'выбор ждёт дальше');
+  db.docs['users/google:g-1/texts/t1'] = doc;
+  assert.equal((await two.A.choose('remote', true)).ok, true);
+  assert.deepEqual(Object.keys(JSON.parse(two.store[OWN]).texts), ['t1']);
+});
+
+test('читалка в аккаунте: страница читалки (без обучения) пишет только читалку и не трогает обучение в аккаунте', async () => {
+  const db = fakeDb();
+  const game = browserWithLearn(db);
+  game.study(10);
+  await game.A.signIn('google');
+  const learn0 = learnDoc(db, 'google:g-1').json;
+  // та же вкладка, страница читалки: Learn там нет; localStorage тот же
+  const lib = loadWithFirebase(null, db);
+  Object.assign(lib.store, game.store);
+  await lib.F.auth.signInWithPopup();
+  lib.A.load();
+  assert.equal(lib.A.linked(), true);
+  putTexts(lib, [textItem('t5', 'Νέο κείμενο από τη βιβλιοθήκη.')]);
+  assert.equal((await lib.A.sync({ noLink: true })).result, 'ok');
+  assert.deepEqual(textDocs(db, 'google:g-1'), ['t5'], 'текст из читалки — в аккаунте');
+  assert.equal(learnDoc(db, 'google:g-1').json, learn0, 'обучение в аккаунте не тронуто');
+  // не сверились при входе — читалка сама сверку не проводит
+  const fresh = loadWithFirebase(null, fakeDb());
+  fresh.store['greekgame.account.v1'] = JSON.stringify({ id: 'b-x', provider: 'google', uid: 'g-1', fbUid: 'g-1', accountId: 'google:g-1', name: 'A', providerName: 'A' });
+  fresh.A.load();
+  assert.equal((await fresh.A.sync({ noLink: true })).result, 'pending');
 });

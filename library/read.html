@@ -8,13 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Caveat:wght@500;600&display=swap">
-  <link rel="stylesheet" href="reader.css?v=11">
+  <link rel="stylesheet" href="reader.css?v=12">
   <!-- Читалка библиотеки: ?book=<id> — книга из каталога, ?own — свой текст по словарю сайта -->
   <script src="catalog.js"></script>
   <script>if (location.protocol === "file:") document.write('<script src="local/catalog.js" onerror="void 0"><\/script>');   // личная полка — только с диска</script>
-  <script src="reader.js?v=11" defer></script>
-  <script src="owntext.js?v=11" defer></script>
-  <script src="library.js?v=11" defer></script>
+  <!-- вошли в игре — свои тексты и карточки слов идут и в аккаунт (library/sync.js) -->
+  <script src="../platform/account-config.js?v=12" defer></script>
+  <script src="../platform/account.js?v=12" defer></script>
+  <script src="sync.js?v=12" defer></script>
+  <script src="reader.js?v=12" defer></script>
+  <script src="owntext.js?v=12" defer></script>
+  <script src="library.js?v=12" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -53,7 +57,7 @@
     <p class="own__lead">Вставьте любой греческий текст или откройте файл .txt. Каждое слово ищется в словаре сайта —
       он собран из всех книг библиотеки: форма слова, лемма и грамматика, значения и <b>обороты</b>
       (<span lang="el">ρίχνω μια ματιά</span> — «взглянуть»). Перевода предложений здесь нет.
-      Текст сохранится в «Моих текстах» — только в этом браузере, никуда не отправляется.</p>
+      Текст сохранится в «Моих текстах» — в этом браузере, а если вы вошли в игре, то и в аккаунте. До 100 000 знаков.</p>
     <input type="text" class="own__name" id="own-name" maxlength="120" placeholder="Название (если пусто — первая строка текста)">
     <textarea class="own__text" id="own-text" lang="el" spellcheck="false" placeholder="Επικολλήστε εδώ ένα ελληνικό κείμενο…"></textarea>
     <div class="own__actions">
