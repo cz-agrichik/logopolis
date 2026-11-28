@@ -289,7 +289,7 @@ test('железный век: «Виноградарство» — сыр в а
   assert.equal(G.goat.kind, 'maenad');
 });
 
-test('железный век: гавань продаёт амфоры за серебро сверх обычной работы — только то, что сверх половины склада', () => {
+test('железный век: гавань продаёт амфоры за серебро сверх обычной работы — только то, что сверх запаса (по умолчанию половина склада)', () => {
   const C = fresh(), G = ironAge(C), s = G.state;
   s.techs.push('phoenicians', 'viticulture');
   const coast = G.map.find(t => t.coast && t.t === 'plain' && !G.buildingAt(t.x, t.y));
@@ -314,6 +314,22 @@ test('железный век: гавань продаёт амфоры за с�
   assert.ok(lowCu.silver > 0 && lowCu.amphora < 0, 'амфоры продаются и без меди');
   s.res.copper = Math.floor(cap * 0.5) + 50;
   assert.ok(G.production(fx, 100, 1, true).rates.copper < 0 && !port.rest, 'сверх половины — снова вывозит медь');
+
+  // запас задаёт игрок: по умолчанию 50 %, у меди и амфор — свой
+  assert.equal(G.keepPct('copper'), 50); assert.equal(G.keepPct('amphora'), 50);
+  s.res.copper = Math.floor(cap * 0.4); s.res.amphora = Math.floor(cap * 0.4);
+  let r = G.production(fx, 100, 1, true).rates;
+  assert.ok(r.copper === 0 && !(r.amphora < 0), 'при 50 % — 40 % ни меди, ни амфор не трогает');
+  assert.ok(G.setKeep('copper', 30) && G.setKeep('amphora', 30));
+  r = G.production(fx, 100, 1, true).rates;
+  assert.ok(r.copper < 0 && r.amphora < 0 && !port.rest, 'запас 30 % — 40 % уже излишек: и медь вывозит, и амфоры продаёт');
+  G.setKeep('amphora', 90);
+  r = G.production(fx, 100, 1, true).rates;
+  assert.ok(r.copper < 0 && r.amphora === 0, 'амфоры — свой запас: 90 %');
+  assert.equal(G.setKeep('wood', 10), false, 'запас — только у меди и амфор');
+  G.setKeep('copper', 150); assert.equal(G.keepPct('copper'), 100);
+  G.setKeep('copper', -5); assert.equal(G.keepPct('copper'), 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(s.keep)), { copper: 0, amphora: 90 }, 'хранится в городе (сохранение)');
 });
 
 test('железный век: святилища улучшаются на своём месте, «золотые часы» сменяются', () => {

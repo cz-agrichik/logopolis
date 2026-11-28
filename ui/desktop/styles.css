@@ -825,6 +825,11 @@ ul.income-notes { font-size: 12.5px; color: var(--ink-2); margin: 2px 0 10px; }
 .em-vignette svg { width: 54px; height: 54px; }
 .plan-modal > p.plan-help { font-size: 13px; color: var(--ink-2); margin: -4px 0 6px; }
 /* вход (ui/desktop/account.js): кнопка 👤 в шапке, окно «Вход и прогресс», шаг на старте, блок в финале обучения */
+/* запас на складе (окно гавани) */
+.keep-row { display: grid; grid-template-columns: 22px 5.2em 1fr 44px; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+.keep-row i { font-style: normal; font-size: 18px; line-height: 1; }
+.keep-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.keep-row output { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 .acc-btn { position: relative; }
 .acc-btn.on::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 9px; height: 9px; border-radius: 50%; background: #6fd36f; box-shadow: 0 0 0 2px #6e2d14; }
 .acc-btn.on.pending::after { background: #f0b429; }   /* есть изменения, ещё не записанные в аккаунт */

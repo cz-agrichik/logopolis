@@ -4,6 +4,15 @@
 // ============================================================
 
 Object.assign(Game, {
+  /** Запас на складе, который гавань не трогает (KEEP_RES: медь — основная работа, амфоры — продажа), % вместимости.
+   *  Задаёт игрок (окно гавани); не задал — BALANCE.keepPct. */
+  keepPct(k) { const v = this.state.keep && this.state.keep[k]; return typeof v === 'number' ? v : BALANCE.keepPct; },
+  /** Задать запас: 0–100 %. false — такого запаса нет. */
+  setKeep(k, pct) {
+    if (!KEEP_RES.includes(k)) return false;
+    this.state.keep = Object.assign({}, this.state.keep, { [k]: Math.max(0, Math.min(100, Math.round(Number(pct) || 0))) });
+    return true;
+  },
   /** Чего не хватает для цены: { items: [[ресурс, сколько]], logos } или null. */
   missing(cost, logos = 0) {
     const items = [];
@@ -232,8 +241,8 @@ Object.assign(Game, {
       const e = this.foodFirst(b) ? effFood : effOther;
       if (share === 0) { if (mark) b.idle = false; if (log) log.push({ b, skip: 'full' }); }
       else {
-        // inKeep (гавань): сырьё — только излишек сверх этой доли склада; меньше — здание ждёт, а не «простаивает без сырья»
-        const keepIn = (BUILDINGS[b.type].inKeep || 0) * storage, wait = keepIn > 0 && ins.some(k => s.res[k] <= keepIn);
+        // inKeep (гавань): сырьё — только излишек сверх запаса на складе (keepPct); меньше — здание ждёт, а не «простаивает без сырья»
+        const wait = !!BUILDINGS[b.type].inKeep && ins.some(k => s.res[k] <= this.keepPct(k) / 100 * storage);
         let ok = !wait;
         for (const k of ins) if (s.res[k] < -p[k] * share * e * dt) ok = false;
         if (mark) { b.idle = !ok && !wait; if (wait) b.rest = 'wait'; }
@@ -248,8 +257,8 @@ Object.assign(Game, {
       const t = this.tradeOf(b, fx);
       if (t) {
         const tin = Object.keys(t).filter(k => t[k] < 0), tout = Object.keys(t).filter(k => t[k] > 0);
-        const keep = (BUILDINGS[b.type].trade.keep || 0) * storage;   // гавань продаёт только то, что сверх половины склада
-        const room = tout.some(k => s.res[k] < storage - 0.01), enough = tin.every(k => s.res[k] >= -t[k] * e * dt && s.res[k] > keep);
+        const keep = k => BUILDINGS[b.type].trade.keep ? this.keepPct(k) / 100 * storage : 0;   // гавань продаёт только то, что сверх запаса
+        const room = tout.some(k => s.res[k] < storage - 0.01), enough = tin.every(k => s.res[k] >= -t[k] * e * dt && s.res[k] > keep(k));
         if (room && enough) for (const [k, v] of Object.entries(t)) {
           rates[k] += v * e;
           if (log) log.push({ b, k, v: v * e, e, share: 1, trade: true });

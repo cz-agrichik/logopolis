@@ -5,6 +5,9 @@
 //  Всё, что касается баланса, — здесь и в BALANCE.
 // ============================================================
 
+/** Ресурсы, запас которых на складе гавань не трогает (медь — её основная работа, амфоры — продажа); доля — Game.keepPct. */
+const KEEP_RES = ['copper', 'amphora'];
+
 const BALANCE = {
   baseStorage: 300,        // вместимость склада без построек
   foodPerPop: 0.05,        // зерна в секунду на жителя
@@ -34,6 +37,7 @@ const BALANCE = {
   coinTech: 'coinage',
   // склады с 10-го уровня растут резче обычного: за ресурсный уровень ×1.2 (а не 1.15), за уровень мудрости ×1.5 (а не 1.4) — под цены переходов
   storeGrowth: { from: 10, res: 1.2, wisdom: 1.5 },
+  keepPct: 50,              // запас на складе, который гавань не трогает (KEEP_RES), % вместимости — по умолчанию; игрок задаёт сам (Game.setKeep)
   offlineMaxHours: 8,
   offlineFullSec: 300,      // первые 5 минут отсутствия — полная скорость, дальше — половина
   maxBuffMinutes: 30, maxBuffs: 5,
@@ -165,7 +169,7 @@ const BUILDINGS = {
   field: { terrain: ['plain'], epoch: 0, cost: { wood: 25 }, workers: 2, prod: { food: 0.5 }, lp: 10, forms: [{}, {}, {}, {}] },
   goatpen: { terrain: ['hill', 'forest'], epoch: 0, cost: { wood: 25, food: 15 }, workers: 1, prod: { food: 0.2, cheese: 0.05 }, prodTech: { cheese: 'cheesemaking' }, lp: 10, forms: [{}, {}] },
   // trade — линия «Железных топоров и кирок»: пока есть железо, +30% выпуска; орудия тупятся — железо понемногу уходит.
-  // keep (у гавани) — сырьё уходит в торговлю только сверх этой доли склада: амфоры сначала копятся до половины, потом продаются
+  // keep (у гавани) — сырьё уходит в торговлю только сверх запаса на складе (Game.keepPct: по умолчанию половина, задаёт игрок)
   lumber: { terrain: ['forest'], epoch: 0, cost: { food: 25 }, workers: 2, prod: { wood: 0.35 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { wood: 0.105 } }, lp: 10, forms: [{}, {}, {}, {}] },
   quarry: { terrain: ['hill'], epoch: 0, cost: { wood: 30 }, workers: 2, prod: { stone: 0.25 }, trade: { tech: 'irontools', in: { iron: 0.005 }, out: { stone: 0.075 } }, lp: 10, forms: [{}, {}, {}, {}] },
   workshop: { terrain: ['plain'], epoch: 0, tech: 'carving', cost: { wood: 60, stone: 40 }, workers: 2, prod: { goods: 0.1 }, lp: 12, forms: [{}, {}, {}, {}] },
@@ -176,9 +180,9 @@ const BUILDINGS = {
   //   sell — это продажа излишков, а не заработок: цена твёрдая — 0.35 серебра за амфору (≈ труд амфоры: по курсам балансера
   //   0.28 со склонами Троодоса, 0.42 без них), бонусы гавани и «Обряд торговли» растят объём (и амфоры, и серебро), а не цену.
   //   Поэтому вывоз можно держать широким: 0.2 амфоры/с на 1-м уровне × бонусы — гавани продают всё, что сверх полсклада.
-  // inKeep — основная работа тоже вывоз излишка: медь гавань берёт, только пока её запас больше половины склада
+  // inKeep — основная работа тоже вывоз излишка: медь гавань берёт, только пока её на складе больше запаса (Game.keepPct)
   //   (и, как у всех переработчиков, только если купленному — товарам/серебру и зерну — есть место). Иначе гавань ждёт.
-  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, inKeep: 0.5, trade: { tech: 'viticulture', in: { amphora: 0.2 }, out: { silver: 0.07 }, keep: 0.5, sell: true }, lp: 12, forms: [null, {}, {}, {}] },
+  port: { terrain: ['plain'], coast: true, epoch: 1, tech: 'seafaring', cost: { wood: 150, stone: 90 }, workers: 3, prod: { copper: -0.096, goods: 0.1, food: 0.525 }, inKeep: true, trade: { tech: 'viticulture', in: { amphora: 0.2 }, out: { silver: 0.07 }, keep: true, sell: true }, lp: 12, forms: [null, {}, {}, {}] },
   foundry: { terrain: ['plain'], epoch: 1, tech: 'bronze', cost: { stone: 100, copper: 40 }, workers: 3, prod: { copper: -0.2, bronze: 0.06 }, lp: 12, forms: [null, {}] },
   vineyard: { terrain: ['hill'], epoch: 2, tech: 'viticulture', cost: { wood: 120, stone: 80 }, workers: 1, prod: { food: 0.05, amphora: 0.06 }, lp: 10, forms: [null, null, {}, {}] },
   olivegrove: { terrain: ['forest'], epoch: 2, tech: 'viticulture', cost: { wood: 80, stone: 100 }, workers: 1, prod: { food: 0.12, amphora: 0.04 }, lp: 10, forms: [null, null, {}, {}] },

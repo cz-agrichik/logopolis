@@ -40,6 +40,13 @@ const UI = {
       const d = e.target.closest && e.target.closest('details[data-fold]');
       if (d) { this.folds[d.dataset.fold] = d.open; this.lastPanel = null; }
     }, true);
+    // запас на складе (окно гавани): ползунок — сразу в игру
+    $('#modal').addEventListener('input', e => {
+      const r = e.target.closest('[data-keep]');
+      if (!r || !Game.setKeep(r.dataset.keep, +r.value)) return;
+      const out = r.parentNode.querySelector('output');
+      if (out) out.textContent = Game.keepPct(r.dataset.keep) + '%';
+    });
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal') return this.modalSticky ? null : this.closeModal();
       const a = e.target.closest('[data-action], [data-pedia]');
@@ -705,8 +712,9 @@ const UI = {
       if (b.idle) h += `<p class="warn">Простаивает: не хватает сырья.</p>`;
       if (b.rest === 'full') h += `<p class="rest">Отдыхает: всё, что здание даёт, уже не помещается в склады — сырьё не тратится.</p>`;
       if (b.rest === 'part') h += `<p class="rest">Часть того, что здание даёт, уже не помещается в склады — сырья уходит меньше.</p>`;
-      if (b.rest === 'wait') { const B = BUILDINGS[b.type], ins = Object.keys(Game.baseProd(b.type)).filter(k => Game.baseProd(b.type)[k] < 0);
-        h += `<p class="rest">Ждёт излишка: ${esc(ins.map(k => Cat.res[k].name.toLowerCase()).join(', '))} берёт, только пока на складе больше ${Math.round(B.inKeep * 100)}% вместимости.</p>`; }
+      if (b.rest === 'wait') { const ins = Object.keys(Game.baseProd(b.type)).filter(k => Game.baseProd(b.type)[k] < 0);
+        h += `<p class="rest">Ждёт излишка: ${esc(ins.map(k => `${Cat.res[k].name.toLowerCase()} берёт, только пока на складе больше ${Game.keepPct(k)}% вместимости`).join('; '))}.</p>`; }
+      h += this.keepHtml(b);
       h += '</div><div class="mb-col">';
       const up = rb ? null : Game.upgradeInfo(b);
       if (up) {
@@ -729,6 +737,18 @@ const UI = {
     this.showModal(h);
   },
 
+  /** «Запас на складе» в окне гавани: сколько меди и амфор (KEEP_RES) гавань не трогает — по ползунку на ресурс, который она сейчас берёт. */
+  keepHtml(b) {
+    const B = BUILDINGS[b.type], p = Game.baseProd(b.type), ks = [];
+    if (B.inKeep) for (const k of Object.keys(p)) if (p[k] < 0 && KEEP_RES.includes(k)) ks.push(k);
+    if (B.trade && B.trade.keep && Game.state.techs.includes(B.trade.tech)) for (const k of Object.keys(B.trade.in)) if (KEEP_RES.includes(k) && !ks.includes(k)) ks.push(k);
+    if (!ks.length) return '';
+    const what = { copper: 'медь вывозит', amphora: 'амфоры продаёт' };
+    return `<div class="sect">Запас на складе</div>
+      <p class="small dim">Этот запас гавань не трогает: ${ks.map(k => what[k]).join(', а ')}, только когда на складе больше. По умолчанию — ${BALANCE.keepPct}% вместимости.</p>
+      ${ks.map(k => `<label class="keep-row"><i>${Art.res(k)}</i><span>${esc(Cat.res[k].name)}</span>
+        <input type="range" min="0" max="100" step="5" value="${Game.keepPct(k)}" data-keep="${k}" aria-label="Запас: ${esc(Cat.res[k].name)}"><output>${Game.keepPct(k)}%</output></label>`).join('')}`;
+  },
   /** Игру в этом браузере перезаписала другая вкладка: здесь всё остановлено, осталась одна кнопка — загрузить свежую. */
   showTakenOver() {
     this.lockWith(`<div class="epoch-modal"><h2>🗂️ Игра открыта в другой вкладке</h2>
